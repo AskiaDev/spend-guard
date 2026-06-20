@@ -1,0 +1,192 @@
+export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+
+export interface Database {
+  public: {
+    Tables: {
+      profiles: {
+        Row: {
+          id: string;
+          user_id: string;
+          currency: string;
+          monthly_income: number;
+          current_savings: number;
+          emergency_fund_target: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          currency?: string;
+          monthly_income: number;
+          current_savings: number;
+          emergency_fund_target: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
+        Relationships: [];
+      };
+      expenses: {
+        Row: {
+          id: string;
+          user_id: string;
+          label: string;
+          amount: number;
+          due_day: number;
+          is_recurring: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          label: string;
+          amount: number;
+          due_day: number;
+          is_recurring?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["expenses"]["Insert"]>;
+        Relationships: [];
+      };
+      debts: {
+        Row: {
+          id: string;
+          user_id: string;
+          label: string;
+          outstanding_balance: number;
+          minimum_payment: number;
+          due_day: number;
+          interest_rate: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          label: string;
+          outstanding_balance: number;
+          minimum_payment: number;
+          due_day: number;
+          interest_rate?: number | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["debts"]["Insert"]>;
+        Relationships: [];
+      };
+      goals: {
+        Row: {
+          id: string;
+          user_id: string;
+          label: string;
+          target_amount: number;
+          saved_amount: number;
+          monthly_contribution: number;
+          target_date: string | null;
+          priority: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          label: string;
+          target_amount: number;
+          saved_amount: number;
+          monthly_contribution: number;
+          target_date?: string | null;
+          priority?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["goals"]["Insert"]>;
+        Relationships: [];
+      };
+      purchase_checks: {
+        Row: {
+          id: string;
+          user_id: string;
+          item_name: string;
+          amount: number;
+          urgency: string;
+          payment_method: string;
+          installment_months: number | null;
+          monthly_payment: number | null;
+          decision: string;
+          safe_to_spend: number;
+          monthly_free_cash_flow: number;
+          advisor_text: string;
+          reasons: Json;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          item_name: string;
+          amount: number;
+          urgency: string;
+          payment_method: string;
+          installment_months?: number | null;
+          monthly_payment?: number | null;
+          decision: string;
+          safe_to_spend: number;
+          monthly_free_cash_flow: number;
+          advisor_text: string;
+          reasons: Json;
+        };
+        Update: Partial<Database["public"]["Tables"]["purchase_checks"]["Insert"]>;
+        Relationships: [];
+      };
+      cooldown_items: {
+        Row: {
+          id: string;
+          user_id: string;
+          item_name: string;
+          amount: number;
+          urgency: string;
+          payment_method: string;
+          source_check_id: string | null;
+          added_at: string;
+          recheck_at: string;
+        };
+        Insert: {
+          user_id: string;
+          item_name: string;
+          amount: number;
+          urgency: string;
+          payment_method: string;
+          source_check_id?: string | null;
+          recheck_at: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["cooldown_items"]["Insert"]>;
+        Relationships: [];
+      };
+      weekly_reports: {
+        Row: {
+          id: string;
+          user_id: string;
+          week_start: string;
+          summary: string;
+          health_score: number;
+          safe_to_spend: number;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          week_start: string;
+          summary: string;
+          health_score: number;
+          safe_to_spend: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["weekly_reports"]["Insert"]>;
+        Relationships: [];
+      };
+      transactions: {
+        Row: { id: string; user_id: string; amount: number; label: string; created_at: string };
+        Insert: { user_id: string; amount: number; label: string };
+        Update: Partial<Database["public"]["Tables"]["transactions"]["Insert"]>;
+        Relationships: [];
+      };
+      voice_sessions: {
+        Row: { id: string; user_id: string; transcript: string; extracted_fields: Json; created_at: string };
+        Insert: { user_id: string; transcript: string; extracted_fields: Json };
+        Update: Partial<Database["public"]["Tables"]["voice_sessions"]["Insert"]>;
+        Relationships: [];
+      };
+    };
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
+  };
+}
