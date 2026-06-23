@@ -68,6 +68,7 @@ export function PurchaseResultPageContent() {
       currency={state.snapshot.profile.currency}
       onAddGoal={state.addGoalFromCheck}
       onAddCooldown={state.addCooldownFromCheck}
+      onMarkStatus={state.markPurchaseCheckStatus}
     />
   );
 }

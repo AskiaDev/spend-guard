@@ -10,6 +10,28 @@ const optionalInstallmentMonths = z.preprocess(
   z.coerce.number().int().min(1).max(60).optional()
 );
 const optionalMoney = z.preprocess(emptyToUndefined, money.optional());
+const optionalTrimmedText = (maxLength: number, message: string) =>
+  z.preprocess(
+    (value) => {
+      if (value === null || value === undefined || value === "") {
+        return undefined;
+      }
+
+      return typeof value === "string" ? value.trim() : value;
+    },
+    z.string().min(1, message).max(maxLength).optional()
+  );
+const optionalRequiredWhenPresentText = (maxLength: number, message: string) =>
+  z.preprocess(
+    (value) => {
+      if (value === null || value === undefined) {
+        return undefined;
+      }
+
+      return typeof value === "string" ? value.trim() : value;
+    },
+    z.string().min(1, message).max(maxLength).optional()
+  );
 const optionalBoolean = z.preprocess((value) => {
   if (value === "" || value === null || value === undefined) {
     return undefined;
@@ -25,6 +47,21 @@ const optionalBoolean = z.preprocess((value) => {
 
   return value;
 }, z.boolean().optional());
+
+function isIsoDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
 
 export const payFrequencySchema = z
   .enum(PAY_FREQUENCIES)
@@ -74,6 +111,13 @@ export const purchaseInputSchema = z
   .object({
     itemName: z.string().min(1, "Name the purchase."),
     amount: money.refine((value) => value > 0, "Enter a purchase amount."),
+    category: optionalRequiredWhenPresentText(60, "Choose a category."),
+    saleDeadline: z.preprocess(
+      emptyToUndefined,
+      z.string().refine(isIsoDate, "Enter a valid sale deadline.").optional()
+    ),
+    location: optionalTrimmedText(120, "Enter a valid location."),
+    notes: optionalTrimmedText(1000, "Keep notes under 1000 characters."),
     urgency: z.enum(["need_now", "need_this_month", "can_wait", "want"]),
     paymentMethod: z.enum(["cash", "installment", "credit_card", "loan", "bnpl"]),
     downPayment: optionalMoney,

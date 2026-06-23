@@ -1,6 +1,13 @@
 "use client";
 
-import { ArrowLeft, LayoutDashboard, PauseCircle, Target } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  LayoutDashboard,
+  PauseCircle,
+  Target,
+  XCircle,
+} from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { ScoreGauge } from "@/components/finance/score-gauge";
@@ -8,22 +15,39 @@ import { StatusBadge } from "@/components/finance/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn, formatCurrency } from "@/lib/utils";
-import type { CurrencyCode, PurchaseCheck, PurchaseDecision } from "@/types/finance";
+import type {
+  CurrencyCode,
+  PurchaseCheck,
+  PurchaseCheckStatus,
+  PurchaseDecision,
+} from "@/types/finance";
 
 interface PurchaseResultProps {
   check?: PurchaseCheck;
   currency: CurrencyCode;
   onAddGoal: (check: PurchaseCheck) => Promise<unknown> | unknown;
   onAddCooldown: (check: PurchaseCheck) => Promise<unknown> | unknown;
+  onMarkStatus?: (
+    check: PurchaseCheck,
+    status: Exclude<PurchaseCheckStatus, "checked">
+  ) => Promise<unknown> | unknown;
 }
 
 const decisionConfidence = 92;
 
-type MutationAction = "goal" | "cooldown";
+type MutationAction = "goal" | "cooldown" | "bought" | "skipped";
 
 const mutationErrorMessages: Record<MutationAction, string> = {
   goal: "We couldn’t add this purchase to a goal. Please try again.",
   cooldown: "We couldn’t add this purchase to cooldown. Please try again.",
+  bought: "We couldn’t update this purchase status. Please try again.",
+  skipped: "We couldn’t update this purchase status. Please try again.",
+};
+
+const statusLabels: Record<PurchaseCheckStatus, string> = {
+  checked: "Checked",
+  bought: "Bought",
+  skipped: "Skipped",
 };
 
 const examplePurchaseCheck: PurchaseCheck = {
@@ -40,7 +64,12 @@ const examplePurchaseCheck: PurchaseCheck = {
   safeToSpend: 20000,
   monthlyFreeCashFlow: 10000,
   savingsAfterPurchase: 120000,
+  emergencyProgress: 0.5,
+  debtPressure: 0.18,
+  goalDelayMonths: 3,
+  healthScore: 74,
   cooldownDays: 30,
+  status: "checked",
   advisorText:
     "Waiting protects your emergency savings and keeps your monthly plan flexible.",
   reasons: [
@@ -78,19 +107,54 @@ export function PurchaseResult({
   currency,
   onAddGoal,
   onAddCooldown,
+  onMarkStatus,
 }: PurchaseResultProps) {
   const activeCheck = check ?? examplePurchaseCheck;
   const isExample = check === undefined;
   const displayCurrency = isExample ? "PHP" : currency;
   const [pendingMutation, setPendingMutation] = useState<MutationAction | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [statusOverride, setStatusOverride] = useState<{
+    checkId: string;
+    status: PurchaseCheckStatus;
+  } | null>(null);
   const mutationInFlight = useRef(false);
   const displayedReasons = buildDisplayedReasons(activeCheck, displayCurrency);
+  const currentStatus =
+    statusOverride?.checkId === activeCheck.id
+      ? statusOverride.status
+      : activeCheck.status ?? "checked";
+
   const impactItems = [
     {
       label: "Purchase price",
       value: formatCurrency(activeCheck.amount, displayCurrency),
       detail: "Total amount included in this decision.",
+    },
+    {
+      label: "Risk score",
+      value: `${activeCheck.riskScore} / 100`,
+      detail: "Higher scores mean more pressure on the current plan.",
+    },
+    {
+      label: "Savings after purchase",
+      value: formatCurrency(activeCheck.savingsAfterPurchase, displayCurrency),
+      detail: "Projected savings left after the payment made today.",
+    },
+    {
+      label: "Emergency fund impact",
+      value: `${Math.round((activeCheck.emergencyProgress ?? 0) * 100)}% funded`,
+      detail: "Emergency-buffer progress recorded when this check ran.",
+    },
+    {
+      label: "Debt conflict",
+      value: `${Math.round((activeCheck.debtPressure ?? 0) * 100)}% debt pressure`,
+      detail: "Minimum debt payments compared with monthly income.",
+    },
+    {
+      label: "Goal delay",
+      value: formatMonths(activeCheck.goalDelayMonths ?? 0),
+      detail: "Estimated delay to current goals from buying now.",
     },
     {
       label: "Safe to spend",
@@ -103,12 +167,13 @@ export function PurchaseResult({
       detail: "Cash flow remaining after monthly commitments.",
     },
     {
-      label: "Suggested cooldown",
+      label: "Cooldown recommendation",
       value: `${activeCheck.cooldownDays} ${activeCheck.cooldownDays === 1 ? "day" : "days"}`,
       detail: "Time to pause before checking this purchase again.",
     },
   ];
   const mutationActionsDisabled = isExample || pendingMutation !== null;
+  const statusActionsDisabled = mutationActionsDisabled || !onMarkStatus;
 
   async function runMutation(
     mutation: MutationAction,
@@ -126,6 +191,26 @@ export function PurchaseResult({
       await callback(activeCheck);
     } catch {
       setMutationError(mutationErrorMessages[mutation]);
+    } finally {
+      mutationInFlight.current = false;
+      setPendingMutation(null);
+    }
+  }
+
+  async function runStatusMutation(status: Exclude<PurchaseCheckStatus, "checked">) {
+    if (isExample || !onMarkStatus || mutationInFlight.current) {
+      return;
+    }
+
+    mutationInFlight.current = true;
+    setPendingMutation(status);
+    setMutationError(null);
+
+    try {
+      await onMarkStatus(activeCheck, status);
+      setStatusOverride({ checkId: activeCheck.id, status });
+    } catch {
+      setMutationError(mutationErrorMessages[status]);
     } finally {
       mutationInFlight.current = false;
       setPendingMutation(null);
@@ -161,11 +246,26 @@ export function PurchaseResult({
               <SummaryRow label="Payment method">
                 {formatPaymentMethod(activeCheck)}
               </SummaryRow>
+              {activeCheck.category ? (
+                <SummaryRow label="Category">{formatLabel(activeCheck.category)}</SummaryRow>
+              ) : null}
               <SummaryRow label="Urgency">{formatLabel(activeCheck.urgency)}</SummaryRow>
+              <SummaryRow label="Status">{statusLabels[currentStatus]}</SummaryRow>
+              {activeCheck.location ? (
+                <SummaryRow label="Location">{activeCheck.location}</SummaryRow>
+              ) : null}
+              {activeCheck.saleDeadline ? (
+                <SummaryRow label="Sale deadline">
+                  {formatDateLabel(activeCheck.saleDeadline)}
+                </SummaryRow>
+              ) : null}
               {activeCheck.monthlyPayment ? (
                 <SummaryRow label="Monthly payment">
                   {formatCurrency(activeCheck.monthlyPayment, displayCurrency)}
                 </SummaryRow>
+              ) : null}
+              {activeCheck.notes ? (
+                <SummaryRow label="Notes">{activeCheck.notes}</SummaryRow>
               ) : null}
             </dl>
 
@@ -262,7 +362,7 @@ export function PurchaseResult({
             {mutationError}
           </p>
         ) : null}
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
           <Button
             type="button"
             variant="secondary"
@@ -284,6 +384,28 @@ export function PurchaseResult({
           >
             <PauseCircle className="size-4" aria-hidden="true" />
             Add to Cooldown
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={statusActionsDisabled || currentStatus === "bought"}
+            isLoading={pendingMutation === "bought"}
+            loadingText="Marking bought..."
+            onClick={() => void runStatusMutation("bought")}
+          >
+            <CheckCircle2 className="size-4" aria-hidden="true" />
+            Mark as bought
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={statusActionsDisabled || currentStatus === "skipped"}
+            isLoading={pendingMutation === "skipped"}
+            loadingText="Marking skipped..."
+            onClick={() => void runStatusMutation("skipped")}
+          >
+            <XCircle className="size-4" aria-hidden="true" />
+            Mark as skipped
           </Button>
           <Link href="/checker" className={navigationActionClass}>
             <ArrowLeft className="size-4" aria-hidden="true" />
@@ -316,6 +438,22 @@ function formatPaymentMethod(check: PurchaseCheck) {
   }
 
   return `${paymentMethod} · ${check.installmentMonths} months`;
+}
+
+function formatMonths(months: number) {
+  return `${months} ${months === 1 ? "month" : "months"}`;
+}
+
+function formatDateLabel(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
 }
 
 function formatLabel(value: string) {

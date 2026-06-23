@@ -249,6 +249,7 @@ describe("PurchaseCheckerWizard", () => {
     expect(onRunCheck).toHaveBeenCalledWith({
       itemName: "iPhone Pro Max 1TB",
       amount: 170000,
+      category: "phone",
       urgency: "can_wait",
       paymentMethod: "loan",
       monthlyPayment: 4500,
@@ -279,6 +280,7 @@ describe("PurchaseCheckerWizard", () => {
     expect(onRunCheck).toHaveBeenCalledWith({
       itemName: "iPhone Pro Max 1TB",
       amount: 170000,
+      category: "phone",
       urgency: "can_wait",
       paymentMethod: "cash",
       currentAlternativeStillWorks: true,
@@ -307,6 +309,7 @@ describe("PurchaseCheckerWizard", () => {
     expect(onRunCheck).toHaveBeenCalledWith({
       itemName: "iPhone Pro Max 1TB",
       amount: 170000,
+      category: "phone",
       urgency: "can_wait",
       paymentMethod: "installment",
       downPayment: 26000,
@@ -320,6 +323,45 @@ describe("PurchaseCheckerWizard", () => {
     resolveAnalysis({});
 
     await waitFor(() => expect(pushSpy).toHaveBeenCalledWith("/checker/result"));
+  });
+
+  it("submits manual-check metadata fields with the analyzed purchase", async () => {
+    const user = userEvent.setup();
+    const onRunCheck = vi.fn().mockResolvedValue({});
+
+    render(<PurchaseCheckerWizard onRunCheck={onRunCheck} />);
+
+    await user.type(screen.getByLabelText(/product name/i), "Standing desk");
+    await user.type(screen.getByLabelText(/price/i), "18000");
+    await user.selectOptions(screen.getByLabelText(/category/i), "home");
+    await user.type(screen.getByLabelText(/sale deadline/i), "2026-07-15");
+    await user.type(screen.getByLabelText(/location/i), "Makati showroom");
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    await user.type(screen.getByLabelText(/reason for purchase/i), "reduce back pain at work");
+    await user.selectOptions(screen.getByLabelText(/urgency/i), "need_this_month");
+    await user.type(screen.getByLabelText(/best alternative/i), "use existing table");
+    await user.type(screen.getByLabelText(/notes/i), "Ask if the store includes delivery.");
+    await user.click(screen.getByRole("radio", { name: /no, it does not work/i }));
+    await user.click(screen.getByRole("radio", { name: /yes, this can generate income/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    await user.click(screen.getByRole("button", { name: /analyze purchase/i }));
+
+    await waitFor(() => expect(onRunCheck).toHaveBeenCalledTimes(1));
+    expect(onRunCheck).toHaveBeenCalledWith({
+      itemName: "Standing desk",
+      amount: 18000,
+      category: "home",
+      saleDeadline: "2026-07-15",
+      location: "Makati showroom",
+      notes: "Ask if the store includes delivery.",
+      urgency: "need_this_month",
+      paymentMethod: "cash",
+      currentAlternativeStillWorks: false,
+      isIncomeGenerating: true,
+    });
+    expect(pushSpy).toHaveBeenCalledWith("/checker/result");
   });
 
   it("shows a non-blaming error and keeps values when analysis is rejected", async () => {

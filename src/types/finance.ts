@@ -12,6 +12,10 @@ export type PurchaseUrgency = "need_now" | "need_this_month" | "can_wait" | "wan
 
 export type GoalPriority = "high" | "medium" | "low";
 
+export const PURCHASE_CHECK_STATUSES = ["checked", "bought", "skipped"] as const;
+
+export type PurchaseCheckStatus = (typeof PURCHASE_CHECK_STATUSES)[number];
+
 export const PAY_FREQUENCIES = ["monthly", "semi_monthly", "biweekly", "weekly"] as const;
 
 export type PayFrequency = (typeof PAY_FREQUENCIES)[number];
@@ -63,6 +67,10 @@ export interface Goal {
 export interface PurchaseInput {
   itemName: string;
   amount: number;
+  category?: string;
+  saleDeadline?: string;
+  location?: string;
+  notes?: string;
   urgency: PurchaseUrgency;
   paymentMethod: PaymentMethod;
   downPayment?: number;
@@ -80,7 +88,12 @@ export interface PurchaseCheck extends PurchaseInput {
   safeToSpend: number;
   monthlyFreeCashFlow: number;
   savingsAfterPurchase: number;
+  emergencyProgress?: number;
+  debtPressure?: number;
+  goalDelayMonths?: number;
+  healthScore?: number;
   cooldownDays: number;
+  status?: PurchaseCheckStatus;
   advisorText: string;
   reasons: string[];
 }

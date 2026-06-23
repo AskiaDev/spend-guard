@@ -115,6 +115,7 @@ describe("page adapters", () => {
       runPurchaseCheck: vi.fn(),
       addGoalFromCheck: vi.fn(),
       addCooldownFromCheck: vi.fn(),
+      markPurchaseCheckStatus: vi.fn(),
       removeCooldownItem: vi.fn(),
       deleteGoal: vi.fn(),
       generateWeeklyReport: vi.fn(),
@@ -187,6 +188,7 @@ describe("page adapters", () => {
     expect(initialProps.currency).toBe(initialState.snapshot.profile.currency);
     expect(initialProps.onAddGoal).toBe(initialState.addGoalFromCheck);
     expect(initialProps.onAddCooldown).toBe(initialState.addCooldownFromCheck);
+    expect(initialProps.onMarkStatus).toBe(initialState.markPurchaseCheckStatus);
 
     const latestCheck = financialState.checks[0];
     const updatedState = {
@@ -204,6 +206,7 @@ describe("page adapters", () => {
     expect(updatedProps.currency).toBe(updatedState.snapshot.profile.currency);
     expect(updatedProps.onAddGoal).toBe(updatedState.addGoalFromCheck);
     expect(updatedProps.onAddCooldown).toBe(updatedState.addCooldownFromCheck);
+    expect(updatedProps.onMarkStatus).toBe(updatedState.markPurchaseCheckStatus);
   });
 
   it("passes goals state and callback identities", () => {

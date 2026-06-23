@@ -7,6 +7,7 @@ import type {
   GoalPriority,
   PayFrequency,
   PaymentMethod,
+  PurchaseCheckStatus,
   PurchaseDecision,
   PurchaseUrgency,
 } from "@/types/finance";
@@ -95,6 +96,10 @@ export function mapFinancialWorkspaceRows(rows: FinancialWorkspaceRows): Financi
         id: check.id,
         itemName: check.item_name,
         amount,
+        category: check.category ?? undefined,
+        saleDeadline: check.sale_deadline ?? undefined,
+        location: check.location ?? undefined,
+        notes: check.notes ?? undefined,
         urgency,
         paymentMethod: enumValue<PaymentMethod>(
           check.payment_method,
@@ -116,8 +121,17 @@ export function mapFinancialWorkspaceRows(rows: FinancialWorkspaceRows): Financi
         safeToSpend,
         monthlyFreeCashFlow: Number(check.monthly_free_cash_flow),
         savingsAfterPurchase: Number(check.savings_after_purchase),
+        emergencyProgress: Number(check.emergency_fund_progress ?? 0),
+        debtPressure: Number(check.debt_pressure ?? 0),
+        goalDelayMonths: check.goal_delay_months ?? 0,
+        healthScore: check.health_score ?? 0,
         cooldownDays:
           check.cooldown_days ?? calculateCooldownDays({ amount, safeToSpend, urgency }),
+        status: enumValue<PurchaseCheckStatus>(
+          check.status ?? "checked",
+          ["checked", "bought", "skipped"],
+          "checked"
+        ),
         advisorText: check.advisor_text,
         reasons: stringReasons(check.reasons),
       };

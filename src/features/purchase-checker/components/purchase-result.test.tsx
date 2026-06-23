@@ -9,6 +9,10 @@ const activeCheck: PurchaseCheck = {
   createdAt: "2026-06-21T00:00:00.000Z",
   itemName: "iPhone Pro Max 1TB",
   amount: 170000,
+  category: "phone",
+  saleDeadline: "2026-07-15",
+  location: "Makati showroom",
+  notes: "Ask if delivery is included.",
   urgency: "can_wait",
   paymentMethod: "installment",
   installmentMonths: 24,
@@ -18,7 +22,12 @@ const activeCheck: PurchaseCheck = {
   safeToSpend: 20000,
   monthlyFreeCashFlow: 10000,
   savingsAfterPurchase: 120000,
+  emergencyProgress: 0.5,
+  debtPressure: 0.18,
+  goalDelayMonths: 3,
+  healthScore: 74,
   cooldownDays: 30,
+  status: "checked",
   advisorText: "Waiting protects your emergency savings and keeps your monthly plan flexible.",
   reasons: [
     "The price is above your current safe-to-spend amount.",
@@ -34,6 +43,7 @@ describe("PurchaseResult", () => {
     const user = userEvent.setup();
     const onAddGoal = vi.fn().mockResolvedValue(undefined);
     const onAddCooldown = vi.fn().mockResolvedValue(undefined);
+    const onMarkStatus = vi.fn().mockResolvedValue(undefined);
 
     render(
       <PurchaseResult
@@ -41,6 +51,7 @@ describe("PurchaseResult", () => {
         currency="PHP"
         onAddGoal={onAddGoal}
         onAddCooldown={onAddCooldown}
+        onMarkStatus={onMarkStatus}
       />
     );
 
@@ -60,13 +71,26 @@ describe("PurchaseResult", () => {
     expect(within(summary).getByText("₱170,000")).toBeVisible();
     expect(within(summary).getByText(/installment/i)).toBeVisible();
     expect(within(summary).getByText(/24 months/i)).toBeVisible();
+    expect(within(summary).getByText("Phone")).toBeVisible();
+    expect(within(summary).getByText("Makati showroom")).toBeVisible();
+    expect(within(summary).getByText("Jul 15, 2026")).toBeVisible();
 
     const impact = screen.getByRole("region", { name: "Plan impact" });
-    expect(within(impact).getAllByRole("listitem")).toHaveLength(4);
+    expect(within(impact).getAllByRole("listitem")).toHaveLength(9);
     expect(within(impact).getByText("Purchase price")).toBeVisible();
+    expect(within(impact).getByText("Risk score")).toBeVisible();
+    expect(within(impact).getByText("95 / 100")).toBeVisible();
+    expect(within(impact).getByText("Savings after purchase")).toBeVisible();
+    expect(within(impact).getByText("₱120,000")).toBeVisible();
+    expect(within(impact).getByText("Emergency fund impact")).toBeVisible();
+    expect(within(impact).getByText("50% funded")).toBeVisible();
+    expect(within(impact).getByText("Debt conflict")).toBeVisible();
+    expect(within(impact).getByText("18% debt pressure")).toBeVisible();
+    expect(within(impact).getByText("Goal delay")).toBeVisible();
+    expect(within(impact).getByText("3 months")).toBeVisible();
     expect(within(impact).getByText("Safe to spend")).toBeVisible();
     expect(within(impact).getByText("Monthly free cash")).toBeVisible();
-    expect(within(impact).getByText("Suggested cooldown")).toBeVisible();
+    expect(within(impact).getByText("Cooldown recommendation")).toBeVisible();
     expect(within(impact).getByText("₱20,000")).toBeVisible();
     expect(within(impact).getByText("₱10,000")).toBeVisible();
     expect(within(impact).getByText("30 days")).toBeVisible();
@@ -86,9 +110,12 @@ describe("PurchaseResult", () => {
 
     await user.click(screen.getByRole("button", { name: "Add to Goal" }));
     await user.click(screen.getByRole("button", { name: "Add to Cooldown" }));
+    await user.click(screen.getByRole("button", { name: "Mark as bought" }));
 
     expect(onAddGoal).toHaveBeenCalledWith(activeCheck);
     expect(onAddCooldown).toHaveBeenCalledWith(activeCheck);
+    expect(onMarkStatus).toHaveBeenCalledWith(activeCheck, "bought");
+    expect(screen.getByText("Bought")).toBeVisible();
     expect(screen.getByRole("link", { name: "Check Another Purchase" })).toHaveAttribute(
       "href",
       "/checker"
@@ -166,6 +193,38 @@ describe("PurchaseResult", () => {
     expect(onAddGoal).toHaveBeenCalledTimes(2);
     expect(onAddGoal).toHaveBeenNthCalledWith(1, activeCheck);
     expect(onAddGoal).toHaveBeenNthCalledWith(2, activeCheck);
+  });
+
+  it("shows retryable feedback when marking a check status fails", async () => {
+    const user = userEvent.setup();
+    const onMarkStatus = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("status unavailable"))
+      .mockResolvedValueOnce(undefined);
+
+    render(
+      <PurchaseResult
+        check={activeCheck}
+        currency="PHP"
+        onAddGoal={vi.fn()}
+        onAddCooldown={vi.fn()}
+        onMarkStatus={onMarkStatus}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Mark as skipped" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "We couldn’t update this purchase status. Please try again."
+    );
+    expect(screen.getByText("Checked")).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Mark as skipped" }));
+
+    expect(onMarkStatus).toHaveBeenCalledTimes(2);
+    expect(onMarkStatus).toHaveBeenNthCalledWith(1, activeCheck, "skipped");
+    expect(onMarkStatus).toHaveBeenNthCalledWith(2, activeCheck, "skipped");
+    expect(screen.getByText("Skipped")).toBeVisible();
   });
 
   it("supplements a one-reason live check with five presentation explanations", () => {

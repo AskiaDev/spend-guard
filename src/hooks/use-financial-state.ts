@@ -9,7 +9,10 @@ import {
 import { loadFinancialWorkspaceAction } from "@/features/financial-profile/api/load-financial-workspace";
 import { saveFinancialProfileAction } from "@/features/financial-profile/api/save-financial-profile";
 import { createGoalAction, deleteGoalAction } from "@/features/goals/api/create-goal";
-import { savePurchaseCheckAction } from "@/features/purchase-checker/api/save-purchase-check";
+import {
+  markPurchaseCheckStatusAction,
+  savePurchaseCheckAction,
+} from "@/features/purchase-checker/api/save-purchase-check";
 import { saveVoiceSessionAction } from "@/features/purchase-checker/api/save-voice-session";
 import { createWeeklyReportAction } from "@/features/reports/api/create-weekly-report";
 import {
@@ -29,6 +32,7 @@ import type {
   FinancialSnapshot,
   Goal,
   PurchaseCheck,
+  PurchaseCheckStatus,
   PurchaseInput,
   VoicePurchaseDraft,
   WeeklyReport,
@@ -100,7 +104,12 @@ export function useFinancialState() {
         safeToSpend: result.safeToSpend,
         monthlyFreeCashFlow: result.monthlyFreeCashFlow,
         savingsAfterPurchase: result.savingsAfterPurchase,
+        emergencyProgress: result.emergencyProgress,
+        debtPressure: result.debtPressure,
+        goalDelayMonths: result.goalDelayMonths,
+        healthScore: result.healthScore,
         cooldownDays: result.cooldownDays,
+        status: "checked",
         advisorText,
         reasons: result.reasons,
       };
@@ -122,6 +131,21 @@ export function useFinancialState() {
       return { check, result };
     },
     [refresh, snapshot]
+  );
+
+  const markPurchaseCheckStatus = useCallback(
+    async (check: PurchaseCheck, status: PurchaseCheckStatus) => {
+      const result = await markPurchaseCheckStatusAction(check.id, status);
+
+      if (!result.ok) {
+        setError(result.error);
+        throw new Error(result.error);
+      }
+
+      await refresh();
+      return { ...check, status };
+    },
+    [refresh]
   );
 
   const addGoalFromCheck = useCallback(
@@ -272,6 +296,7 @@ export function useFinancialState() {
     runPurchaseCheck,
     addGoalFromCheck,
     addCooldownFromCheck,
+    markPurchaseCheckStatus,
     removeCooldownItem,
     deleteGoal,
     generateWeeklyReport,

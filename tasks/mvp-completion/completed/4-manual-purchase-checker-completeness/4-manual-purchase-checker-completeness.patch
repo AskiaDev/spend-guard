@@ -1,0 +1,1523 @@
+diff --git a/src/app/(app)/_components/page-adapters.test.tsx b/src/app/(app)/_components/page-adapters.test.tsx
+index ae6eebc..587f3ed 100644
+--- a/src/app/(app)/_components/page-adapters.test.tsx
++++ b/src/app/(app)/_components/page-adapters.test.tsx
+@@ -115,6 +115,7 @@ describe("page adapters", () => {
+       runPurchaseCheck: vi.fn(),
+       addGoalFromCheck: vi.fn(),
+       addCooldownFromCheck: vi.fn(),
++      markPurchaseCheckStatus: vi.fn(),
+       removeCooldownItem: vi.fn(),
+       deleteGoal: vi.fn(),
+       generateWeeklyReport: vi.fn(),
+@@ -187,6 +188,7 @@ describe("page adapters", () => {
+     expect(initialProps.currency).toBe(initialState.snapshot.profile.currency);
+     expect(initialProps.onAddGoal).toBe(initialState.addGoalFromCheck);
+     expect(initialProps.onAddCooldown).toBe(initialState.addCooldownFromCheck);
++    expect(initialProps.onMarkStatus).toBe(initialState.markPurchaseCheckStatus);
+ 
+     const latestCheck = financialState.checks[0];
+     const updatedState = {
+@@ -204,6 +206,7 @@ describe("page adapters", () => {
+     expect(updatedProps.currency).toBe(updatedState.snapshot.profile.currency);
+     expect(updatedProps.onAddGoal).toBe(updatedState.addGoalFromCheck);
+     expect(updatedProps.onAddCooldown).toBe(updatedState.addCooldownFromCheck);
++    expect(updatedProps.onMarkStatus).toBe(updatedState.markPurchaseCheckStatus);
+   });
+ 
+   it("passes goals state and callback identities", () => {
+diff --git a/src/app/(app)/_components/page-adapters.tsx b/src/app/(app)/_components/page-adapters.tsx
+index d45ec2d..79ddc1f 100644
+--- a/src/app/(app)/_components/page-adapters.tsx
++++ b/src/app/(app)/_components/page-adapters.tsx
+@@ -68,6 +68,7 @@ export function PurchaseResultPageContent() {
+       currency={state.snapshot.profile.currency}
+       onAddGoal={state.addGoalFromCheck}
+       onAddCooldown={state.addCooldownFromCheck}
++      onMarkStatus={state.markPurchaseCheckStatus}
+     />
+   );
+ }
+diff --git a/src/features/purchase-checker/api/save-purchase-check.test.ts b/src/features/purchase-checker/api/save-purchase-check.test.ts
+index 7213901..239b9bb 100644
+--- a/src/features/purchase-checker/api/save-purchase-check.test.ts
++++ b/src/features/purchase-checker/api/save-purchase-check.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, expect, it, vi } from "vitest";
+-import { savePurchaseCheck } from "./save-purchase-check";
++import { markPurchaseCheckStatus, savePurchaseCheck } from "./save-purchase-check";
+ 
+ vi.mock("@/lib/supabase/server", () => ({ requireUserId: vi.fn() }));
+ 
+@@ -16,6 +16,10 @@ describe("savePurchaseCheck", () => {
+     const purchase = {
+       itemName: "Phone",
+       amount: 25_000,
++      category: "phone",
++      saleDeadline: "2026-07-15",
++      location: "Makati showroom",
++      notes: "Ask if delivery is included.",
+       urgency: "can_wait" as const,
+       paymentMethod: "installment" as const,
+       downPayment: 5_000,
+@@ -29,7 +33,12 @@ describe("savePurchaseCheck", () => {
+       safeToSpend: 20_000,
+       monthlyFreeCashFlow: 30_000,
+       savingsAfterPurchase: 15_000,
++      emergencyProgress: 0.5,
++      debtPressure: 0.18,
++      goalDelayMonths: 3,
++      healthScore: 74,
+       cooldownDays: 7,
++      status: "checked" as const,
+       advisorText: "Wait before buying.",
+       reasons: ["This would exceed today's safe-to-spend amount."],
+     };
+@@ -45,13 +54,95 @@ describe("savePurchaseCheck", () => {
+       expect.objectContaining({
+         user_id: "user-1",
+         item_name: "Phone",
++        category: "phone",
++        sale_deadline: "2026-07-15",
++        location: "Makati showroom",
++        notes: "Ask if delivery is included.",
+         down_payment: 5_000,
+         is_income_generating: true,
+         current_alternative_still_works: false,
+         risk_score: 50,
+         savings_after_purchase: 15_000,
++        emergency_fund_progress: 0.5,
++        debt_pressure: 0.18,
++        goal_delay_months: 3,
++        health_score: 74,
+         cooldown_days: 7,
++        status: "checked",
+       })
+     );
+   });
++
++  it("returns a friendly error when saving the purchase check fails", async () => {
++    const single = vi.fn(async () => ({
++      data: null,
++      error: { message: "insert failed" },
++    }));
++    const select = vi.fn(() => ({ single }));
++    const insert = vi.fn(() => ({ select }));
++    const supabase = { from: vi.fn(() => ({ insert })) };
++    const purchase = {
++      itemName: "Phone",
++      amount: 25_000,
++      urgency: "can_wait" as const,
++      paymentMethod: "cash" as const,
++    };
++    const check = {
++      ...purchase,
++      decision: "WAIT" as const,
++      riskScore: 50,
++      safeToSpend: 20_000,
++      monthlyFreeCashFlow: 30_000,
++      savingsAfterPurchase: 15_000,
++      cooldownDays: 7,
++      advisorText: "Wait before buying.",
++      reasons: ["This would exceed today's safe-to-spend amount."],
++    };
++
++    await expect(savePurchaseCheck(supabase as never, "user-1", purchase, check)).resolves.toEqual({
++      ok: false,
++      error: "Unable to save this purchase check.",
++    });
++  });
++
++  it("updates only the authenticated user's purchase-check status", async () => {
++    const eqUser = vi.fn(async () => ({ error: null }));
++    const eqId = vi.fn(() => ({ eq: eqUser }));
++    const update = vi.fn(() => ({ eq: eqId }));
++    const supabase = { from: vi.fn(() => ({ update })) };
++
++    await expect(
++      markPurchaseCheckStatus(supabase as never, "user-1", "check-1", "bought")
++    ).resolves.toEqual({ ok: true, data: null });
++
++    expect(supabase.from).toHaveBeenCalledWith("purchase_checks");
++    expect(update).toHaveBeenCalledWith({ status: "bought" });
++    expect(eqId).toHaveBeenCalledWith("id", "check-1");
++    expect(eqUser).toHaveBeenCalledWith("user_id", "user-1");
++  });
++
++  it("rejects missing or invalid purchase-check status updates before writing", async () => {
++    const update = vi.fn();
++    const supabase = { from: vi.fn(() => ({ update })) };
++
++    await expect(
++      markPurchaseCheckStatus(supabase as never, "user-1", "", "bought")
++    ).resolves.toEqual({ ok: false, error: "Purchase check ID is required." });
++    await expect(
++      markPurchaseCheckStatus(supabase as never, "user-1", "check-1", "sold" as never)
++    ).resolves.toEqual({ ok: false, error: "Check the purchase status." });
++
++    expect(update).not.toHaveBeenCalled();
++  });
++
++  it("returns a friendly error when the status update fails", async () => {
++    const eqUser = vi.fn(async () => ({ error: { message: "update failed" } }));
++    const eqId = vi.fn(() => ({ eq: eqUser }));
++    const update = vi.fn(() => ({ eq: eqId }));
++    const supabase = { from: vi.fn(() => ({ update })) };
++
++    await expect(
++      markPurchaseCheckStatus(supabase as never, "user-1", "check-1", "skipped")
++    ).resolves.toEqual({ ok: false, error: "Unable to update this purchase status." });
++  });
+ });
+diff --git a/src/features/purchase-checker/api/save-purchase-check.ts b/src/features/purchase-checker/api/save-purchase-check.ts
+index 4116f2c..d2136bc 100644
+--- a/src/features/purchase-checker/api/save-purchase-check.ts
++++ b/src/features/purchase-checker/api/save-purchase-check.ts
+@@ -1,17 +1,21 @@
+ "use server";
+ 
+ import type { SupabaseClient } from "@supabase/supabase-js";
++import { z } from "zod";
+ import { purchaseInputSchema } from "@/lib/schemas/finance";
+ import { requireUserId } from "@/lib/supabase/server";
+ import type { ActionResult } from "@/types/action-result";
+ import type { Database } from "@/types/database";
+-import type { PurchaseCheck, PurchaseInput } from "@/types/finance";
++import { PURCHASE_CHECK_STATUSES } from "@/types/finance";
++import type { PurchaseCheck, PurchaseCheckStatus, PurchaseInput } from "@/types/finance";
+ 
+ interface SavedPurchaseCheck {
+   id: string;
+   createdAt: string;
+ }
+ 
++const purchaseCheckStatusSchema = z.enum(PURCHASE_CHECK_STATUSES);
++
+ export async function savePurchaseCheck(
+   supabase: SupabaseClient<Database>,
+   userId: string,
+@@ -24,6 +28,10 @@ export async function savePurchaseCheck(
+       user_id: userId,
+       item_name: purchase.itemName,
+       amount: purchase.amount,
++      category: purchase.category ?? null,
++      sale_deadline: purchase.saleDeadline ?? null,
++      location: purchase.location ?? null,
++      notes: purchase.notes ?? null,
+       urgency: purchase.urgency,
+       payment_method: purchase.paymentMethod,
+       down_payment: purchase.downPayment ?? null,
+@@ -36,7 +44,12 @@ export async function savePurchaseCheck(
+       safe_to_spend: check.safeToSpend,
+       monthly_free_cash_flow: check.monthlyFreeCashFlow,
+       savings_after_purchase: check.savingsAfterPurchase,
++      emergency_fund_progress: check.emergencyProgress ?? 0,
++      debt_pressure: check.debtPressure ?? 0,
++      goal_delay_months: check.goalDelayMonths ?? 0,
++      health_score: check.healthScore ?? 0,
+       cooldown_days: check.cooldownDays,
++      status: check.status ?? "checked",
+       advisor_text: check.advisorText,
+       reasons: check.reasons,
+     })
+@@ -51,6 +64,36 @@ export async function savePurchaseCheck(
+   return { ok: true, data: { id: data.id, createdAt: data.created_at } };
+ }
+ 
++export async function markPurchaseCheckStatus(
++  supabase: SupabaseClient<Database>,
++  userId: string,
++  id: string,
++  status: PurchaseCheckStatus
++): Promise<ActionResult<null>> {
++  if (!id) {
++    return { ok: false, error: "Purchase check ID is required." };
++  }
++
++  const parsedStatus = purchaseCheckStatusSchema.safeParse(status);
++
++  if (!parsedStatus.success) {
++    return { ok: false, error: "Check the purchase status." };
++  }
++
++  const { error } = await supabase
++    .from("purchase_checks")
++    .update({ status: parsedStatus.data })
++    .eq("id", id)
++    .eq("user_id", userId);
++
++  if (error) {
++    console.error("Unable to update Supabase purchase check status", error);
++    return { ok: false, error: "Unable to update this purchase status." };
++  }
++
++  return { ok: true, data: null };
++}
++
+ export async function savePurchaseCheckAction(
+   input: unknown,
+   check: Omit<PurchaseCheck, "id" | "createdAt">
+@@ -75,3 +118,18 @@ export async function savePurchaseCheckAction(
+     };
+   }
+ }
++
++export async function markPurchaseCheckStatusAction(
++  id: string,
++  status: PurchaseCheckStatus
++): Promise<ActionResult<null>> {
++  try {
++    const { supabase, userId } = await requireUserId();
++    return await markPurchaseCheckStatus(supabase, userId, id, status);
++  } catch (error) {
++    return {
++      ok: false,
++      error: error instanceof Error ? error.message : "Unable to update purchase status.",
++    };
++  }
++}
+diff --git a/src/features/purchase-checker/components/purchase-checker-wizard.test.tsx b/src/features/purchase-checker/components/purchase-checker-wizard.test.tsx
+index 80bdcf0..06bcabe 100644
+--- a/src/features/purchase-checker/components/purchase-checker-wizard.test.tsx
++++ b/src/features/purchase-checker/components/purchase-checker-wizard.test.tsx
+@@ -249,6 +249,7 @@ describe("PurchaseCheckerWizard", () => {
+     expect(onRunCheck).toHaveBeenCalledWith({
+       itemName: "iPhone Pro Max 1TB",
+       amount: 170000,
++      category: "phone",
+       urgency: "can_wait",
+       paymentMethod: "loan",
+       monthlyPayment: 4500,
+@@ -279,6 +280,7 @@ describe("PurchaseCheckerWizard", () => {
+     expect(onRunCheck).toHaveBeenCalledWith({
+       itemName: "iPhone Pro Max 1TB",
+       amount: 170000,
++      category: "phone",
+       urgency: "can_wait",
+       paymentMethod: "cash",
+       currentAlternativeStillWorks: true,
+@@ -307,6 +309,7 @@ describe("PurchaseCheckerWizard", () => {
+     expect(onRunCheck).toHaveBeenCalledWith({
+       itemName: "iPhone Pro Max 1TB",
+       amount: 170000,
++      category: "phone",
+       urgency: "can_wait",
+       paymentMethod: "installment",
+       downPayment: 26000,
+@@ -322,6 +325,45 @@ describe("PurchaseCheckerWizard", () => {
+     await waitFor(() => expect(pushSpy).toHaveBeenCalledWith("/checker/result"));
+   });
+ 
++  it("submits manual-check metadata fields with the analyzed purchase", async () => {
++    const user = userEvent.setup();
++    const onRunCheck = vi.fn().mockResolvedValue({});
++
++    render(<PurchaseCheckerWizard onRunCheck={onRunCheck} />);
++
++    await user.type(screen.getByLabelText(/product name/i), "Standing desk");
++    await user.type(screen.getByLabelText(/price/i), "18000");
++    await user.selectOptions(screen.getByLabelText(/category/i), "home");
++    await user.type(screen.getByLabelText(/sale deadline/i), "2026-07-15");
++    await user.type(screen.getByLabelText(/location/i), "Makati showroom");
++    await user.click(screen.getByRole("button", { name: /continue/i }));
++
++    await user.type(screen.getByLabelText(/reason for purchase/i), "reduce back pain at work");
++    await user.selectOptions(screen.getByLabelText(/urgency/i), "need_this_month");
++    await user.type(screen.getByLabelText(/best alternative/i), "use existing table");
++    await user.type(screen.getByLabelText(/notes/i), "Ask if the store includes delivery.");
++    await user.click(screen.getByRole("radio", { name: /no, it does not work/i }));
++    await user.click(screen.getByRole("radio", { name: /yes, this can generate income/i }));
++    await user.click(screen.getByRole("button", { name: /continue/i }));
++
++    await user.click(screen.getByRole("button", { name: /analyze purchase/i }));
++
++    await waitFor(() => expect(onRunCheck).toHaveBeenCalledTimes(1));
++    expect(onRunCheck).toHaveBeenCalledWith({
++      itemName: "Standing desk",
++      amount: 18000,
++      category: "home",
++      saleDeadline: "2026-07-15",
++      location: "Makati showroom",
++      notes: "Ask if the store includes delivery.",
++      urgency: "need_this_month",
++      paymentMethod: "cash",
++      currentAlternativeStillWorks: false,
++      isIncomeGenerating: true,
++    });
++    expect(pushSpy).toHaveBeenCalledWith("/checker/result");
++  });
++
+   it("shows a non-blaming error and keeps values when analysis is rejected", async () => {
+     const user = userEvent.setup();
+     const onRunCheck = vi.fn().mockRejectedValue(new Error("service unavailable"));
+diff --git a/src/features/purchase-checker/components/purchase-checker-wizard.tsx b/src/features/purchase-checker/components/purchase-checker-wizard.tsx
+index 0f59a89..2383f7f 100644
+--- a/src/features/purchase-checker/components/purchase-checker-wizard.tsx
++++ b/src/features/purchase-checker/components/purchase-checker-wizard.tsx
+@@ -23,7 +23,10 @@ interface PurchaseWizardValues {
+   itemName: string;
+   amount: number;
+   category: string;
++  saleDeadline: string;
++  location: string;
+   reason: string;
++  notes: string;
+   urgency: PurchaseUrgency;
+   alternative: string;
+   currentAlternativeWorks: AlternativeWorksChoice;
+@@ -44,7 +47,10 @@ const errorIds: Record<keyof PurchaseWizardValues, string> = {
+   itemName: "purchase-item-name-error",
+   amount: "purchase-amount-error",
+   category: "purchase-category-error",
++  saleDeadline: "purchase-sale-deadline-error",
++  location: "purchase-location-error",
+   reason: "purchase-reason-error",
++  notes: "purchase-notes-error",
+   urgency: "purchase-urgency-error",
+   alternative: "purchase-alternative-error",
+   currentAlternativeWorks: "purchase-current-alternative-error",
+@@ -90,10 +96,38 @@ function isPositiveNumber(value: unknown): value is number {
+   return typeof value === "number" && Number.isFinite(value) && value > 0;
+ }
+ 
++function isNonNegativeNumber(value: unknown): value is number {
++  return typeof value === "number" && Number.isFinite(value) && value >= 0;
++}
++
+ function positiveNumberOrUndefined(value: unknown): number | undefined {
+   return isPositiveNumber(value) ? value : undefined;
+ }
+ 
++function nonNegativeNumberOrUndefined(value: unknown): number | undefined {
++  return isNonNegativeNumber(value) ? value : undefined;
++}
++
++function trimmedStringOrUndefined(value: string): string | undefined {
++  const trimmed = value.trim();
++  return trimmed ? trimmed : undefined;
++}
++
++function isIsoDate(value: string) {
++  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
++    return false;
++  }
++
++  const [year, month, day] = value.split("-").map(Number);
++  const date = new Date(Date.UTC(year, month - 1, day));
++
++  return (
++    date.getUTCFullYear() === year &&
++    date.getUTCMonth() === month - 1 &&
++    date.getUTCDate() === day
++  );
++}
++
+ function isFinancedPaymentMethod(paymentMethod: PaymentMethod) {
+   return financedPaymentMethods.includes(paymentMethod);
+ }
+@@ -106,14 +140,30 @@ function buildPurchaseInput(values: PurchaseWizardValues): PurchaseInput {
+   const purchase: PurchaseInput = {
+     itemName: values.itemName.trim(),
+     amount: values.amount,
++    category: values.category,
+     urgency: values.urgency,
+     paymentMethod: values.paymentMethod,
+     currentAlternativeStillWorks: values.currentAlternativeWorks === "yes",
+     isIncomeGenerating: values.incomeGeneration === "yes",
+   };
++  const saleDeadline = trimmedStringOrUndefined(values.saleDeadline);
++  const location = trimmedStringOrUndefined(values.location);
++  const notes = trimmedStringOrUndefined(values.notes);
++
++  if (saleDeadline) {
++    purchase.saleDeadline = saleDeadline;
++  }
++
++  if (location) {
++    purchase.location = location;
++  }
++
++  if (notes) {
++    purchase.notes = notes;
++  }
+ 
+   if (isFinancedPaymentMethod(values.paymentMethod)) {
+-    const downPayment = positiveNumberOrUndefined(values.downPayment);
++    const downPayment = nonNegativeNumberOrUndefined(values.downPayment);
+     const installmentMonths = positiveNumberOrUndefined(values.installmentMonths);
+     const monthlyPayment = positiveNumberOrUndefined(values.monthlyPayment);
+ 
+@@ -151,7 +201,10 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
+       itemName: "",
+       amount: Number.NaN,
+       category: "",
++      saleDeadline: "",
++      location: "",
+       reason: "",
++      notes: "",
+       urgency: "want",
+       alternative: "",
+       currentAlternativeWorks: "",
+@@ -183,6 +236,14 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
+       nextErrors.category = "Choose a category.";
+     }
+ 
++    if (values.saleDeadline && !isIsoDate(values.saleDeadline)) {
++      nextErrors.saleDeadline = "Enter a valid sale deadline.";
++    }
++
++    if (values.location.trim().length > 120) {
++      nextErrors.location = "Keep the location under 120 characters.";
++    }
++
+     setErrors(nextErrors);
+     return Object.keys(nextErrors).length === 0;
+   }
+@@ -195,6 +256,10 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
+       nextErrors.reason = "Add why you are considering this purchase.";
+     }
+ 
++    if (values.notes.trim().length > 1000) {
++      nextErrors.notes = "Keep notes under 1000 characters.";
++    }
++
+     if (!values.alternative.trim()) {
+       nextErrors.alternative = "Add the best alternative.";
+     }
+@@ -216,6 +281,14 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
+     const nextErrors: PurchaseWizardErrors = {};
+ 
+     if (isFinancedPaymentMethod(values.paymentMethod)) {
++      if (
++        values.downPayment !== undefined &&
++        !Number.isNaN(values.downPayment) &&
++        !isNonNegativeNumber(values.downPayment)
++      ) {
++        nextErrors.downPayment = "Enter a non-negative down payment.";
++      }
++
+       if (!isPositiveNumber(values.monthlyPayment)) {
+         nextErrors.monthlyPayment = "Enter the monthly payment for this payment method.";
+       }
+@@ -352,6 +425,34 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
+                   <FieldErrorText id={errorIds.category}>{errors.category}</FieldErrorText>
+                 </div>
+               </div>
++
++              <div className="grid gap-4 md:grid-cols-2">
++                <div className="grid gap-2">
++                  <Label htmlFor="purchase-sale-deadline">Sale deadline</Label>
++                  <Input
++                    id="purchase-sale-deadline"
++                    aria-describedby={errors.saleDeadline ? errorIds.saleDeadline : undefined}
++                    aria-invalid={errors.saleDeadline ? "true" : undefined}
++                    type="date"
++                    {...register("saleDeadline")}
++                  />
++                  <FieldErrorText id={errorIds.saleDeadline}>
++                    {errors.saleDeadline}
++                  </FieldErrorText>
++                </div>
++
++                <div className="grid gap-2">
++                  <Label htmlFor="purchase-location">Location</Label>
++                  <Input
++                    id="purchase-location"
++                    aria-describedby={errors.location ? errorIds.location : undefined}
++                    aria-invalid={errors.location ? "true" : undefined}
++                    placeholder="Makati showroom"
++                    {...register("location")}
++                  />
++                  <FieldErrorText id={errorIds.location}>{errors.location}</FieldErrorText>
++                </div>
++              </div>
+             </section>
+           ) : null}
+ 
+@@ -378,6 +479,18 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
+                 <FieldErrorText id={errorIds.reason}>{errors.reason}</FieldErrorText>
+               </div>
+ 
++              <div className="grid gap-2">
++                <Label htmlFor="purchase-notes">Notes</Label>
++                <Textarea
++                  id="purchase-notes"
++                  aria-describedby={errors.notes ? errorIds.notes : undefined}
++                  aria-invalid={errors.notes ? "true" : undefined}
++                  placeholder="delivery, warranty, discount details"
++                  {...register("notes")}
++                />
++                <FieldErrorText id={errorIds.notes}>{errors.notes}</FieldErrorText>
++              </div>
++
+               <div className="grid gap-4 md:grid-cols-2">
+                 <div className="grid gap-2">
+                   <Label htmlFor="purchase-urgency">Urgency</Label>
+@@ -511,11 +624,16 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
+                     <Label htmlFor="purchase-down-payment">Down payment</Label>
+                     <Input
+                       id="purchase-down-payment"
++                      aria-describedby={errors.downPayment ? errorIds.downPayment : undefined}
++                      aria-invalid={errors.downPayment ? "true" : undefined}
+                       min="0"
+                       placeholder="26000"
+                       type="number"
+                       {...register("downPayment", { valueAsNumber: true })}
+                     />
++                    <FieldErrorText id={errorIds.downPayment}>
++                      {errors.downPayment}
++                    </FieldErrorText>
+                   </div>
+ 
+                   <div className="grid gap-2">
+diff --git a/src/features/purchase-checker/components/purchase-result.test.tsx b/src/features/purchase-checker/components/purchase-result.test.tsx
+index 0f5e409..e4410c9 100644
+--- a/src/features/purchase-checker/components/purchase-result.test.tsx
++++ b/src/features/purchase-checker/components/purchase-result.test.tsx
+@@ -9,6 +9,10 @@ const activeCheck: PurchaseCheck = {
+   createdAt: "2026-06-21T00:00:00.000Z",
+   itemName: "iPhone Pro Max 1TB",
+   amount: 170000,
++  category: "phone",
++  saleDeadline: "2026-07-15",
++  location: "Makati showroom",
++  notes: "Ask if delivery is included.",
+   urgency: "can_wait",
+   paymentMethod: "installment",
+   installmentMonths: 24,
+@@ -18,7 +22,12 @@ const activeCheck: PurchaseCheck = {
+   safeToSpend: 20000,
+   monthlyFreeCashFlow: 10000,
+   savingsAfterPurchase: 120000,
++  emergencyProgress: 0.5,
++  debtPressure: 0.18,
++  goalDelayMonths: 3,
++  healthScore: 74,
+   cooldownDays: 30,
++  status: "checked",
+   advisorText: "Waiting protects your emergency savings and keeps your monthly plan flexible.",
+   reasons: [
+     "The price is above your current safe-to-spend amount.",
+@@ -34,6 +43,7 @@ describe("PurchaseResult", () => {
+     const user = userEvent.setup();
+     const onAddGoal = vi.fn().mockResolvedValue(undefined);
+     const onAddCooldown = vi.fn().mockResolvedValue(undefined);
++    const onMarkStatus = vi.fn().mockResolvedValue(undefined);
+ 
+     render(
+       <PurchaseResult
+@@ -41,6 +51,7 @@ describe("PurchaseResult", () => {
+         currency="PHP"
+         onAddGoal={onAddGoal}
+         onAddCooldown={onAddCooldown}
++        onMarkStatus={onMarkStatus}
+       />
+     );
+ 
+@@ -60,13 +71,26 @@ describe("PurchaseResult", () => {
+     expect(within(summary).getByText("₱170,000")).toBeVisible();
+     expect(within(summary).getByText(/installment/i)).toBeVisible();
+     expect(within(summary).getByText(/24 months/i)).toBeVisible();
++    expect(within(summary).getByText("Phone")).toBeVisible();
++    expect(within(summary).getByText("Makati showroom")).toBeVisible();
++    expect(within(summary).getByText("Jul 15, 2026")).toBeVisible();
+ 
+     const impact = screen.getByRole("region", { name: "Plan impact" });
+-    expect(within(impact).getAllByRole("listitem")).toHaveLength(4);
++    expect(within(impact).getAllByRole("listitem")).toHaveLength(9);
+     expect(within(impact).getByText("Purchase price")).toBeVisible();
++    expect(within(impact).getByText("Risk score")).toBeVisible();
++    expect(within(impact).getByText("95 / 100")).toBeVisible();
++    expect(within(impact).getByText("Savings after purchase")).toBeVisible();
++    expect(within(impact).getByText("₱120,000")).toBeVisible();
++    expect(within(impact).getByText("Emergency fund impact")).toBeVisible();
++    expect(within(impact).getByText("50% funded")).toBeVisible();
++    expect(within(impact).getByText("Debt conflict")).toBeVisible();
++    expect(within(impact).getByText("18% debt pressure")).toBeVisible();
++    expect(within(impact).getByText("Goal delay")).toBeVisible();
++    expect(within(impact).getByText("3 months")).toBeVisible();
+     expect(within(impact).getByText("Safe to spend")).toBeVisible();
+     expect(within(impact).getByText("Monthly free cash")).toBeVisible();
+-    expect(within(impact).getByText("Suggested cooldown")).toBeVisible();
++    expect(within(impact).getByText("Cooldown recommendation")).toBeVisible();
+     expect(within(impact).getByText("₱20,000")).toBeVisible();
+     expect(within(impact).getByText("₱10,000")).toBeVisible();
+     expect(within(impact).getByText("30 days")).toBeVisible();
+@@ -86,9 +110,12 @@ describe("PurchaseResult", () => {
+ 
+     await user.click(screen.getByRole("button", { name: "Add to Goal" }));
+     await user.click(screen.getByRole("button", { name: "Add to Cooldown" }));
++    await user.click(screen.getByRole("button", { name: "Mark as bought" }));
+ 
+     expect(onAddGoal).toHaveBeenCalledWith(activeCheck);
+     expect(onAddCooldown).toHaveBeenCalledWith(activeCheck);
++    expect(onMarkStatus).toHaveBeenCalledWith(activeCheck, "bought");
++    expect(screen.getByText("Bought")).toBeVisible();
+     expect(screen.getByRole("link", { name: "Check Another Purchase" })).toHaveAttribute(
+       "href",
+       "/checker"
+@@ -168,6 +195,38 @@ describe("PurchaseResult", () => {
+     expect(onAddGoal).toHaveBeenNthCalledWith(2, activeCheck);
+   });
+ 
++  it("shows retryable feedback when marking a check status fails", async () => {
++    const user = userEvent.setup();
++    const onMarkStatus = vi
++      .fn()
++      .mockRejectedValueOnce(new Error("status unavailable"))
++      .mockResolvedValueOnce(undefined);
++
++    render(
++      <PurchaseResult
++        check={activeCheck}
++        currency="PHP"
++        onAddGoal={vi.fn()}
++        onAddCooldown={vi.fn()}
++        onMarkStatus={onMarkStatus}
++      />
++    );
++
++    await user.click(screen.getByRole("button", { name: "Mark as skipped" }));
++
++    expect(await screen.findByRole("alert")).toHaveTextContent(
++      "We couldn’t update this purchase status. Please try again."
++    );
++    expect(screen.getByText("Checked")).toBeVisible();
++
++    await user.click(screen.getByRole("button", { name: "Mark as skipped" }));
++
++    expect(onMarkStatus).toHaveBeenCalledTimes(2);
++    expect(onMarkStatus).toHaveBeenNthCalledWith(1, activeCheck, "skipped");
++    expect(onMarkStatus).toHaveBeenNthCalledWith(2, activeCheck, "skipped");
++    expect(screen.getByText("Skipped")).toBeVisible();
++  });
++
+   it("supplements a one-reason live check with five presentation explanations", () => {
+     const storedReason = "The purchase exceeds the current safe-to-spend amount.";
+ 
+diff --git a/src/features/purchase-checker/components/purchase-result.tsx b/src/features/purchase-checker/components/purchase-result.tsx
+index d7ed2de..4f58aa3 100644
+--- a/src/features/purchase-checker/components/purchase-result.tsx
++++ b/src/features/purchase-checker/components/purchase-result.tsx
+@@ -1,6 +1,13 @@
+ "use client";
+ 
+-import { ArrowLeft, LayoutDashboard, PauseCircle, Target } from "lucide-react";
++import {
++  ArrowLeft,
++  CheckCircle2,
++  LayoutDashboard,
++  PauseCircle,
++  Target,
++  XCircle,
++} from "lucide-react";
+ import Link from "next/link";
+ import { useRef, useState } from "react";
+ import { ScoreGauge } from "@/components/finance/score-gauge";
+@@ -8,22 +15,39 @@ import { StatusBadge } from "@/components/finance/status-badge";
+ import { Button } from "@/components/ui/button";
+ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+ import { cn, formatCurrency } from "@/lib/utils";
+-import type { CurrencyCode, PurchaseCheck, PurchaseDecision } from "@/types/finance";
++import type {
++  CurrencyCode,
++  PurchaseCheck,
++  PurchaseCheckStatus,
++  PurchaseDecision,
++} from "@/types/finance";
+ 
+ interface PurchaseResultProps {
+   check?: PurchaseCheck;
+   currency: CurrencyCode;
+   onAddGoal: (check: PurchaseCheck) => Promise<unknown> | unknown;
+   onAddCooldown: (check: PurchaseCheck) => Promise<unknown> | unknown;
++  onMarkStatus?: (
++    check: PurchaseCheck,
++    status: Exclude<PurchaseCheckStatus, "checked">
++  ) => Promise<unknown> | unknown;
+ }
+ 
+ const decisionConfidence = 92;
+ 
+-type MutationAction = "goal" | "cooldown";
++type MutationAction = "goal" | "cooldown" | "bought" | "skipped";
+ 
+ const mutationErrorMessages: Record<MutationAction, string> = {
+   goal: "We couldn’t add this purchase to a goal. Please try again.",
+   cooldown: "We couldn’t add this purchase to cooldown. Please try again.",
++  bought: "We couldn’t update this purchase status. Please try again.",
++  skipped: "We couldn’t update this purchase status. Please try again.",
++};
++
++const statusLabels: Record<PurchaseCheckStatus, string> = {
++  checked: "Checked",
++  bought: "Bought",
++  skipped: "Skipped",
+ };
+ 
+ const examplePurchaseCheck: PurchaseCheck = {
+@@ -40,7 +64,12 @@ const examplePurchaseCheck: PurchaseCheck = {
+   safeToSpend: 20000,
+   monthlyFreeCashFlow: 10000,
+   savingsAfterPurchase: 120000,
++  emergencyProgress: 0.5,
++  debtPressure: 0.18,
++  goalDelayMonths: 3,
++  healthScore: 74,
+   cooldownDays: 30,
++  status: "checked",
+   advisorText:
+     "Waiting protects your emergency savings and keeps your monthly plan flexible.",
+   reasons: [
+@@ -78,20 +107,55 @@ export function PurchaseResult({
+   currency,
+   onAddGoal,
+   onAddCooldown,
++  onMarkStatus,
+ }: PurchaseResultProps) {
+   const activeCheck = check ?? examplePurchaseCheck;
+   const isExample = check === undefined;
+   const displayCurrency = isExample ? "PHP" : currency;
+   const [pendingMutation, setPendingMutation] = useState<MutationAction | null>(null);
+   const [mutationError, setMutationError] = useState<string | null>(null);
++  const [statusOverride, setStatusOverride] = useState<{
++    checkId: string;
++    status: PurchaseCheckStatus;
++  } | null>(null);
+   const mutationInFlight = useRef(false);
+   const displayedReasons = buildDisplayedReasons(activeCheck, displayCurrency);
++  const currentStatus =
++    statusOverride?.checkId === activeCheck.id
++      ? statusOverride.status
++      : activeCheck.status ?? "checked";
++
+   const impactItems = [
+     {
+       label: "Purchase price",
+       value: formatCurrency(activeCheck.amount, displayCurrency),
+       detail: "Total amount included in this decision.",
+     },
++    {
++      label: "Risk score",
++      value: `${activeCheck.riskScore} / 100`,
++      detail: "Higher scores mean more pressure on the current plan.",
++    },
++    {
++      label: "Savings after purchase",
++      value: formatCurrency(activeCheck.savingsAfterPurchase, displayCurrency),
++      detail: "Projected savings left after the payment made today.",
++    },
++    {
++      label: "Emergency fund impact",
++      value: `${Math.round((activeCheck.emergencyProgress ?? 0) * 100)}% funded`,
++      detail: "Emergency-buffer progress recorded when this check ran.",
++    },
++    {
++      label: "Debt conflict",
++      value: `${Math.round((activeCheck.debtPressure ?? 0) * 100)}% debt pressure`,
++      detail: "Minimum debt payments compared with monthly income.",
++    },
++    {
++      label: "Goal delay",
++      value: formatMonths(activeCheck.goalDelayMonths ?? 0),
++      detail: "Estimated delay to current goals from buying now.",
++    },
+     {
+       label: "Safe to spend",
+       value: formatCurrency(activeCheck.safeToSpend, displayCurrency),
+@@ -103,12 +167,13 @@ export function PurchaseResult({
+       detail: "Cash flow remaining after monthly commitments.",
+     },
+     {
+-      label: "Suggested cooldown",
++      label: "Cooldown recommendation",
+       value: `${activeCheck.cooldownDays} ${activeCheck.cooldownDays === 1 ? "day" : "days"}`,
+       detail: "Time to pause before checking this purchase again.",
+     },
+   ];
+   const mutationActionsDisabled = isExample || pendingMutation !== null;
++  const statusActionsDisabled = mutationActionsDisabled || !onMarkStatus;
+ 
+   async function runMutation(
+     mutation: MutationAction,
+@@ -132,6 +197,26 @@ export function PurchaseResult({
+     }
+   }
+ 
++  async function runStatusMutation(status: Exclude<PurchaseCheckStatus, "checked">) {
++    if (isExample || !onMarkStatus || mutationInFlight.current) {
++      return;
++    }
++
++    mutationInFlight.current = true;
++    setPendingMutation(status);
++    setMutationError(null);
++
++    try {
++      await onMarkStatus(activeCheck, status);
++      setStatusOverride({ checkId: activeCheck.id, status });
++    } catch {
++      setMutationError(mutationErrorMessages[status]);
++    } finally {
++      mutationInFlight.current = false;
++      setPendingMutation(null);
++    }
++  }
++
+   return (
+     <div className="grid gap-6">
+       {isExample ? (
+@@ -161,12 +246,27 @@ export function PurchaseResult({
+               <SummaryRow label="Payment method">
+                 {formatPaymentMethod(activeCheck)}
+               </SummaryRow>
++              {activeCheck.category ? (
++                <SummaryRow label="Category">{formatLabel(activeCheck.category)}</SummaryRow>
++              ) : null}
+               <SummaryRow label="Urgency">{formatLabel(activeCheck.urgency)}</SummaryRow>
++              <SummaryRow label="Status">{statusLabels[currentStatus]}</SummaryRow>
++              {activeCheck.location ? (
++                <SummaryRow label="Location">{activeCheck.location}</SummaryRow>
++              ) : null}
++              {activeCheck.saleDeadline ? (
++                <SummaryRow label="Sale deadline">
++                  {formatDateLabel(activeCheck.saleDeadline)}
++                </SummaryRow>
++              ) : null}
+               {activeCheck.monthlyPayment ? (
+                 <SummaryRow label="Monthly payment">
+                   {formatCurrency(activeCheck.monthlyPayment, displayCurrency)}
+                 </SummaryRow>
+               ) : null}
++              {activeCheck.notes ? (
++                <SummaryRow label="Notes">{activeCheck.notes}</SummaryRow>
++              ) : null}
+             </dl>
+ 
+             <div className="rounded-control bg-slate-50 p-4 text-center">
+@@ -262,7 +362,7 @@ export function PurchaseResult({
+             {mutationError}
+           </p>
+         ) : null}
+-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
++        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+           <Button
+             type="button"
+             variant="secondary"
+@@ -285,6 +385,28 @@ export function PurchaseResult({
+             <PauseCircle className="size-4" aria-hidden="true" />
+             Add to Cooldown
+           </Button>
++          <Button
++            type="button"
++            variant="secondary"
++            disabled={statusActionsDisabled || currentStatus === "bought"}
++            isLoading={pendingMutation === "bought"}
++            loadingText="Marking bought..."
++            onClick={() => void runStatusMutation("bought")}
++          >
++            <CheckCircle2 className="size-4" aria-hidden="true" />
++            Mark as bought
++          </Button>
++          <Button
++            type="button"
++            variant="secondary"
++            disabled={statusActionsDisabled || currentStatus === "skipped"}
++            isLoading={pendingMutation === "skipped"}
++            loadingText="Marking skipped..."
++            onClick={() => void runStatusMutation("skipped")}
++          >
++            <XCircle className="size-4" aria-hidden="true" />
++            Mark as skipped
++          </Button>
+           <Link href="/checker" className={navigationActionClass}>
+             <ArrowLeft className="size-4" aria-hidden="true" />
+             Check Another Purchase
+@@ -318,6 +440,22 @@ function formatPaymentMethod(check: PurchaseCheck) {
+   return `${paymentMethod} · ${check.installmentMonths} months`;
+ }
+ 
++function formatMonths(months: number) {
++  return `${months} ${months === 1 ? "month" : "months"}`;
++}
++
++function formatDateLabel(value: string) {
++  const [year, month, day] = value.split("-").map(Number);
++  const date = new Date(Date.UTC(year, month - 1, day));
++
++  return new Intl.DateTimeFormat("en-US", {
++    month: "short",
++    day: "numeric",
++    year: "numeric",
++    timeZone: "UTC",
++  }).format(date);
++}
++
+ function formatLabel(value: string) {
+   return value
+     .split("_")
+diff --git a/src/hooks/use-financial-state.test.tsx b/src/hooks/use-financial-state.test.tsx
+index a851b9f..eda1014 100644
+--- a/src/hooks/use-financial-state.test.tsx
++++ b/src/hooks/use-financial-state.test.tsx
+@@ -6,6 +6,7 @@ const actions = vi.hoisted(() => ({
+   load: vi.fn(),
+   saveProfile: vi.fn(),
+   saveCheck: vi.fn(),
++  markStatus: vi.fn(),
+   createGoal: vi.fn(),
+   deleteGoal: vi.fn(),
+   createCooldown: vi.fn(),
+@@ -22,6 +23,7 @@ vi.mock("@/features/financial-profile/api/save-financial-profile", () => ({
+ }));
+ vi.mock("@/features/purchase-checker/api/save-purchase-check", () => ({
+   savePurchaseCheckAction: actions.saveCheck,
++  markPurchaseCheckStatusAction: actions.markStatus,
+ }));
+ vi.mock("@/features/goals/api/create-goal", () => ({
+   createGoalAction: actions.createGoal,
+@@ -59,6 +61,7 @@ describe("useFinancialState Supabase mode", () => {
+         createdAt: "2026-06-20T02:00:00.000Z",
+       },
+     });
++    actions.markStatus.mockResolvedValue({ ok: true, data: null });
+     actions.createGoal.mockResolvedValue({ ok: true, data: null });
+     actions.deleteGoal.mockResolvedValue({ ok: true, data: null });
+     actions.createCooldown.mockResolvedValue({ ok: true, data: null });
+@@ -112,6 +115,10 @@ describe("useFinancialState Supabase mode", () => {
+       savedCheck = await result.current.runPurchaseCheck({
+         itemName: "Phone",
+         amount: 25_000,
++        category: "phone",
++        saleDeadline: "2026-07-15",
++        location: "Makati showroom",
++        notes: "Ask if delivery is included.",
+         urgency: "can_wait",
+         paymentMethod: "cash",
+       });
+@@ -126,6 +133,7 @@ describe("useFinancialState Supabase mode", () => {
+     await act(async () => {
+       await result.current.addGoalFromCheck(savedCheck!.check);
+       await result.current.addCooldownFromCheck(savedCheck!.check);
++      await result.current.markPurchaseCheckStatus(savedCheck!.check, "bought");
+       await result.current.deleteGoal("goal-1");
+       await result.current.removeCooldownItem("cooldown-1");
+       await result.current.generateWeeklyReport();
+@@ -144,6 +152,7 @@ describe("useFinancialState Supabase mode", () => {
+     expect(actions.createCooldown).toHaveBeenCalledWith(
+       expect.objectContaining({ sourceCheckId: savedCheck?.check.id })
+     );
++    expect(actions.markStatus).toHaveBeenCalledWith(savedCheck?.check.id, "bought");
+     expect(actions.deleteGoal).toHaveBeenCalledWith("goal-1");
+     expect(actions.deleteCooldown).toHaveBeenCalledWith("cooldown-1");
+     expect(actions.createReport).toHaveBeenCalledWith(
+@@ -187,7 +196,12 @@ describe("useFinancialState Supabase mode", () => {
+       safeToSpend: 0,
+       monthlyFreeCashFlow: 0,
+       savingsAfterPurchase: 0,
++      emergencyProgress: 0,
++      debtPressure: 0,
++      goalDelayMonths: 0,
++      healthScore: 0,
+       cooldownDays: 30,
++      status: "checked" as const,
+       advisorText: "Wait.",
+       reasons: ["This would exceed today's safe-to-spend amount."],
+     };
+@@ -225,6 +239,14 @@ describe("useFinancialState Supabase mode", () => {
+       expect(result.current.error).toBe(message);
+     }
+ 
++    actions.markStatus.mockResolvedValueOnce({ ok: false, error: "Status failed." });
++    await act(async () => {
++      await expect(result.current.markPurchaseCheckStatus(check, "skipped")).rejects.toThrow(
++        "Status failed."
++      );
++    });
++    expect(result.current.error).toBe("Status failed.");
++
+     actions.saveVoice.mockResolvedValueOnce({ ok: false, error: "Voice failed." });
+     await act(async () => {
+       await result.current.confirmVoiceDraft({
+diff --git a/src/hooks/use-financial-state.ts b/src/hooks/use-financial-state.ts
+index 1f155f4..4d7440d 100644
+--- a/src/hooks/use-financial-state.ts
++++ b/src/hooks/use-financial-state.ts
+@@ -9,7 +9,10 @@ import {
+ import { loadFinancialWorkspaceAction } from "@/features/financial-profile/api/load-financial-workspace";
+ import { saveFinancialProfileAction } from "@/features/financial-profile/api/save-financial-profile";
+ import { createGoalAction, deleteGoalAction } from "@/features/goals/api/create-goal";
+-import { savePurchaseCheckAction } from "@/features/purchase-checker/api/save-purchase-check";
++import {
++  markPurchaseCheckStatusAction,
++  savePurchaseCheckAction,
++} from "@/features/purchase-checker/api/save-purchase-check";
+ import { saveVoiceSessionAction } from "@/features/purchase-checker/api/save-voice-session";
+ import { createWeeklyReportAction } from "@/features/reports/api/create-weekly-report";
+ import {
+@@ -29,6 +32,7 @@ import type {
+   FinancialSnapshot,
+   Goal,
+   PurchaseCheck,
++  PurchaseCheckStatus,
+   PurchaseInput,
+   VoicePurchaseDraft,
+   WeeklyReport,
+@@ -100,7 +104,12 @@ export function useFinancialState() {
+         safeToSpend: result.safeToSpend,
+         monthlyFreeCashFlow: result.monthlyFreeCashFlow,
+         savingsAfterPurchase: result.savingsAfterPurchase,
++        emergencyProgress: result.emergencyProgress,
++        debtPressure: result.debtPressure,
++        goalDelayMonths: result.goalDelayMonths,
++        healthScore: result.healthScore,
+         cooldownDays: result.cooldownDays,
++        status: "checked",
+         advisorText,
+         reasons: result.reasons,
+       };
+@@ -124,6 +133,21 @@ export function useFinancialState() {
+     [refresh, snapshot]
+   );
+ 
++  const markPurchaseCheckStatus = useCallback(
++    async (check: PurchaseCheck, status: PurchaseCheckStatus) => {
++      const result = await markPurchaseCheckStatusAction(check.id, status);
++
++      if (!result.ok) {
++        setError(result.error);
++        throw new Error(result.error);
++      }
++
++      await refresh();
++      return { ...check, status };
++    },
++    [refresh]
++  );
++
+   const addGoalFromCheck = useCallback(
+     async (check: PurchaseCheck) => {
+       const goal: Goal = {
+@@ -272,6 +296,7 @@ export function useFinancialState() {
+     runPurchaseCheck,
+     addGoalFromCheck,
+     addCooldownFromCheck,
++    markPurchaseCheckStatus,
+     removeCooldownItem,
+     deleteGoal,
+     generateWeeklyReport,
+diff --git a/src/lib/schemas/finance.test.ts b/src/lib/schemas/finance.test.ts
+index efa1ea1..be0d1dd 100644
+--- a/src/lib/schemas/finance.test.ts
++++ b/src/lib/schemas/finance.test.ts
+@@ -69,6 +69,10 @@ describe("purchaseInputSchema", () => {
+       amount: "25000",
+       urgency: "can_wait",
+       paymentMethod: "installment",
++      category: "phone",
++      saleDeadline: "2026-07-15",
++      location: "  Makati showroom  ",
++      notes: "  Ask if the store includes delivery.  ",
+       downPayment: "5000",
+       installmentMonths: "12",
+       monthlyPayment: "2500",
+@@ -78,6 +82,10 @@ describe("purchaseInputSchema", () => {
+ 
+     expect(parsed).toMatchObject({
+       amount: 25_000,
++      category: "phone",
++      saleDeadline: "2026-07-15",
++      location: "Makati showroom",
++      notes: "Ask if the store includes delivery.",
+       downPayment: 5_000,
+       installmentMonths: 12,
+       monthlyPayment: 2_500,
+@@ -85,4 +93,36 @@ describe("purchaseInputSchema", () => {
+       currentAlternativeStillWorks: false,
+     });
+   });
++
++  it("rejects invalid manual-check metadata", () => {
++    expect(() =>
++      purchaseInputSchema.parse({
++        itemName: "Phone",
++        amount: 25_000,
++        urgency: "can_wait",
++        paymentMethod: "cash",
++        category: "",
++      })
++    ).toThrow();
++
++    expect(() =>
++      purchaseInputSchema.parse({
++        itemName: "Phone",
++        amount: 25_000,
++        urgency: "can_wait",
++        paymentMethod: "cash",
++        saleDeadline: "07/15/2026",
++      })
++    ).toThrow();
++
++    expect(() =>
++      purchaseInputSchema.parse({
++        itemName: "Phone",
++        amount: 25_000,
++        urgency: "can_wait",
++        paymentMethod: "cash",
++        location: "x".repeat(121),
++      })
++    ).toThrow();
++  });
+ });
+diff --git a/src/lib/schemas/finance.ts b/src/lib/schemas/finance.ts
+index f9f6c40..7bb6b16 100644
+--- a/src/lib/schemas/finance.ts
++++ b/src/lib/schemas/finance.ts
+@@ -10,6 +10,28 @@ const optionalInstallmentMonths = z.preprocess(
+   z.coerce.number().int().min(1).max(60).optional()
+ );
+ const optionalMoney = z.preprocess(emptyToUndefined, money.optional());
++const optionalTrimmedText = (maxLength: number, message: string) =>
++  z.preprocess(
++    (value) => {
++      if (value === null || value === undefined || value === "") {
++        return undefined;
++      }
++
++      return typeof value === "string" ? value.trim() : value;
++    },
++    z.string().min(1, message).max(maxLength).optional()
++  );
++const optionalRequiredWhenPresentText = (maxLength: number, message: string) =>
++  z.preprocess(
++    (value) => {
++      if (value === null || value === undefined) {
++        return undefined;
++      }
++
++      return typeof value === "string" ? value.trim() : value;
++    },
++    z.string().min(1, message).max(maxLength).optional()
++  );
+ const optionalBoolean = z.preprocess((value) => {
+   if (value === "" || value === null || value === undefined) {
+     return undefined;
+@@ -26,6 +48,21 @@ const optionalBoolean = z.preprocess((value) => {
+   return value;
+ }, z.boolean().optional());
+ 
++function isIsoDate(value: string) {
++  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
++    return false;
++  }
++
++  const [year, month, day] = value.split("-").map(Number);
++  const date = new Date(Date.UTC(year, month - 1, day));
++
++  return (
++    date.getUTCFullYear() === year &&
++    date.getUTCMonth() === month - 1 &&
++    date.getUTCDate() === day
++  );
++}
++
+ export const payFrequencySchema = z
+   .enum(PAY_FREQUENCIES)
+   .default("monthly");
+@@ -74,6 +111,13 @@ export const purchaseInputSchema = z
+   .object({
+     itemName: z.string().min(1, "Name the purchase."),
+     amount: money.refine((value) => value > 0, "Enter a purchase amount."),
++    category: optionalRequiredWhenPresentText(60, "Choose a category."),
++    saleDeadline: z.preprocess(
++      emptyToUndefined,
++      z.string().refine(isIsoDate, "Enter a valid sale deadline.").optional()
++    ),
++    location: optionalTrimmedText(120, "Enter a valid location."),
++    notes: optionalTrimmedText(1000, "Keep notes under 1000 characters."),
+     urgency: z.enum(["need_now", "need_this_month", "can_wait", "want"]),
+     paymentMethod: z.enum(["cash", "installment", "credit_card", "loan", "bnpl"]),
+     downPayment: optionalMoney,
+diff --git a/src/lib/supabase/finance-mappers.test.ts b/src/lib/supabase/finance-mappers.test.ts
+index 4370462..5598c95 100644
+--- a/src/lib/supabase/finance-mappers.test.ts
++++ b/src/lib/supabase/finance-mappers.test.ts
+@@ -72,6 +72,10 @@ describe("mapFinancialWorkspaceRows", () => {
+           user_id: "user-1",
+           item_name: "Phone",
+           amount: 25_000,
++          category: "phone",
++          sale_deadline: "2026-07-15",
++          location: "Makati showroom",
++          notes: "Ask if delivery is included.",
+           urgency: "can_wait",
+           payment_method: "installment",
+           down_payment: 5_000,
+@@ -84,7 +88,12 @@ describe("mapFinancialWorkspaceRows", () => {
+           safe_to_spend: 20_000,
+           monthly_free_cash_flow: 59_500,
+           savings_after_purchase: 175_000,
++          emergency_fund_progress: 0.5,
++          debt_pressure: 0.18,
++          goal_delay_months: 3,
++          health_score: 74,
+           cooldown_days: 21,
++          status: "skipped",
+           advisor_text: "Wait before buying.",
+           reasons: ["This would exceed today's safe-to-spend amount.", 42],
+           created_at: "2026-06-20T01:00:00.000Z",
+@@ -130,12 +139,21 @@ describe("mapFinancialWorkspaceRows", () => {
+     expect(workspace.checks[0]).toMatchObject({
+       id: "check-1",
+       paymentMethod: "installment",
++      category: "phone",
++      saleDeadline: "2026-07-15",
++      location: "Makati showroom",
++      notes: "Ask if delivery is included.",
+       downPayment: 5_000,
+       isIncomeGenerating: true,
+       currentAlternativeStillWorks: false,
+       riskScore: 50,
+       savingsAfterPurchase: 175_000,
++      emergencyProgress: 0.5,
++      debtPressure: 0.18,
++      goalDelayMonths: 3,
++      healthScore: 74,
+       cooldownDays: 21,
++      status: "skipped",
+       reasons: ["This would exceed today's safe-to-spend amount."],
+     });
+     expect(workspace.cooldownItems[0].sourceCheckId).toBe("check-1");
+@@ -193,6 +211,10 @@ describe("mapFinancialWorkspaceRows", () => {
+           user_id: "user-1",
+           item_name: "Unknown",
+           amount: 1_000,
++          category: null,
++          sale_deadline: null,
++          location: null,
++          notes: null,
+           urgency: "unexpected",
+           payment_method: "unexpected",
+           down_payment: null,
+@@ -205,7 +227,12 @@ describe("mapFinancialWorkspaceRows", () => {
+           safe_to_spend: 0,
+           monthly_free_cash_flow: 0,
+           savings_after_purchase: 0,
++          emergency_fund_progress: 0,
++          debt_pressure: 0,
++          goal_delay_months: 0,
++          health_score: 0,
+           cooldown_days: 1,
++          status: "unexpected",
+           advisor_text: "Wait.",
+           reasons: { invalid: true },
+           created_at: "2026-06-20T00:00:00.000Z",
+@@ -235,13 +262,22 @@ describe("mapFinancialWorkspaceRows", () => {
+     expect(workspace.checks[0]).toMatchObject({
+       urgency: "want",
+       paymentMethod: "cash",
++      category: undefined,
++      saleDeadline: undefined,
++      location: undefined,
++      notes: undefined,
+       decision: "WAIT",
+       installmentMonths: undefined,
+       monthlyPayment: undefined,
+       downPayment: undefined,
+       riskScore: 0,
+       savingsAfterPurchase: 0,
++      emergencyProgress: 0,
++      debtPressure: 0,
++      goalDelayMonths: 0,
++      healthScore: 0,
+       cooldownDays: 1,
++      status: "checked",
+       reasons: [],
+     });
+     expect(workspace.cooldownItems[0]).toMatchObject({
+diff --git a/src/lib/supabase/finance-mappers.ts b/src/lib/supabase/finance-mappers.ts
+index 31da3c3..bdc1a37 100644
+--- a/src/lib/supabase/finance-mappers.ts
++++ b/src/lib/supabase/finance-mappers.ts
+@@ -7,6 +7,7 @@ import type {
+   GoalPriority,
+   PayFrequency,
+   PaymentMethod,
++  PurchaseCheckStatus,
+   PurchaseDecision,
+   PurchaseUrgency,
+ } from "@/types/finance";
+@@ -95,6 +96,10 @@ export function mapFinancialWorkspaceRows(rows: FinancialWorkspaceRows): Financi
+         id: check.id,
+         itemName: check.item_name,
+         amount,
++        category: check.category ?? undefined,
++        saleDeadline: check.sale_deadline ?? undefined,
++        location: check.location ?? undefined,
++        notes: check.notes ?? undefined,
+         urgency,
+         paymentMethod: enumValue<PaymentMethod>(
+           check.payment_method,
+@@ -116,8 +121,17 @@ export function mapFinancialWorkspaceRows(rows: FinancialWorkspaceRows): Financi
+         safeToSpend,
+         monthlyFreeCashFlow: Number(check.monthly_free_cash_flow),
+         savingsAfterPurchase: Number(check.savings_after_purchase),
++        emergencyProgress: Number(check.emergency_fund_progress ?? 0),
++        debtPressure: Number(check.debt_pressure ?? 0),
++        goalDelayMonths: check.goal_delay_months ?? 0,
++        healthScore: check.health_score ?? 0,
+         cooldownDays:
+           check.cooldown_days ?? calculateCooldownDays({ amount, safeToSpend, urgency }),
++        status: enumValue<PurchaseCheckStatus>(
++          check.status ?? "checked",
++          ["checked", "bought", "skipped"],
++          "checked"
++        ),
+         advisorText: check.advisor_text,
+         reasons: stringReasons(check.reasons),
+       };
+diff --git a/src/types/database.ts b/src/types/database.ts
+index 1aff5f8..17e17a7 100644
+--- a/src/types/database.ts
++++ b/src/types/database.ts
+@@ -107,6 +107,10 @@ export interface Database {
+           user_id: string;
+           item_name: string;
+           amount: number;
++          category: string | null;
++          sale_deadline: string | null;
++          location: string | null;
++          notes: string | null;
+           urgency: string;
+           payment_method: string;
+           down_payment: number | null;
+@@ -119,7 +123,12 @@ export interface Database {
+           safe_to_spend: number;
+           monthly_free_cash_flow: number;
+           savings_after_purchase: number;
++          emergency_fund_progress: number;
++          debt_pressure: number;
++          goal_delay_months: number;
++          health_score: number;
+           cooldown_days: number;
++          status: string;
+           advisor_text: string;
+           reasons: Json;
+           created_at: string;
+@@ -128,6 +137,10 @@ export interface Database {
+           user_id: string;
+           item_name: string;
+           amount: number;
++          category?: string | null;
++          sale_deadline?: string | null;
++          location?: string | null;
++          notes?: string | null;
+           urgency: string;
+           payment_method: string;
+           down_payment?: number | null;
+@@ -140,7 +153,12 @@ export interface Database {
+           safe_to_spend: number;
+           monthly_free_cash_flow: number;
+           savings_after_purchase: number;
++          emergency_fund_progress?: number;
++          debt_pressure?: number;
++          goal_delay_months?: number;
++          health_score?: number;
+           cooldown_days: number;
++          status?: string;
+           advisor_text: string;
+           reasons: Json;
+         };
+diff --git a/src/types/finance.ts b/src/types/finance.ts
+index 43ecba6..03c0b29 100644
+--- a/src/types/finance.ts
++++ b/src/types/finance.ts
+@@ -12,6 +12,10 @@ export type PurchaseUrgency = "need_now" | "need_this_month" | "can_wait" | "wan
+ 
+ export type GoalPriority = "high" | "medium" | "low";
+ 
++export const PURCHASE_CHECK_STATUSES = ["checked", "bought", "skipped"] as const;
++
++export type PurchaseCheckStatus = (typeof PURCHASE_CHECK_STATUSES)[number];
++
+ export const PAY_FREQUENCIES = ["monthly", "semi_monthly", "biweekly", "weekly"] as const;
+ 
+ export type PayFrequency = (typeof PAY_FREQUENCIES)[number];
+@@ -63,6 +67,10 @@ export interface Goal {
+ export interface PurchaseInput {
+   itemName: string;
+   amount: number;
++  category?: string;
++  saleDeadline?: string;
++  location?: string;
++  notes?: string;
+   urgency: PurchaseUrgency;
+   paymentMethod: PaymentMethod;
+   downPayment?: number;
+@@ -80,7 +88,12 @@ export interface PurchaseCheck extends PurchaseInput {
+   safeToSpend: number;
+   monthlyFreeCashFlow: number;
+   savingsAfterPurchase: number;
++  emergencyProgress?: number;
++  debtPressure?: number;
++  goalDelayMonths?: number;
++  healthScore?: number;
+   cooldownDays: number;
++  status?: PurchaseCheckStatus;
+   advisorText: string;
+   reasons: string[];
+ }
+diff --git a/supabase/migrations/20260623002000_manual_purchase_checker_completion.sql b/supabase/migrations/20260623002000_manual_purchase_checker_completion.sql
+new file mode 100644
+index 0000000..10e46db
+--- /dev/null
++++ b/supabase/migrations/20260623002000_manual_purchase_checker_completion.sql
+@@ -0,0 +1,48 @@
++alter table public.purchase_checks
++  add column if not exists category text,
++  add column if not exists sale_deadline date,
++  add column if not exists location text,
++  add column if not exists notes text,
++  add column if not exists status text not null default 'checked',
++  add column if not exists emergency_fund_progress numeric(5,4) not null default 0,
++  add column if not exists debt_pressure numeric(7,4) not null default 0,
++  add column if not exists goal_delay_months integer not null default 0,
++  add column if not exists health_score integer not null default 0;
++
++alter table public.purchase_checks
++  add constraint purchase_checks_category_length
++    check (category is null or (char_length(category) between 1 and 60)),
++  add constraint purchase_checks_location_length
++    check (location is null or char_length(location) <= 120),
++  add constraint purchase_checks_notes_length
++    check (notes is null or char_length(notes) <= 1000),
++  add constraint purchase_checks_status_check
++    check (status in ('checked', 'bought', 'skipped')),
++  add constraint purchase_checks_emergency_fund_progress_range
++    check (emergency_fund_progress >= 0 and emergency_fund_progress <= 1),
++  add constraint purchase_checks_debt_pressure_nonnegative
++    check (debt_pressure >= 0),
++  add constraint purchase_checks_goal_delay_months_nonnegative
++    check (goal_delay_months >= 0),
++  add constraint purchase_checks_health_score_range
++    check (health_score >= 0 and health_score <= 100);
++
++-- Rollback, if needed:
++-- alter table public.purchase_checks
++--   drop constraint if exists purchase_checks_category_length,
++--   drop constraint if exists purchase_checks_location_length,
++--   drop constraint if exists purchase_checks_notes_length,
++--   drop constraint if exists purchase_checks_status_check,
++--   drop constraint if exists purchase_checks_emergency_fund_progress_range,
++--   drop constraint if exists purchase_checks_debt_pressure_nonnegative,
++--   drop constraint if exists purchase_checks_goal_delay_months_nonnegative,
++--   drop constraint if exists purchase_checks_health_score_range,
++--   drop column if exists health_score,
++--   drop column if exists goal_delay_months,
++--   drop column if exists debt_pressure,
++--   drop column if exists emergency_fund_progress,
++--   drop column if exists status,
++--   drop column if exists notes,
++--   drop column if exists location,
++--   drop column if exists sale_deadline,
++--   drop column if exists category;

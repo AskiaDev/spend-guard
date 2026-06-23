@@ -23,7 +23,10 @@ interface PurchaseWizardValues {
   itemName: string;
   amount: number;
   category: string;
+  saleDeadline: string;
+  location: string;
   reason: string;
+  notes: string;
   urgency: PurchaseUrgency;
   alternative: string;
   currentAlternativeWorks: AlternativeWorksChoice;
@@ -44,7 +47,10 @@ const errorIds: Record<keyof PurchaseWizardValues, string> = {
   itemName: "purchase-item-name-error",
   amount: "purchase-amount-error",
   category: "purchase-category-error",
+  saleDeadline: "purchase-sale-deadline-error",
+  location: "purchase-location-error",
   reason: "purchase-reason-error",
+  notes: "purchase-notes-error",
   urgency: "purchase-urgency-error",
   alternative: "purchase-alternative-error",
   currentAlternativeWorks: "purchase-current-alternative-error",
@@ -90,8 +96,36 @@ function isPositiveNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }
 
+function isNonNegativeNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
 function positiveNumberOrUndefined(value: unknown): number | undefined {
   return isPositiveNumber(value) ? value : undefined;
+}
+
+function nonNegativeNumberOrUndefined(value: unknown): number | undefined {
+  return isNonNegativeNumber(value) ? value : undefined;
+}
+
+function trimmedStringOrUndefined(value: string): string | undefined {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+function isIsoDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
 }
 
 function isFinancedPaymentMethod(paymentMethod: PaymentMethod) {
@@ -106,14 +140,30 @@ function buildPurchaseInput(values: PurchaseWizardValues): PurchaseInput {
   const purchase: PurchaseInput = {
     itemName: values.itemName.trim(),
     amount: values.amount,
+    category: values.category,
     urgency: values.urgency,
     paymentMethod: values.paymentMethod,
     currentAlternativeStillWorks: values.currentAlternativeWorks === "yes",
     isIncomeGenerating: values.incomeGeneration === "yes",
   };
+  const saleDeadline = trimmedStringOrUndefined(values.saleDeadline);
+  const location = trimmedStringOrUndefined(values.location);
+  const notes = trimmedStringOrUndefined(values.notes);
+
+  if (saleDeadline) {
+    purchase.saleDeadline = saleDeadline;
+  }
+
+  if (location) {
+    purchase.location = location;
+  }
+
+  if (notes) {
+    purchase.notes = notes;
+  }
 
   if (isFinancedPaymentMethod(values.paymentMethod)) {
-    const downPayment = positiveNumberOrUndefined(values.downPayment);
+    const downPayment = nonNegativeNumberOrUndefined(values.downPayment);
     const installmentMonths = positiveNumberOrUndefined(values.installmentMonths);
     const monthlyPayment = positiveNumberOrUndefined(values.monthlyPayment);
 
@@ -151,7 +201,10 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
       itemName: "",
       amount: Number.NaN,
       category: "",
+      saleDeadline: "",
+      location: "",
       reason: "",
+      notes: "",
       urgency: "want",
       alternative: "",
       currentAlternativeWorks: "",
@@ -183,6 +236,14 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
       nextErrors.category = "Choose a category.";
     }
 
+    if (values.saleDeadline && !isIsoDate(values.saleDeadline)) {
+      nextErrors.saleDeadline = "Enter a valid sale deadline.";
+    }
+
+    if (values.location.trim().length > 120) {
+      nextErrors.location = "Keep the location under 120 characters.";
+    }
+
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
@@ -193,6 +254,10 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
 
     if (!values.reason.trim()) {
       nextErrors.reason = "Add why you are considering this purchase.";
+    }
+
+    if (values.notes.trim().length > 1000) {
+      nextErrors.notes = "Keep notes under 1000 characters.";
     }
 
     if (!values.alternative.trim()) {
@@ -216,6 +281,14 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
     const nextErrors: PurchaseWizardErrors = {};
 
     if (isFinancedPaymentMethod(values.paymentMethod)) {
+      if (
+        values.downPayment !== undefined &&
+        !Number.isNaN(values.downPayment) &&
+        !isNonNegativeNumber(values.downPayment)
+      ) {
+        nextErrors.downPayment = "Enter a non-negative down payment.";
+      }
+
       if (!isPositiveNumber(values.monthlyPayment)) {
         nextErrors.monthlyPayment = "Enter the monthly payment for this payment method.";
       }
@@ -352,6 +425,34 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
                   <FieldErrorText id={errorIds.category}>{errors.category}</FieldErrorText>
                 </div>
               </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="purchase-sale-deadline">Sale deadline</Label>
+                  <Input
+                    id="purchase-sale-deadline"
+                    aria-describedby={errors.saleDeadline ? errorIds.saleDeadline : undefined}
+                    aria-invalid={errors.saleDeadline ? "true" : undefined}
+                    type="date"
+                    {...register("saleDeadline")}
+                  />
+                  <FieldErrorText id={errorIds.saleDeadline}>
+                    {errors.saleDeadline}
+                  </FieldErrorText>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="purchase-location">Location</Label>
+                  <Input
+                    id="purchase-location"
+                    aria-describedby={errors.location ? errorIds.location : undefined}
+                    aria-invalid={errors.location ? "true" : undefined}
+                    placeholder="Makati showroom"
+                    {...register("location")}
+                  />
+                  <FieldErrorText id={errorIds.location}>{errors.location}</FieldErrorText>
+                </div>
+              </div>
             </section>
           ) : null}
 
@@ -376,6 +477,18 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
                   {...register("reason")}
                 />
                 <FieldErrorText id={errorIds.reason}>{errors.reason}</FieldErrorText>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="purchase-notes">Notes</Label>
+                <Textarea
+                  id="purchase-notes"
+                  aria-describedby={errors.notes ? errorIds.notes : undefined}
+                  aria-invalid={errors.notes ? "true" : undefined}
+                  placeholder="delivery, warranty, discount details"
+                  {...register("notes")}
+                />
+                <FieldErrorText id={errorIds.notes}>{errors.notes}</FieldErrorText>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -511,11 +624,16 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
                     <Label htmlFor="purchase-down-payment">Down payment</Label>
                     <Input
                       id="purchase-down-payment"
+                      aria-describedby={errors.downPayment ? errorIds.downPayment : undefined}
+                      aria-invalid={errors.downPayment ? "true" : undefined}
                       min="0"
                       placeholder="26000"
                       type="number"
                       {...register("downPayment", { valueAsNumber: true })}
                     />
+                    <FieldErrorText id={errorIds.downPayment}>
+                      {errors.downPayment}
+                    </FieldErrorText>
                   </div>
 
                   <div className="grid gap-2">

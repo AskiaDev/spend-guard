@@ -107,6 +107,10 @@ export interface Database {
           user_id: string;
           item_name: string;
           amount: number;
+          category: string | null;
+          sale_deadline: string | null;
+          location: string | null;
+          notes: string | null;
           urgency: string;
           payment_method: string;
           down_payment: number | null;
@@ -119,7 +123,12 @@ export interface Database {
           safe_to_spend: number;
           monthly_free_cash_flow: number;
           savings_after_purchase: number;
+          emergency_fund_progress: number;
+          debt_pressure: number;
+          goal_delay_months: number;
+          health_score: number;
           cooldown_days: number;
+          status: string;
           advisor_text: string;
           reasons: Json;
           created_at: string;
@@ -128,6 +137,10 @@ export interface Database {
           user_id: string;
           item_name: string;
           amount: number;
+          category?: string | null;
+          sale_deadline?: string | null;
+          location?: string | null;
+          notes?: string | null;
           urgency: string;
           payment_method: string;
           down_payment?: number | null;
@@ -140,7 +153,12 @@ export interface Database {
           safe_to_spend: number;
           monthly_free_cash_flow: number;
           savings_after_purchase: number;
+          emergency_fund_progress?: number;
+          debt_pressure?: number;
+          goal_delay_months?: number;
+          health_score?: number;
           cooldown_days: number;
+          status?: string;
           advisor_text: string;
           reasons: Json;
         };

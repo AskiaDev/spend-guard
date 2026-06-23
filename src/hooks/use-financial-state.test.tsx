@@ -6,6 +6,7 @@ const actions = vi.hoisted(() => ({
   load: vi.fn(),
   saveProfile: vi.fn(),
   saveCheck: vi.fn(),
+  markStatus: vi.fn(),
   createGoal: vi.fn(),
   deleteGoal: vi.fn(),
   createCooldown: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock("@/features/financial-profile/api/save-financial-profile", () => ({
 }));
 vi.mock("@/features/purchase-checker/api/save-purchase-check", () => ({
   savePurchaseCheckAction: actions.saveCheck,
+  markPurchaseCheckStatusAction: actions.markStatus,
 }));
 vi.mock("@/features/goals/api/create-goal", () => ({
   createGoalAction: actions.createGoal,
@@ -59,6 +61,7 @@ describe("useFinancialState Supabase mode", () => {
         createdAt: "2026-06-20T02:00:00.000Z",
       },
     });
+    actions.markStatus.mockResolvedValue({ ok: true, data: null });
     actions.createGoal.mockResolvedValue({ ok: true, data: null });
     actions.deleteGoal.mockResolvedValue({ ok: true, data: null });
     actions.createCooldown.mockResolvedValue({ ok: true, data: null });
@@ -112,6 +115,10 @@ describe("useFinancialState Supabase mode", () => {
       savedCheck = await result.current.runPurchaseCheck({
         itemName: "Phone",
         amount: 25_000,
+        category: "phone",
+        saleDeadline: "2026-07-15",
+        location: "Makati showroom",
+        notes: "Ask if delivery is included.",
         urgency: "can_wait",
         paymentMethod: "cash",
       });
@@ -126,6 +133,7 @@ describe("useFinancialState Supabase mode", () => {
     await act(async () => {
       await result.current.addGoalFromCheck(savedCheck!.check);
       await result.current.addCooldownFromCheck(savedCheck!.check);
+      await result.current.markPurchaseCheckStatus(savedCheck!.check, "bought");
       await result.current.deleteGoal("goal-1");
       await result.current.removeCooldownItem("cooldown-1");
       await result.current.generateWeeklyReport();
@@ -144,6 +152,7 @@ describe("useFinancialState Supabase mode", () => {
     expect(actions.createCooldown).toHaveBeenCalledWith(
       expect.objectContaining({ sourceCheckId: savedCheck?.check.id })
     );
+    expect(actions.markStatus).toHaveBeenCalledWith(savedCheck?.check.id, "bought");
     expect(actions.deleteGoal).toHaveBeenCalledWith("goal-1");
     expect(actions.deleteCooldown).toHaveBeenCalledWith("cooldown-1");
     expect(actions.createReport).toHaveBeenCalledWith(
@@ -187,7 +196,12 @@ describe("useFinancialState Supabase mode", () => {
       safeToSpend: 0,
       monthlyFreeCashFlow: 0,
       savingsAfterPurchase: 0,
+      emergencyProgress: 0,
+      debtPressure: 0,
+      goalDelayMonths: 0,
+      healthScore: 0,
       cooldownDays: 30,
+      status: "checked" as const,
       advisorText: "Wait.",
       reasons: ["This would exceed today's safe-to-spend amount."],
     };
@@ -224,6 +238,14 @@ describe("useFinancialState Supabase mode", () => {
       });
       expect(result.current.error).toBe(message);
     }
+
+    actions.markStatus.mockResolvedValueOnce({ ok: false, error: "Status failed." });
+    await act(async () => {
+      await expect(result.current.markPurchaseCheckStatus(check, "skipped")).rejects.toThrow(
+        "Status failed."
+      );
+    });
+    expect(result.current.error).toBe("Status failed.");
 
     actions.saveVoice.mockResolvedValueOnce({ ok: false, error: "Voice failed." });
     await act(async () => {

@@ -69,6 +69,10 @@ describe("purchaseInputSchema", () => {
       amount: "25000",
       urgency: "can_wait",
       paymentMethod: "installment",
+      category: "phone",
+      saleDeadline: "2026-07-15",
+      location: "  Makati showroom  ",
+      notes: "  Ask if the store includes delivery.  ",
       downPayment: "5000",
       installmentMonths: "12",
       monthlyPayment: "2500",
@@ -78,11 +82,47 @@ describe("purchaseInputSchema", () => {
 
     expect(parsed).toMatchObject({
       amount: 25_000,
+      category: "phone",
+      saleDeadline: "2026-07-15",
+      location: "Makati showroom",
+      notes: "Ask if the store includes delivery.",
       downPayment: 5_000,
       installmentMonths: 12,
       monthlyPayment: 2_500,
       isIncomeGenerating: true,
       currentAlternativeStillWorks: false,
     });
+  });
+
+  it("rejects invalid manual-check metadata", () => {
+    expect(() =>
+      purchaseInputSchema.parse({
+        itemName: "Phone",
+        amount: 25_000,
+        urgency: "can_wait",
+        paymentMethod: "cash",
+        category: "",
+      })
+    ).toThrow();
+
+    expect(() =>
+      purchaseInputSchema.parse({
+        itemName: "Phone",
+        amount: 25_000,
+        urgency: "can_wait",
+        paymentMethod: "cash",
+        saleDeadline: "07/15/2026",
+      })
+    ).toThrow();
+
+    expect(() =>
+      purchaseInputSchema.parse({
+        itemName: "Phone",
+        amount: 25_000,
+        urgency: "can_wait",
+        paymentMethod: "cash",
+        location: "x".repeat(121),
+      })
+    ).toThrow();
   });
 });
