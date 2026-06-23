@@ -45,6 +45,8 @@ interface OnboardingPayload {
   goals: Goal[];
 }
 
+type GoalDraft = Omit<Goal, "id">;
+
 export function useFinancialState() {
   const [snapshot, setSnapshot] = useState<FinancialSnapshot>(() => emptySnapshot);
   const [checks, setChecks] = useState<PurchaseCheck[]>([]);
@@ -148,6 +150,21 @@ export function useFinancialState() {
     [refresh]
   );
 
+  const createGoal = useCallback(
+    async (goalDraft: GoalDraft) => {
+      const result = await createGoalAction(goalDraft);
+
+      if (!result.ok) {
+        setError(result.error);
+        throw new Error(result.error);
+      }
+
+      await refresh();
+      return { id: createId("goal"), ...goalDraft };
+    },
+    [refresh]
+  );
+
   const addGoalFromCheck = useCallback(
     async (check: PurchaseCheck) => {
       const goal: Goal = {
@@ -160,17 +177,9 @@ export function useFinancialState() {
         priority: check.urgency === "need_now" ? "high" : "medium",
       };
 
-      const result = await createGoalAction(goal);
-
-      if (!result.ok) {
-        setError(result.error);
-        return undefined;
-      }
-
-      await refresh();
-      return goal;
+      return createGoal(goal);
     },
-    [refresh]
+    [createGoal]
   );
 
   const addCooldownFromCheck = useCallback(
@@ -227,7 +236,7 @@ export function useFinancialState() {
 
       if (!result.ok) {
         setError(result.error);
-        return;
+        throw new Error(result.error);
       }
 
       await refresh();
@@ -294,6 +303,7 @@ export function useFinancialState() {
     metrics,
     replaceFinancialSetup,
     runPurchaseCheck,
+    createGoal,
     addGoalFromCheck,
     addCooldownFromCheck,
     markPurchaseCheckStatus,

@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { financialSnapshotFixture as defaultSnapshot } from "@/test/fixtures/financial-snapshot";
-import type { FinancialSnapshot } from "@/types/finance";
+import type { FinancialSnapshot, Goal } from "@/types/finance";
 import { GoalsPanel } from "./goals-panel";
 
 const goalsSnapshot: FinancialSnapshot = {
@@ -22,9 +22,30 @@ const goalsSnapshot: FinancialSnapshot = {
   ],
 };
 
+function renderGoalsPanel({
+  snapshot = goalsSnapshot,
+  monthlyFreeCashFlow = 20_000,
+  onCreateGoal = vi.fn().mockResolvedValue(undefined),
+  onDeleteGoal = vi.fn().mockResolvedValue(undefined),
+}: {
+  snapshot?: FinancialSnapshot;
+  monthlyFreeCashFlow?: number;
+  onCreateGoal?: (goal: Omit<Goal, "id">) => Promise<Goal | undefined>;
+  onDeleteGoal?: (id: string) => Promise<void>;
+} = {}) {
+  return render(
+    <GoalsPanel
+      snapshot={snapshot}
+      monthlyFreeCashFlow={monthlyFreeCashFlow}
+      onCreateGoal={onCreateGoal}
+      onDeleteGoal={onDeleteGoal}
+    />
+  );
+}
+
 describe("GoalsPanel", () => {
   it("renders goal summary metrics, detailed cards, and advisor guidance", () => {
-    render(<GoalsPanel snapshot={goalsSnapshot} onDeleteGoal={vi.fn()} />);
+    renderGoalsPanel();
 
     const summary = screen.getByTestId("goals-summary-metrics");
     expect(within(summary).getByText("Active Goals")).toBeVisible();
@@ -37,8 +58,7 @@ describe("GoalsPanel", () => {
     expect(within(summary).getByText("₱15,000")).toBeVisible();
 
     const newGoalButton = screen.getByRole("button", { name: "New Goal" });
-    expect(newGoalButton).toBeDisabled();
-    expect(screen.getByText(/goal creation is coming soon/i)).toBeVisible();
+    expect(newGoalButton).toBeEnabled();
 
     const emergencyGoal = screen.getByRole("article", { name: "Emergency buffer goal" });
     expect(within(emergencyGoal).getByText("Emergency buffer")).toBeVisible();
@@ -47,6 +67,9 @@ describe("GoalsPanel", () => {
     expect(within(emergencyGoal).getByText("₱10,000 monthly contribution")).toBeVisible();
     expect(within(emergencyGoal).getByText("Estimated completion Dec 31, 2026")).toBeVisible();
     expect(within(emergencyGoal).getByText("Safe-buy date Dec 31, 2026")).toBeVisible();
+    expect(within(emergencyGoal).getByText("Needed monthly")).toBeVisible();
+    expect(within(emergencyGoal).getByText("₱10,000 / payday")).toBeVisible();
+    expect(within(emergencyGoal).getByText("Realistic")).toBeVisible();
     expect(within(emergencyGoal).getByText("Most important")).toBeVisible();
     expect(
       within(emergencyGoal).getByRole("progressbar", { name: "Emergency buffer progress" })
@@ -61,6 +84,7 @@ describe("GoalsPanel", () => {
     expect(within(headphonesGoal).getByText("₱5,000 monthly contribution")).toBeVisible();
     expect(within(headphonesGoal).getByText("Estimated completion Oct 15, 2026")).toBeVisible();
     expect(within(headphonesGoal).getByText("Safe-buy date Oct 15, 2026")).toBeVisible();
+    expect(within(headphonesGoal).getByText("₱5,000 / payday")).toBeVisible();
 
     expect(screen.getByText("Advisor tip")).toBeVisible();
     expect(
@@ -68,11 +92,86 @@ describe("GoalsPanel", () => {
     ).toBeVisible();
   });
 
+  it("creates a new goal from the enabled goal form", async () => {
+    const user = userEvent.setup();
+    const onCreateGoal = vi.fn().mockResolvedValue(undefined);
+
+    renderGoalsPanel({ onCreateGoal });
+
+    await user.click(screen.getByRole("button", { name: "New Goal" }));
+
+    await user.type(screen.getByLabelText("Goal name"), "Camera upgrade");
+    await user.type(screen.getByLabelText("Target amount"), "60000");
+    await user.type(screen.getByLabelText("Saved so far"), "10000");
+    await user.type(screen.getByLabelText("Monthly contribution"), "8000");
+    await user.type(screen.getByLabelText("Target date"), "2026-12-15");
+    await user.selectOptions(screen.getByLabelText("Priority"), "high");
+    await user.click(screen.getByRole("button", { name: "Create Goal" }));
+
+    expect(onCreateGoal).toHaveBeenCalledWith({
+      label: "Camera upgrade",
+      targetAmount: 60_000,
+      savedAmount: 10_000,
+      monthlyContribution: 8_000,
+      targetDate: "2026-12-15",
+      priority: "high",
+    });
+  });
+
+  it("blocks invalid goal input with accessible errors and allows retry", async () => {
+    const user = userEvent.setup();
+    const onCreateGoal = vi.fn().mockResolvedValue(undefined);
+
+    renderGoalsPanel({ onCreateGoal });
+
+    await user.click(screen.getByRole("button", { name: "New Goal" }));
+    await user.click(screen.getByRole("button", { name: "Create Goal" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Name this goal.");
+    expect(alert).toHaveTextContent("Enter a target amount above zero.");
+    expect(onCreateGoal).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText("Goal name"), "Starter fund");
+    await user.type(screen.getByLabelText("Target amount"), "12000");
+    await user.type(screen.getByLabelText("Monthly contribution"), "3000");
+    await user.click(screen.getByRole("button", { name: "Create Goal" }));
+
+    expect(onCreateGoal).toHaveBeenCalledOnce();
+  });
+
+  it("shows not-realistic guidance when needed funding exceeds free cash flow", () => {
+    renderGoalsPanel({ monthlyFreeCashFlow: 2_000 });
+
+    const emergencyGoal = screen.getByRole("article", { name: "Emergency buffer goal" });
+    expect(within(emergencyGoal).getByText("Tight plan")).toBeVisible();
+    expect(within(emergencyGoal).getByText(/above current free cash flow/i)).toBeVisible();
+  });
+
+  it("uses the profile pay frequency for per-payday guidance", () => {
+    renderGoalsPanel({
+      snapshot: {
+        ...goalsSnapshot,
+        profile: {
+          ...goalsSnapshot.profile,
+          payFrequency: "biweekly",
+        },
+        goals: [goalsSnapshot.goals[1]],
+      },
+    });
+
+    const headphonesGoal = screen.getByRole("article", {
+      name: "Noise-cancelling headphones goal",
+    });
+
+    expect(within(headphonesGoal).getByText("₱2,308 / payday")).toBeVisible();
+  });
+
   it("keeps goal delete controls accessible and calls the delete mutation", async () => {
     const user = userEvent.setup();
     const onDeleteGoal = vi.fn().mockResolvedValue(undefined);
 
-    render(<GoalsPanel snapshot={goalsSnapshot} onDeleteGoal={onDeleteGoal} />);
+    renderGoalsPanel({ onDeleteGoal });
 
     expect(screen.getByRole("button", { name: "Delete Emergency buffer" })).toBeVisible();
 
@@ -87,7 +186,7 @@ describe("GoalsPanel", () => {
     process.env.TZ = "America/Los_Angeles";
 
     try {
-      render(<GoalsPanel snapshot={goalsSnapshot} onDeleteGoal={vi.fn()} />);
+      renderGoalsPanel();
 
       expect(screen.getByText("Safe-buy date Dec 31, 2026")).toBeVisible();
       expect(screen.queryByText(/Dec 30, 2026/)).not.toBeInTheDocument();
@@ -105,20 +204,17 @@ describe("GoalsPanel", () => {
     process.env.TZ = "America/Los_Angeles";
 
     try {
-      render(
-        <GoalsPanel
-          snapshot={{
-            ...goalsSnapshot,
-            goals: [
-              {
-                ...goalsSnapshot.goals[0],
-                targetDate: "2026-12-31T00:00:00.000Z",
-              },
-            ],
-          }}
-          onDeleteGoal={vi.fn()}
-        />
-      );
+      renderGoalsPanel({
+        snapshot: {
+          ...goalsSnapshot,
+          goals: [
+            {
+              ...goalsSnapshot.goals[0],
+              targetDate: "2026-12-31T00:00:00.000Z",
+            },
+          ],
+        },
+      });
 
       expect(screen.getByText("Safe-buy date Dec 31, 2026")).toBeVisible();
       expect(screen.queryByText(/Dec 30, 2026/)).not.toBeInTheDocument();
@@ -132,7 +228,7 @@ describe("GoalsPanel", () => {
   });
 
   it("uses neutral summary copy when there are no goals", () => {
-    render(<GoalsPanel snapshot={{ ...goalsSnapshot, goals: [] }} onDeleteGoal={vi.fn()} />);
+    renderGoalsPanel({ snapshot: { ...goalsSnapshot, goals: [] } });
 
     const summary = screen.getByTestId("goals-summary-metrics");
 
@@ -141,24 +237,21 @@ describe("GoalsPanel", () => {
   });
 
   it("does not present zero-target goals as fully funded", () => {
-    render(
-      <GoalsPanel
-        snapshot={{
-          ...goalsSnapshot,
-          goals: [
-            {
-              id: "goal_zero_target",
-              label: "Goal without target",
-              targetAmount: 0,
-              savedAmount: 0,
-              monthlyContribution: 1000,
-              priority: "low",
-            },
-          ],
-        }}
-        onDeleteGoal={vi.fn()}
-      />
-    );
+    renderGoalsPanel({
+      snapshot: {
+        ...goalsSnapshot,
+        goals: [
+          {
+            id: "goal_zero_target",
+            label: "Goal without target",
+            targetAmount: 0,
+            savedAmount: 0,
+            monthlyContribution: 1000,
+            priority: "low",
+          },
+        ],
+      },
+    });
 
     const goal = screen.getByRole("article", { name: "Goal without target goal" });
 
@@ -170,24 +263,21 @@ describe("GoalsPanel", () => {
   });
 
   it("shows funded dates for completed goals without fabricating today's date", () => {
-    render(
-      <GoalsPanel
-        snapshot={{
-          ...goalsSnapshot,
-          goals: [
-            {
-              id: "goal_completed",
-              label: "Completed trip fund",
-              targetAmount: 10000,
-              savedAmount: 12000,
-              monthlyContribution: 0,
-              priority: "medium",
-            },
-          ],
-        }}
-        onDeleteGoal={vi.fn()}
-      />
-    );
+    renderGoalsPanel({
+      snapshot: {
+        ...goalsSnapshot,
+        goals: [
+          {
+            id: "goal_completed",
+            label: "Completed trip fund",
+            targetAmount: 10000,
+            savedAmount: 12000,
+            monthlyContribution: 0,
+            priority: "medium",
+          },
+        ],
+      },
+    });
 
     const goal = screen.getByRole("article", { name: "Completed trip fund goal" });
 

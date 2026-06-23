@@ -80,7 +80,14 @@ export function GoalsPageContent() {
     return <HydrationNotice />;
   }
 
-  return <GoalsPanel snapshot={state.snapshot} onDeleteGoal={state.deleteGoal} />;
+  return (
+    <GoalsPanel
+      snapshot={state.snapshot}
+      monthlyFreeCashFlow={state.metrics.monthlyFreeCashFlow}
+      onCreateGoal={state.createGoal}
+      onDeleteGoal={state.deleteGoal}
+    />
+  );
 }
 
 export function CooldownPageContent() {

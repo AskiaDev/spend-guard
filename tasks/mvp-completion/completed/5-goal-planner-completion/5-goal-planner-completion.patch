@@ -1,0 +1,1172 @@
+diff --git a/src/app/(app)/_components/page-adapters.test.tsx b/src/app/(app)/_components/page-adapters.test.tsx
+index 587f3ed..dadb245 100644
+--- a/src/app/(app)/_components/page-adapters.test.tsx
++++ b/src/app/(app)/_components/page-adapters.test.tsx
+@@ -114,6 +114,7 @@ describe("page adapters", () => {
+       replaceFinancialSetup: vi.fn(),
+       runPurchaseCheck: vi.fn(),
+       addGoalFromCheck: vi.fn(),
++      createGoal: vi.fn(),
+       addCooldownFromCheck: vi.fn(),
+       markPurchaseCheckStatus: vi.fn(),
+       removeCooldownItem: vi.fn(),
+@@ -217,6 +218,8 @@ describe("page adapters", () => {
+ 
+     const props = vi.mocked(GoalsPanel).mock.calls[0][0];
+     expect(props.snapshot).toBe(financialState.snapshot);
++    expect(props.monthlyFreeCashFlow).toBe(financialState.metrics.monthlyFreeCashFlow);
++    expect(props.onCreateGoal).toBe(financialState.createGoal);
+     expect(props.onDeleteGoal).toBe(financialState.deleteGoal);
+   });
+ 
+diff --git a/src/app/(app)/_components/page-adapters.tsx b/src/app/(app)/_components/page-adapters.tsx
+index 79ddc1f..8c47d19 100644
+--- a/src/app/(app)/_components/page-adapters.tsx
++++ b/src/app/(app)/_components/page-adapters.tsx
+@@ -80,7 +80,14 @@ export function GoalsPageContent() {
+     return <HydrationNotice />;
+   }
+ 
+-  return <GoalsPanel snapshot={state.snapshot} onDeleteGoal={state.deleteGoal} />;
++  return (
++    <GoalsPanel
++      snapshot={state.snapshot}
++      monthlyFreeCashFlow={state.metrics.monthlyFreeCashFlow}
++      onCreateGoal={state.createGoal}
++      onDeleteGoal={state.deleteGoal}
++    />
++  );
+ }
+ 
+ export function CooldownPageContent() {
+diff --git a/src/features/goals/api/create-goal.test.ts b/src/features/goals/api/create-goal.test.ts
+new file mode 100644
+index 0000000..a41a93e
+--- /dev/null
++++ b/src/features/goals/api/create-goal.test.ts
+@@ -0,0 +1,96 @@
++import { beforeEach, describe, expect, it, vi } from "vitest";
++import { createGoalAction, deleteGoalAction } from "./create-goal";
++
++vi.mock("@/lib/supabase/server", () => ({ requireUserId: vi.fn() }));
++
++import { requireUserId } from "@/lib/supabase/server";
++
++const mockedRequireUserId = vi.mocked(requireUserId);
++
++describe("goal actions", () => {
++  beforeEach(() => {
++    vi.clearAllMocks();
++  });
++
++  it("inserts a validated goal for the authenticated user", async () => {
++    const insert = vi.fn(async () => ({ error: null }));
++    const supabase = { from: vi.fn(() => ({ insert })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await createGoalAction({
++      label: "Camera upgrade",
++      targetAmount: 60_000,
++      savedAmount: 10_000,
++      monthlyContribution: 8_000,
++      targetDate: "2026-12-15",
++      priority: "high",
++    });
++
++    expect(result).toEqual({ ok: true, data: null });
++    expect(supabase.from).toHaveBeenCalledWith("goals");
++    expect(insert).toHaveBeenCalledWith({
++      user_id: "user-1",
++      label: "Camera upgrade",
++      target_amount: 60_000,
++      saved_amount: 10_000,
++      monthly_contribution: 8_000,
++      target_date: "2026-12-15",
++      priority: "high",
++    });
++  });
++
++  it("rejects invalid goal payloads before auth or database access", async () => {
++    const result = await createGoalAction({
++      label: "",
++      targetAmount: 0,
++      savedAmount: 0,
++      monthlyContribution: 0,
++      targetDate: "not-a-date",
++      priority: "medium",
++    });
++
++    expect(result.ok).toBe(false);
++    expect(result).toMatchObject({
++      error: "Check the goal fields.",
++      fieldErrors: {
++        label: ["Name this goal."],
++        targetAmount: ["Enter a target amount above zero."],
++        monthlyContribution: ["Enter a monthly contribution above zero."],
++        targetDate: ["Enter a valid target date."],
++      },
++    });
++    expect(mockedRequireUserId).not.toHaveBeenCalled();
++  });
++
++  it("returns a friendly error when insertion fails", async () => {
++    const insert = vi.fn(async () => ({ error: { message: "insert failed" } }));
++    const supabase = { from: vi.fn(() => ({ insert })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await createGoalAction({
++      label: "Camera upgrade",
++      targetAmount: 60_000,
++      savedAmount: 10_000,
++      monthlyContribution: 8_000,
++      priority: "high",
++    });
++
++    expect(result).toEqual({ ok: false, error: "Unable to create this goal." });
++  });
++
++  it("deletes goals only for the authenticated user", async () => {
++    const eqUser = vi.fn(async () => ({ error: null }));
++    const eqId = vi.fn(() => ({ eq: eqUser }));
++    const remove = vi.fn(() => ({ eq: eqId }));
++    const supabase = { from: vi.fn(() => ({ delete: remove })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await deleteGoalAction("goal-1");
++
++    expect(result).toEqual({ ok: true, data: null });
++    expect(supabase.from).toHaveBeenCalledWith("goals");
++    expect(remove).toHaveBeenCalled();
++    expect(eqId).toHaveBeenCalledWith("id", "goal-1");
++    expect(eqUser).toHaveBeenCalledWith("user_id", "user-1");
++  });
++});
+diff --git a/src/features/goals/components/goals-panel.test.tsx b/src/features/goals/components/goals-panel.test.tsx
+index 6eb6124..1b4b06d 100644
+--- a/src/features/goals/components/goals-panel.test.tsx
++++ b/src/features/goals/components/goals-panel.test.tsx
+@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
+ import { describe, expect, it, vi } from "vitest";
+ 
+ import { financialSnapshotFixture as defaultSnapshot } from "@/test/fixtures/financial-snapshot";
+-import type { FinancialSnapshot } from "@/types/finance";
++import type { FinancialSnapshot, Goal } from "@/types/finance";
+ import { GoalsPanel } from "./goals-panel";
+ 
+ const goalsSnapshot: FinancialSnapshot = {
+@@ -22,9 +22,30 @@ const goalsSnapshot: FinancialSnapshot = {
+   ],
+ };
+ 
++function renderGoalsPanel({
++  snapshot = goalsSnapshot,
++  monthlyFreeCashFlow = 20_000,
++  onCreateGoal = vi.fn().mockResolvedValue(undefined),
++  onDeleteGoal = vi.fn().mockResolvedValue(undefined),
++}: {
++  snapshot?: FinancialSnapshot;
++  monthlyFreeCashFlow?: number;
++  onCreateGoal?: (goal: Omit<Goal, "id">) => Promise<Goal | undefined>;
++  onDeleteGoal?: (id: string) => Promise<void>;
++} = {}) {
++  return render(
++    <GoalsPanel
++      snapshot={snapshot}
++      monthlyFreeCashFlow={monthlyFreeCashFlow}
++      onCreateGoal={onCreateGoal}
++      onDeleteGoal={onDeleteGoal}
++    />
++  );
++}
++
+ describe("GoalsPanel", () => {
+   it("renders goal summary metrics, detailed cards, and advisor guidance", () => {
+-    render(<GoalsPanel snapshot={goalsSnapshot} onDeleteGoal={vi.fn()} />);
++    renderGoalsPanel();
+ 
+     const summary = screen.getByTestId("goals-summary-metrics");
+     expect(within(summary).getByText("Active Goals")).toBeVisible();
+@@ -37,8 +58,7 @@ describe("GoalsPanel", () => {
+     expect(within(summary).getByText("₱15,000")).toBeVisible();
+ 
+     const newGoalButton = screen.getByRole("button", { name: "New Goal" });
+-    expect(newGoalButton).toBeDisabled();
+-    expect(screen.getByText(/goal creation is coming soon/i)).toBeVisible();
++    expect(newGoalButton).toBeEnabled();
+ 
+     const emergencyGoal = screen.getByRole("article", { name: "Emergency buffer goal" });
+     expect(within(emergencyGoal).getByText("Emergency buffer")).toBeVisible();
+@@ -47,6 +67,9 @@ describe("GoalsPanel", () => {
+     expect(within(emergencyGoal).getByText("₱10,000 monthly contribution")).toBeVisible();
+     expect(within(emergencyGoal).getByText("Estimated completion Dec 31, 2026")).toBeVisible();
+     expect(within(emergencyGoal).getByText("Safe-buy date Dec 31, 2026")).toBeVisible();
++    expect(within(emergencyGoal).getByText("Needed monthly")).toBeVisible();
++    expect(within(emergencyGoal).getByText("₱10,000 / payday")).toBeVisible();
++    expect(within(emergencyGoal).getByText("Realistic")).toBeVisible();
+     expect(within(emergencyGoal).getByText("Most important")).toBeVisible();
+     expect(
+       within(emergencyGoal).getByRole("progressbar", { name: "Emergency buffer progress" })
+@@ -61,6 +84,7 @@ describe("GoalsPanel", () => {
+     expect(within(headphonesGoal).getByText("₱5,000 monthly contribution")).toBeVisible();
+     expect(within(headphonesGoal).getByText("Estimated completion Oct 15, 2026")).toBeVisible();
+     expect(within(headphonesGoal).getByText("Safe-buy date Oct 15, 2026")).toBeVisible();
++    expect(within(headphonesGoal).getByText("₱5,000 / payday")).toBeVisible();
+ 
+     expect(screen.getByText("Advisor tip")).toBeVisible();
+     expect(
+@@ -68,11 +92,86 @@ describe("GoalsPanel", () => {
+     ).toBeVisible();
+   });
+ 
++  it("creates a new goal from the enabled goal form", async () => {
++    const user = userEvent.setup();
++    const onCreateGoal = vi.fn().mockResolvedValue(undefined);
++
++    renderGoalsPanel({ onCreateGoal });
++
++    await user.click(screen.getByRole("button", { name: "New Goal" }));
++
++    await user.type(screen.getByLabelText("Goal name"), "Camera upgrade");
++    await user.type(screen.getByLabelText("Target amount"), "60000");
++    await user.type(screen.getByLabelText("Saved so far"), "10000");
++    await user.type(screen.getByLabelText("Monthly contribution"), "8000");
++    await user.type(screen.getByLabelText("Target date"), "2026-12-15");
++    await user.selectOptions(screen.getByLabelText("Priority"), "high");
++    await user.click(screen.getByRole("button", { name: "Create Goal" }));
++
++    expect(onCreateGoal).toHaveBeenCalledWith({
++      label: "Camera upgrade",
++      targetAmount: 60_000,
++      savedAmount: 10_000,
++      monthlyContribution: 8_000,
++      targetDate: "2026-12-15",
++      priority: "high",
++    });
++  });
++
++  it("blocks invalid goal input with accessible errors and allows retry", async () => {
++    const user = userEvent.setup();
++    const onCreateGoal = vi.fn().mockResolvedValue(undefined);
++
++    renderGoalsPanel({ onCreateGoal });
++
++    await user.click(screen.getByRole("button", { name: "New Goal" }));
++    await user.click(screen.getByRole("button", { name: "Create Goal" }));
++
++    const alert = await screen.findByRole("alert");
++    expect(alert).toHaveTextContent("Name this goal.");
++    expect(alert).toHaveTextContent("Enter a target amount above zero.");
++    expect(onCreateGoal).not.toHaveBeenCalled();
++
++    await user.type(screen.getByLabelText("Goal name"), "Starter fund");
++    await user.type(screen.getByLabelText("Target amount"), "12000");
++    await user.type(screen.getByLabelText("Monthly contribution"), "3000");
++    await user.click(screen.getByRole("button", { name: "Create Goal" }));
++
++    expect(onCreateGoal).toHaveBeenCalledOnce();
++  });
++
++  it("shows not-realistic guidance when needed funding exceeds free cash flow", () => {
++    renderGoalsPanel({ monthlyFreeCashFlow: 2_000 });
++
++    const emergencyGoal = screen.getByRole("article", { name: "Emergency buffer goal" });
++    expect(within(emergencyGoal).getByText("Tight plan")).toBeVisible();
++    expect(within(emergencyGoal).getByText(/above current free cash flow/i)).toBeVisible();
++  });
++
++  it("uses the profile pay frequency for per-payday guidance", () => {
++    renderGoalsPanel({
++      snapshot: {
++        ...goalsSnapshot,
++        profile: {
++          ...goalsSnapshot.profile,
++          payFrequency: "biweekly",
++        },
++        goals: [goalsSnapshot.goals[1]],
++      },
++    });
++
++    const headphonesGoal = screen.getByRole("article", {
++      name: "Noise-cancelling headphones goal",
++    });
++
++    expect(within(headphonesGoal).getByText("₱2,308 / payday")).toBeVisible();
++  });
++
+   it("keeps goal delete controls accessible and calls the delete mutation", async () => {
+     const user = userEvent.setup();
+     const onDeleteGoal = vi.fn().mockResolvedValue(undefined);
+ 
+-    render(<GoalsPanel snapshot={goalsSnapshot} onDeleteGoal={onDeleteGoal} />);
++    renderGoalsPanel({ onDeleteGoal });
+ 
+     expect(screen.getByRole("button", { name: "Delete Emergency buffer" })).toBeVisible();
+ 
+@@ -87,7 +186,7 @@ describe("GoalsPanel", () => {
+     process.env.TZ = "America/Los_Angeles";
+ 
+     try {
+-      render(<GoalsPanel snapshot={goalsSnapshot} onDeleteGoal={vi.fn()} />);
++      renderGoalsPanel();
+ 
+       expect(screen.getByText("Safe-buy date Dec 31, 2026")).toBeVisible();
+       expect(screen.queryByText(/Dec 30, 2026/)).not.toBeInTheDocument();
+@@ -105,20 +204,17 @@ describe("GoalsPanel", () => {
+     process.env.TZ = "America/Los_Angeles";
+ 
+     try {
+-      render(
+-        <GoalsPanel
+-          snapshot={{
+-            ...goalsSnapshot,
+-            goals: [
+-              {
+-                ...goalsSnapshot.goals[0],
+-                targetDate: "2026-12-31T00:00:00.000Z",
+-              },
+-            ],
+-          }}
+-          onDeleteGoal={vi.fn()}
+-        />
+-      );
++      renderGoalsPanel({
++        snapshot: {
++          ...goalsSnapshot,
++          goals: [
++            {
++              ...goalsSnapshot.goals[0],
++              targetDate: "2026-12-31T00:00:00.000Z",
++            },
++          ],
++        },
++      });
+ 
+       expect(screen.getByText("Safe-buy date Dec 31, 2026")).toBeVisible();
+       expect(screen.queryByText(/Dec 30, 2026/)).not.toBeInTheDocument();
+@@ -132,7 +228,7 @@ describe("GoalsPanel", () => {
+   });
+ 
+   it("uses neutral summary copy when there are no goals", () => {
+-    render(<GoalsPanel snapshot={{ ...goalsSnapshot, goals: [] }} onDeleteGoal={vi.fn()} />);
++    renderGoalsPanel({ snapshot: { ...goalsSnapshot, goals: [] } });
+ 
+     const summary = screen.getByTestId("goals-summary-metrics");
+ 
+@@ -141,24 +237,21 @@ describe("GoalsPanel", () => {
+   });
+ 
+   it("does not present zero-target goals as fully funded", () => {
+-    render(
+-      <GoalsPanel
+-        snapshot={{
+-          ...goalsSnapshot,
+-          goals: [
+-            {
+-              id: "goal_zero_target",
+-              label: "Goal without target",
+-              targetAmount: 0,
+-              savedAmount: 0,
+-              monthlyContribution: 1000,
+-              priority: "low",
+-            },
+-          ],
+-        }}
+-        onDeleteGoal={vi.fn()}
+-      />
+-    );
++    renderGoalsPanel({
++      snapshot: {
++        ...goalsSnapshot,
++        goals: [
++          {
++            id: "goal_zero_target",
++            label: "Goal without target",
++            targetAmount: 0,
++            savedAmount: 0,
++            monthlyContribution: 1000,
++            priority: "low",
++          },
++        ],
++      },
++    });
+ 
+     const goal = screen.getByRole("article", { name: "Goal without target goal" });
+ 
+@@ -170,24 +263,21 @@ describe("GoalsPanel", () => {
+   });
+ 
+   it("shows funded dates for completed goals without fabricating today's date", () => {
+-    render(
+-      <GoalsPanel
+-        snapshot={{
+-          ...goalsSnapshot,
+-          goals: [
+-            {
+-              id: "goal_completed",
+-              label: "Completed trip fund",
+-              targetAmount: 10000,
+-              savedAmount: 12000,
+-              monthlyContribution: 0,
+-              priority: "medium",
+-            },
+-          ],
+-        }}
+-        onDeleteGoal={vi.fn()}
+-      />
+-    );
++    renderGoalsPanel({
++      snapshot: {
++        ...goalsSnapshot,
++        goals: [
++          {
++            id: "goal_completed",
++            label: "Completed trip fund",
++            targetAmount: 10000,
++            savedAmount: 12000,
++            monthlyContribution: 0,
++            priority: "medium",
++          },
++        ],
++      },
++    });
+ 
+     const goal = screen.getByRole("article", { name: "Completed trip fund goal" });
+ 
+diff --git a/src/features/goals/components/goals-panel.tsx b/src/features/goals/components/goals-panel.tsx
+index 3632a1a..93d55d9 100644
+--- a/src/features/goals/components/goals-panel.tsx
++++ b/src/features/goals/components/goals-panel.tsx
+@@ -1,25 +1,116 @@
+ "use client";
+ 
+-import { CalendarDays, Lightbulb, Plus, Target, Trash2 } from "lucide-react";
+-import type { ReactNode } from "react";
++import { AlertTriangle, CalendarDays, CheckCircle2, Lightbulb, Plus, Target, Trash2, X } from "lucide-react";
++import { useState, type FormEvent, type ReactNode } from "react";
+ 
+ import { Badge } from "@/components/ui/badge";
+ import { Button } from "@/components/ui/button";
+ import { Card, CardContent } from "@/components/ui/card";
++import { FieldError, Input, Label, Select } from "@/components/ui/form-fields";
+ import { Progress } from "@/components/ui/progress";
+ import { advisorInsight, referenceGoals } from "@/features/reference-data";
+ import { formatCurrency } from "@/lib/utils";
+-import type { CurrencyCode, FinancialSnapshot, Goal } from "@/types/finance";
++import type { CurrencyCode, FinancialSnapshot, Goal, PayFrequency } from "@/types/finance";
++
++type GoalDraft = Omit<Goal, "id">;
++
++type GoalFormValues = {
++  label: string;
++  targetAmount: string;
++  savedAmount: string;
++  monthlyContribution: string;
++  targetDate: string;
++  priority: Goal["priority"];
++};
++
++type GoalFormErrors = Partial<Record<keyof GoalFormValues, string>>;
++
++const emptyGoalForm: GoalFormValues = {
++  label: "",
++  targetAmount: "",
++  savedAmount: "0",
++  monthlyContribution: "",
++  targetDate: "",
++  priority: "medium",
++};
++
++const payPeriodsPerMonth: Record<PayFrequency, number> = {
++  monthly: 1,
++  semi_monthly: 2,
++  biweekly: 26 / 12,
++  weekly: 52 / 12,
++};
+ 
+ export function GoalsPanel({
+   snapshot,
++  monthlyFreeCashFlow,
++  onCreateGoal,
+   onDeleteGoal,
+ }: {
+   snapshot: FinancialSnapshot;
++  monthlyFreeCashFlow: number;
++  onCreateGoal: (goal: GoalDraft) => Promise<Goal | undefined>;
+   onDeleteGoal: (id: string) => Promise<void>;
+ }) {
+   const currency = snapshot.profile.currency;
++  const payFrequency = snapshot.profile.payFrequency ?? "monthly";
+   const summary = getGoalSummary(snapshot.goals);
++  const [isCreating, setIsCreating] = useState(false);
++  const [formValues, setFormValues] = useState<GoalFormValues>(emptyGoalForm);
++  const [formErrors, setFormErrors] = useState<GoalFormErrors>({});
++  const [formMessage, setFormMessage] = useState<string | null>(null);
++  const [pendingCreate, setPendingCreate] = useState(false);
++  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
++
++  const formErrorMessages = Object.values(formErrors).filter(Boolean);
++
++  function updateField<K extends keyof GoalFormValues>(field: K, value: GoalFormValues[K]) {
++    setFormValues((current) => ({ ...current, [field]: value }));
++    setFormErrors((current) => {
++      const rest = { ...current };
++      delete rest[field];
++      return rest;
++    });
++    setFormMessage(null);
++  }
++
++  async function submitGoal(event: FormEvent<HTMLFormElement>) {
++    event.preventDefault();
++    setFormMessage(null);
++    const parsed = parseGoalForm(formValues);
++
++    if (!parsed.ok) {
++      setFormErrors(parsed.errors);
++      return;
++    }
++
++    setPendingCreate(true);
++
++    try {
++      await onCreateGoal(parsed.goal);
++      setFormValues(emptyGoalForm);
++      setFormErrors({});
++      setIsCreating(false);
++      setFormMessage("Goal created.");
++    } catch {
++      setFormMessage("We couldn't create this goal. Please try again.");
++    } finally {
++      setPendingCreate(false);
++    }
++  }
++
++  async function deleteGoal(id: string) {
++    setFormMessage(null);
++    setPendingDeleteId(id);
++
++    try {
++      await onDeleteGoal(id);
++    } catch {
++      setFormMessage("We couldn't delete this goal. Please try again.");
++    } finally {
++      setPendingDeleteId(null);
++    }
++  }
+ 
+   return (
+     <div className="grid gap-5">
+@@ -45,16 +136,172 @@ export function GoalsPanel({
+           type="button"
+           variant="default"
+           className="sm:w-auto"
+-          disabled
+-          aria-describedby="new-goal-availability"
++          onClick={() => {
++            setIsCreating(true);
++            setFormMessage(null);
++          }}
++          aria-expanded={isCreating}
+         >
+           <Plus className="size-4" aria-hidden="true" />
+           New Goal
+         </Button>
+       </div>
+-      <p id="new-goal-availability" className="-mt-3 text-xs leading-5 text-muted">
+-        Goal creation is coming soon. For now, create goals from purchase decisions or onboarding.
+-      </p>
++
++      {formMessage ? (
++        <p
++          role={formMessage.startsWith("We couldn't") ? "alert" : "status"}
++          className="rounded-control border border-border bg-slate-50 px-3 py-2 text-sm text-muted"
++        >
++          {formMessage}
++        </p>
++      ) : null}
++
++      {isCreating ? (
++        <Card aria-labelledby="new-goal-heading">
++          <CardContent>
++            <form className="grid gap-4" onSubmit={submitGoal} noValidate>
++              <div className="flex items-start justify-between gap-4">
++                <div>
++                  <h3 id="new-goal-heading" className="text-lg font-semibold text-foreground">
++                    New savings goal
++                  </h3>
++                  <p className="mt-1 text-sm leading-6 text-muted">
++                    Set a target, then check the monthly and payday funding pressure.
++                  </p>
++                </div>
++                <Button
++                  type="button"
++                  variant="ghost"
++                  size="icon"
++                  aria-label="Cancel new goal"
++                  onClick={() => {
++                    setIsCreating(false);
++                    setFormValues(emptyGoalForm);
++                    setFormErrors({});
++                  }}
++                >
++                  <X className="size-4" aria-hidden="true" />
++                </Button>
++              </div>
++
++              {formErrorMessages.length > 0 ? (
++                <div
++                  role="alert"
++                  className="rounded-control border border-risk/20 bg-red-50 px-3 py-2 text-sm text-risk"
++                >
++                  <p className="font-semibold">Check the goal fields.</p>
++                  <ul className="mt-1 list-disc space-y-1 pl-4">
++                    {formErrorMessages.map((message) => (
++                      <li key={message}>{message}</li>
++                    ))}
++                  </ul>
++                </div>
++              ) : null}
++
++              <div className="grid gap-4 md:grid-cols-2">
++                <div className="grid gap-2">
++                  <Label htmlFor="goal-label">Goal name</Label>
++                  <Input
++                    id="goal-label"
++                    value={formValues.label}
++                    onChange={(event) => updateField("label", event.target.value)}
++                    aria-invalid={formErrors.label ? "true" : undefined}
++                  />
++                  <FieldError>{formErrors.label}</FieldError>
++                </div>
++
++                <div className="grid gap-2">
++                  <Label htmlFor="goal-priority">Priority</Label>
++                  <Select
++                    id="goal-priority"
++                    value={formValues.priority}
++                    onChange={(event) =>
++                      updateField("priority", event.target.value as Goal["priority"])
++                    }
++                  >
++                    <option value="high">High priority</option>
++                    <option value="medium">Medium priority</option>
++                    <option value="low">Low priority</option>
++                  </Select>
++                </div>
++              </div>
++
++              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
++                <div className="grid gap-2">
++                  <Label htmlFor="goal-target">Target amount</Label>
++                  <Input
++                    id="goal-target"
++                    inputMode="decimal"
++                    type="number"
++                    min="0"
++                    value={formValues.targetAmount}
++                    onChange={(event) => updateField("targetAmount", event.target.value)}
++                    aria-invalid={formErrors.targetAmount ? "true" : undefined}
++                  />
++                  <FieldError>{formErrors.targetAmount}</FieldError>
++                </div>
++
++                <div className="grid gap-2">
++                  <Label htmlFor="goal-saved">Saved so far</Label>
++                  <Input
++                    id="goal-saved"
++                    inputMode="decimal"
++                    type="number"
++                    min="0"
++                    value={formValues.savedAmount}
++                    onChange={(event) => updateField("savedAmount", event.target.value)}
++                    aria-invalid={formErrors.savedAmount ? "true" : undefined}
++                  />
++                  <FieldError>{formErrors.savedAmount}</FieldError>
++                </div>
++
++                <div className="grid gap-2">
++                  <Label htmlFor="goal-monthly">Monthly contribution</Label>
++                  <Input
++                    id="goal-monthly"
++                    inputMode="decimal"
++                    type="number"
++                    min="0"
++                    value={formValues.monthlyContribution}
++                    onChange={(event) => updateField("monthlyContribution", event.target.value)}
++                    aria-invalid={formErrors.monthlyContribution ? "true" : undefined}
++                  />
++                  <FieldError>{formErrors.monthlyContribution}</FieldError>
++                </div>
++
++                <div className="grid gap-2">
++                  <Label htmlFor="goal-target-date">Target date</Label>
++                  <Input
++                    id="goal-target-date"
++                    type="date"
++                    value={formValues.targetDate}
++                    onChange={(event) => updateField("targetDate", event.target.value)}
++                    aria-invalid={formErrors.targetDate ? "true" : undefined}
++                  />
++                  <FieldError>{formErrors.targetDate}</FieldError>
++                </div>
++              </div>
++
++              <div className="flex flex-wrap justify-end gap-2">
++                <Button
++                  type="button"
++                  variant="secondary"
++                  onClick={() => {
++                    setIsCreating(false);
++                    setFormValues(emptyGoalForm);
++                    setFormErrors({});
++                  }}
++                >
++                  Cancel
++                </Button>
++                <Button type="submit" disabled={pendingCreate} isLoading={pendingCreate}>
++                  Create Goal
++                </Button>
++              </div>
++            </form>
++          </CardContent>
++        </Card>
++      ) : null}
+ 
+       <div
+         data-testid="goals-summary-metrics"
+@@ -85,7 +332,10 @@ export function GoalsPanel({
+               key={goal.id}
+               goal={goal}
+               currency={currency}
+-              onDeleteGoal={onDeleteGoal}
++              monthlyFreeCashFlow={monthlyFreeCashFlow}
++              payFrequency={payFrequency}
++              isDeleting={pendingDeleteId === goal.id}
++              onDeleteGoal={deleteGoal}
+             />
+           ))}
+         </div>
+@@ -147,15 +397,22 @@ function SummaryMetric({
+ function GoalCard({
+   goal,
+   currency,
++  monthlyFreeCashFlow,
++  payFrequency,
++  isDeleting,
+   onDeleteGoal,
+ }: {
+   goal: Goal;
+   currency: CurrencyCode;
++  monthlyFreeCashFlow: number;
++  payFrequency: PayFrequency;
++  isDeleting: boolean;
+   onDeleteGoal: (id: string) => Promise<void>;
+ }) {
+   const progress = getPercentage(goal.savedAmount, goal.targetAmount);
+   const progressLabel = getGoalProgressLabel(goal, progress);
+   const dateLabel = getGoalDateLabel(goal);
++  const plan = getGoalPlan(goal, monthlyFreeCashFlow, payFrequency);
+   const helper = referenceGoals[goal.id]?.helperText ?? `${formatPriority(goal.priority)} goal`;
+ 
+   return (
+@@ -179,6 +436,8 @@ function GoalCard({
+           variant="ghost"
+           size="icon"
+           aria-label={`Delete ${goal.label}`}
++          disabled={isDeleting}
++          isLoading={isDeleting}
+           onClick={() => void onDeleteGoal(goal.id)}
+         >
+           <Trash2 className="size-4" aria-hidden="true" />
+@@ -195,17 +454,35 @@ function GoalCard({
+ 
+       <p className="text-sm leading-6 text-muted">{helper}</p>
+ 
+-      <dl className="grid gap-3 text-sm sm:grid-cols-3">
++      <dl className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
+         <GoalFact label="Monthly contribution">
+           {formatCurrency(goal.monthlyContribution, currency)} monthly contribution
+         </GoalFact>
++        <GoalFact label="Needed monthly">
++          {formatCurrency(plan.neededMonthlyContribution, currency)} needed monthly
++        </GoalFact>
++        <GoalFact label="Per payday">
++          {formatCurrency(plan.perPaydayContribution, currency)} / payday
++        </GoalFact>
+         <GoalFact label="Estimated completion">Estimated completion {dateLabel}</GoalFact>
+         <GoalFact label="Safe-buy date">Safe-buy date {dateLabel}</GoalFact>
++        <GoalFact label="Plan fit">
++          <span className="flex items-center gap-2">
++            {plan.isRealistic ? (
++              <CheckCircle2 className="size-4 text-safe" aria-hidden="true" />
++            ) : (
++              <AlertTriangle className="size-4 text-caution" aria-hidden="true" />
++            )}
++            {plan.isRealistic ? "Realistic" : "Tight plan"}
++          </span>
++        </GoalFact>
+       </dl>
+ 
+       <p className="flex items-center gap-2 text-xs text-muted">
+         <CalendarDays aria-hidden="true" className="size-3.5" />
+-        Target dates are displayed as local calendar dates to avoid timezone drift.
++        {plan.isRealistic
++          ? "Goal funding fits inside current free cash flow."
++          : "Needed monthly funding is above current free cash flow."}
+       </p>
+     </article>
+   );
+@@ -289,6 +566,31 @@ function getGoalDateLabel(goal: Goal) {
+   return formatLongDate(date);
+ }
+ 
++function getGoalPlan(goal: Goal, monthlyFreeCashFlow: number, payFrequency: PayFrequency) {
++  const remainingAmount = Math.max(0, goal.targetAmount - goal.savedAmount);
++  const payPeriods = payPeriodsPerMonth[payFrequency];
++  const monthsUntilTarget = goal.targetDate
++    ? getMonthDistance(new Date(), parseDisplayDate(goal.targetDate))
++    : 0;
++  const neededMonthlyContribution =
++    remainingAmount <= 0
++      ? 0
++      : monthsUntilTarget > 0
++        ? Math.ceil(remainingAmount / monthsUntilTarget)
++        : goal.monthlyContribution;
++  const perPaydayContribution =
++    payPeriods > 0 ? Math.ceil(neededMonthlyContribution / payPeriods) : neededMonthlyContribution;
++  const isRealistic =
++    remainingAmount <= 0 ||
++    (neededMonthlyContribution > 0 && neededMonthlyContribution <= monthlyFreeCashFlow);
++
++  return {
++    neededMonthlyContribution,
++    perPaydayContribution,
++    isRealistic,
++  };
++}
++
+ function formatPriority(priority: Goal["priority"]) {
+   const labels = {
+     high: "High priority",
+@@ -319,3 +621,74 @@ function parseDisplayDate(value: string) {
+ 
+   return new Date(value);
+ }
++
++function getMonthDistance(from: Date, to: Date) {
++  const months = (to.getFullYear() - from.getFullYear()) * 12 + to.getMonth() - from.getMonth();
++  return Math.max(1, months);
++}
++
++function parseGoalForm(values: GoalFormValues):
++  | { ok: true; goal: GoalDraft }
++  | { ok: false; errors: GoalFormErrors } {
++  const errors: GoalFormErrors = {};
++  const label = values.label.trim();
++  const targetAmount = Number(values.targetAmount);
++  const savedAmount = values.savedAmount.trim() === "" ? 0 : Number(values.savedAmount);
++  const monthlyContribution = Number(values.monthlyContribution);
++  const targetDate = values.targetDate.trim();
++
++  if (!label) {
++    errors.label = "Name this goal.";
++  }
++
++  if (!Number.isFinite(targetAmount) || targetAmount <= 0) {
++    errors.targetAmount = "Enter a target amount above zero.";
++  }
++
++  if (!Number.isFinite(savedAmount) || savedAmount < 0) {
++    errors.savedAmount = "Enter saved amount as zero or more.";
++  }
++
++  if (Number.isFinite(targetAmount) && Number.isFinite(savedAmount) && savedAmount > targetAmount) {
++    errors.savedAmount = "Saved amount cannot exceed the target.";
++  }
++
++  if (!Number.isFinite(monthlyContribution) || monthlyContribution <= 0) {
++    errors.monthlyContribution = "Enter a monthly contribution above zero.";
++  }
++
++  if (targetDate && !isIsoDate(targetDate)) {
++    errors.targetDate = "Enter a valid target date.";
++  }
++
++  if (Object.keys(errors).length > 0) {
++    return { ok: false, errors };
++  }
++
++  return {
++    ok: true,
++    goal: {
++      label,
++      targetAmount,
++      savedAmount,
++      monthlyContribution,
++      targetDate: targetDate || undefined,
++      priority: values.priority,
++    },
++  };
++}
++
++function isIsoDate(value: string) {
++  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
++    return false;
++  }
++
++  const [year, month, day] = value.split("-").map(Number);
++  const date = new Date(Date.UTC(year, month - 1, day));
++
++  return (
++    date.getUTCFullYear() === year &&
++    date.getUTCMonth() === month - 1 &&
++    date.getUTCDate() === day
++  );
++}
+diff --git a/src/features/purchase-checker/components/purchase-result.test.tsx b/src/features/purchase-checker/components/purchase-result.test.tsx
+index e4410c9..c7116d7 100644
+--- a/src/features/purchase-checker/components/purchase-result.test.tsx
++++ b/src/features/purchase-checker/components/purchase-result.test.tsx
+@@ -109,6 +109,7 @@ describe("PurchaseResult", () => {
+     ).toBeVisible();
+ 
+     await user.click(screen.getByRole("button", { name: "Add to Goal" }));
++    expect(screen.getByRole("status")).toHaveTextContent("Goal created from this check.");
+     await user.click(screen.getByRole("button", { name: "Add to Cooldown" }));
+     await user.click(screen.getByRole("button", { name: "Mark as bought" }));
+ 
+diff --git a/src/features/purchase-checker/components/purchase-result.tsx b/src/features/purchase-checker/components/purchase-result.tsx
+index 4f58aa3..9d6a2b0 100644
+--- a/src/features/purchase-checker/components/purchase-result.tsx
++++ b/src/features/purchase-checker/components/purchase-result.tsx
+@@ -114,6 +114,7 @@ export function PurchaseResult({
+   const displayCurrency = isExample ? "PHP" : currency;
+   const [pendingMutation, setPendingMutation] = useState<MutationAction | null>(null);
+   const [mutationError, setMutationError] = useState<string | null>(null);
++  const [mutationSuccess, setMutationSuccess] = useState<string | null>(null);
+   const [statusOverride, setStatusOverride] = useState<{
+     checkId: string;
+     status: PurchaseCheckStatus;
+@@ -186,9 +187,13 @@ export function PurchaseResult({
+     mutationInFlight.current = true;
+     setPendingMutation(mutation);
+     setMutationError(null);
++    setMutationSuccess(null);
+ 
+     try {
+       await callback(activeCheck);
++      setMutationSuccess(
++        mutation === "goal" ? "Goal created from this check." : "Cooldown item created."
++      );
+     } catch {
+       setMutationError(mutationErrorMessages[mutation]);
+     } finally {
+@@ -205,6 +210,7 @@ export function PurchaseResult({
+     mutationInFlight.current = true;
+     setPendingMutation(status);
+     setMutationError(null);
++    setMutationSuccess(null);
+ 
+     try {
+       await onMarkStatus(activeCheck, status);
+@@ -362,6 +368,11 @@ export function PurchaseResult({
+             {mutationError}
+           </p>
+         ) : null}
++        {mutationSuccess ? (
++          <p role="status" className="mb-3 rounded-control bg-safe/10 px-3 py-2 text-sm text-safe">
++            {mutationSuccess}
++          </p>
++        ) : null}
+         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+           <Button
+             type="button"
+diff --git a/src/hooks/use-financial-state.test.tsx b/src/hooks/use-financial-state.test.tsx
+index eda1014..e4de734 100644
+--- a/src/hooks/use-financial-state.test.tsx
++++ b/src/hooks/use-financial-state.test.tsx
+@@ -131,6 +131,14 @@ describe("useFinancialState Supabase mode", () => {
+     );
+ 
+     await act(async () => {
++      await result.current.createGoal({
++        label: "Camera upgrade",
++        targetAmount: 60_000,
++        savedAmount: 10_000,
++        monthlyContribution: 8_000,
++        targetDate: "2026-12-15",
++        priority: "high",
++      });
+       await result.current.addGoalFromCheck(savedCheck!.check);
+       await result.current.addCooldownFromCheck(savedCheck!.check);
+       await result.current.markPurchaseCheckStatus(savedCheck!.check, "bought");
+@@ -148,6 +156,9 @@ describe("useFinancialState Supabase mode", () => {
+       });
+     });
+ 
++    expect(actions.createGoal).toHaveBeenCalledWith(
++      expect.objectContaining({ label: "Camera upgrade" })
++    );
+     expect(actions.createGoal).toHaveBeenCalledWith(expect.objectContaining({ label: "Phone" }));
+     expect(actions.createCooldown).toHaveBeenCalledWith(
+       expect.objectContaining({ sourceCheckId: savedCheck?.check.id })
+@@ -220,9 +231,7 @@ describe("useFinancialState Supabase mode", () => {
+     expect(result.current.error).toBe("Check failed.");
+ 
+     const failures = [
+-      [actions.createGoal, () => result.current.addGoalFromCheck(check), "Goal failed."],
+       [actions.createCooldown, () => result.current.addCooldownFromCheck(check), "Cooldown failed."],
+-      [actions.deleteGoal, () => result.current.deleteGoal("goal-1"), "Delete goal failed."],
+       [
+         actions.deleteCooldown,
+         () => result.current.removeCooldownItem("cooldown-1"),
+@@ -239,6 +248,32 @@ describe("useFinancialState Supabase mode", () => {
+       expect(result.current.error).toBe(message);
+     }
+ 
++    actions.createGoal.mockResolvedValueOnce({ ok: false, error: "Goal failed." });
++    await act(async () => {
++      await expect(
++        result.current.createGoal({
++          label: "Camera upgrade",
++          targetAmount: 60_000,
++          savedAmount: 10_000,
++          monthlyContribution: 8_000,
++          priority: "high",
++        })
++      ).rejects.toThrow("Goal failed.");
++    });
++    expect(result.current.error).toBe("Goal failed.");
++
++    actions.createGoal.mockResolvedValueOnce({ ok: false, error: "Goal failed." });
++    await act(async () => {
++      await expect(result.current.addGoalFromCheck(check)).rejects.toThrow("Goal failed.");
++    });
++    expect(result.current.error).toBe("Goal failed.");
++
++    actions.deleteGoal.mockResolvedValueOnce({ ok: false, error: "Delete goal failed." });
++    await act(async () => {
++      await expect(result.current.deleteGoal("goal-1")).rejects.toThrow("Delete goal failed.");
++    });
++    expect(result.current.error).toBe("Delete goal failed.");
++
+     actions.markStatus.mockResolvedValueOnce({ ok: false, error: "Status failed." });
+     await act(async () => {
+       await expect(result.current.markPurchaseCheckStatus(check, "skipped")).rejects.toThrow(
+diff --git a/src/hooks/use-financial-state.ts b/src/hooks/use-financial-state.ts
+index 4d7440d..1249e50 100644
+--- a/src/hooks/use-financial-state.ts
++++ b/src/hooks/use-financial-state.ts
+@@ -45,6 +45,8 @@ interface OnboardingPayload {
+   goals: Goal[];
+ }
+ 
++type GoalDraft = Omit<Goal, "id">;
++
+ export function useFinancialState() {
+   const [snapshot, setSnapshot] = useState<FinancialSnapshot>(() => emptySnapshot);
+   const [checks, setChecks] = useState<PurchaseCheck[]>([]);
+@@ -148,6 +150,21 @@ export function useFinancialState() {
+     [refresh]
+   );
+ 
++  const createGoal = useCallback(
++    async (goalDraft: GoalDraft) => {
++      const result = await createGoalAction(goalDraft);
++
++      if (!result.ok) {
++        setError(result.error);
++        throw new Error(result.error);
++      }
++
++      await refresh();
++      return { id: createId("goal"), ...goalDraft };
++    },
++    [refresh]
++  );
++
+   const addGoalFromCheck = useCallback(
+     async (check: PurchaseCheck) => {
+       const goal: Goal = {
+@@ -160,17 +177,9 @@ export function useFinancialState() {
+         priority: check.urgency === "need_now" ? "high" : "medium",
+       };
+ 
+-      const result = await createGoalAction(goal);
+-
+-      if (!result.ok) {
+-        setError(result.error);
+-        return undefined;
+-      }
+-
+-      await refresh();
+-      return goal;
++      return createGoal(goal);
+     },
+-    [refresh]
++    [createGoal]
+   );
+ 
+   const addCooldownFromCheck = useCallback(
+@@ -227,7 +236,7 @@ export function useFinancialState() {
+ 
+       if (!result.ok) {
+         setError(result.error);
+-        return;
++        throw new Error(result.error);
+       }
+ 
+       await refresh();
+@@ -294,6 +303,7 @@ export function useFinancialState() {
+     metrics,
+     replaceFinancialSetup,
+     runPurchaseCheck,
++    createGoal,
+     addGoalFromCheck,
+     addCooldownFromCheck,
+     markPurchaseCheckStatus,
+diff --git a/src/lib/schemas/finance.ts b/src/lib/schemas/finance.ts
+index 7bb6b16..c4d0c67 100644
+--- a/src/lib/schemas/finance.ts
++++ b/src/lib/schemas/finance.ts
+@@ -97,15 +97,31 @@ export const debtSchema = z.object({
+   interestRate: z.coerce.number().min(0).max(1).optional(),
+ });
+ 
+-export const goalSchema = z.object({
+-  id: z.string().optional(),
+-  label: z.string().min(1, "Name this goal."),
+-  targetAmount: money,
+-  savedAmount: money,
+-  monthlyContribution: money,
+-  targetDate: z.string().optional(),
+-  priority: z.enum(["high", "medium", "low"]).default("medium"),
+-});
++export const goalSchema = z
++  .object({
++    id: z.string().optional(),
++    label: z.string().min(1, "Name this goal."),
++    targetAmount: money.refine((value) => value > 0, "Enter a target amount above zero."),
++    savedAmount: money,
++    monthlyContribution: money.refine(
++      (value) => value > 0,
++      "Enter a monthly contribution above zero."
++    ),
++    targetDate: z.preprocess(
++      emptyToUndefined,
++      z.string().refine(isIsoDate, "Enter a valid target date.").optional()
++    ),
++    priority: z.enum(["high", "medium", "low"]).default("medium"),
++  })
++  .superRefine((value, context) => {
++    if (value.savedAmount > value.targetAmount) {
++      context.addIssue({
++        code: "custom",
++        path: ["savedAmount"],
++        message: "Saved amount cannot exceed the target.",
++      });
++    }
++  });
+ 
+ export const purchaseInputSchema = z
+   .object({

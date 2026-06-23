@@ -109,6 +109,7 @@ describe("PurchaseResult", () => {
     ).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Add to Goal" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Goal created from this check.");
     await user.click(screen.getByRole("button", { name: "Add to Cooldown" }));
     await user.click(screen.getByRole("button", { name: "Mark as bought" }));
 

@@ -97,15 +97,31 @@ export const debtSchema = z.object({
   interestRate: z.coerce.number().min(0).max(1).optional(),
 });
 
-export const goalSchema = z.object({
-  id: z.string().optional(),
-  label: z.string().min(1, "Name this goal."),
-  targetAmount: money,
-  savedAmount: money,
-  monthlyContribution: money,
-  targetDate: z.string().optional(),
-  priority: z.enum(["high", "medium", "low"]).default("medium"),
-});
+export const goalSchema = z
+  .object({
+    id: z.string().optional(),
+    label: z.string().min(1, "Name this goal."),
+    targetAmount: money.refine((value) => value > 0, "Enter a target amount above zero."),
+    savedAmount: money,
+    monthlyContribution: money.refine(
+      (value) => value > 0,
+      "Enter a monthly contribution above zero."
+    ),
+    targetDate: z.preprocess(
+      emptyToUndefined,
+      z.string().refine(isIsoDate, "Enter a valid target date.").optional()
+    ),
+    priority: z.enum(["high", "medium", "low"]).default("medium"),
+  })
+  .superRefine((value, context) => {
+    if (value.savedAmount > value.targetAmount) {
+      context.addIssue({
+        code: "custom",
+        path: ["savedAmount"],
+        message: "Saved amount cannot exceed the target.",
+      });
+    }
+  });
 
 export const purchaseInputSchema = z
   .object({

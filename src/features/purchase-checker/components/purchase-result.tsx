@@ -114,6 +114,7 @@ export function PurchaseResult({
   const displayCurrency = isExample ? "PHP" : currency;
   const [pendingMutation, setPendingMutation] = useState<MutationAction | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [mutationSuccess, setMutationSuccess] = useState<string | null>(null);
   const [statusOverride, setStatusOverride] = useState<{
     checkId: string;
     status: PurchaseCheckStatus;
@@ -186,9 +187,13 @@ export function PurchaseResult({
     mutationInFlight.current = true;
     setPendingMutation(mutation);
     setMutationError(null);
+    setMutationSuccess(null);
 
     try {
       await callback(activeCheck);
+      setMutationSuccess(
+        mutation === "goal" ? "Goal created from this check." : "Cooldown item created."
+      );
     } catch {
       setMutationError(mutationErrorMessages[mutation]);
     } finally {
@@ -205,6 +210,7 @@ export function PurchaseResult({
     mutationInFlight.current = true;
     setPendingMutation(status);
     setMutationError(null);
+    setMutationSuccess(null);
 
     try {
       await onMarkStatus(activeCheck, status);
@@ -360,6 +366,11 @@ export function PurchaseResult({
         {mutationError ? (
           <p role="alert" className="mb-3 rounded-control bg-risk/10 px-3 py-2 text-sm text-risk">
             {mutationError}
+          </p>
+        ) : null}
+        {mutationSuccess ? (
+          <p role="status" className="mb-3 rounded-control bg-safe/10 px-3 py-2 text-sm text-safe">
+            {mutationSuccess}
           </p>
         ) : null}
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">

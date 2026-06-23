@@ -114,6 +114,7 @@ describe("page adapters", () => {
       replaceFinancialSetup: vi.fn(),
       runPurchaseCheck: vi.fn(),
       addGoalFromCheck: vi.fn(),
+      createGoal: vi.fn(),
       addCooldownFromCheck: vi.fn(),
       markPurchaseCheckStatus: vi.fn(),
       removeCooldownItem: vi.fn(),
@@ -217,6 +218,8 @@ describe("page adapters", () => {
 
     const props = vi.mocked(GoalsPanel).mock.calls[0][0];
     expect(props.snapshot).toBe(financialState.snapshot);
+    expect(props.monthlyFreeCashFlow).toBe(financialState.metrics.monthlyFreeCashFlow);
+    expect(props.onCreateGoal).toBe(financialState.createGoal);
     expect(props.onDeleteGoal).toBe(financialState.deleteGoal);
   });
 

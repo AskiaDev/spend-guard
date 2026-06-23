@@ -131,6 +131,14 @@ describe("useFinancialState Supabase mode", () => {
     );
 
     await act(async () => {
+      await result.current.createGoal({
+        label: "Camera upgrade",
+        targetAmount: 60_000,
+        savedAmount: 10_000,
+        monthlyContribution: 8_000,
+        targetDate: "2026-12-15",
+        priority: "high",
+      });
       await result.current.addGoalFromCheck(savedCheck!.check);
       await result.current.addCooldownFromCheck(savedCheck!.check);
       await result.current.markPurchaseCheckStatus(savedCheck!.check, "bought");
@@ -148,6 +156,9 @@ describe("useFinancialState Supabase mode", () => {
       });
     });
 
+    expect(actions.createGoal).toHaveBeenCalledWith(
+      expect.objectContaining({ label: "Camera upgrade" })
+    );
     expect(actions.createGoal).toHaveBeenCalledWith(expect.objectContaining({ label: "Phone" }));
     expect(actions.createCooldown).toHaveBeenCalledWith(
       expect.objectContaining({ sourceCheckId: savedCheck?.check.id })
@@ -220,9 +231,7 @@ describe("useFinancialState Supabase mode", () => {
     expect(result.current.error).toBe("Check failed.");
 
     const failures = [
-      [actions.createGoal, () => result.current.addGoalFromCheck(check), "Goal failed."],
       [actions.createCooldown, () => result.current.addCooldownFromCheck(check), "Cooldown failed."],
-      [actions.deleteGoal, () => result.current.deleteGoal("goal-1"), "Delete goal failed."],
       [
         actions.deleteCooldown,
         () => result.current.removeCooldownItem("cooldown-1"),
@@ -238,6 +247,32 @@ describe("useFinancialState Supabase mode", () => {
       });
       expect(result.current.error).toBe(message);
     }
+
+    actions.createGoal.mockResolvedValueOnce({ ok: false, error: "Goal failed." });
+    await act(async () => {
+      await expect(
+        result.current.createGoal({
+          label: "Camera upgrade",
+          targetAmount: 60_000,
+          savedAmount: 10_000,
+          monthlyContribution: 8_000,
+          priority: "high",
+        })
+      ).rejects.toThrow("Goal failed.");
+    });
+    expect(result.current.error).toBe("Goal failed.");
+
+    actions.createGoal.mockResolvedValueOnce({ ok: false, error: "Goal failed." });
+    await act(async () => {
+      await expect(result.current.addGoalFromCheck(check)).rejects.toThrow("Goal failed.");
+    });
+    expect(result.current.error).toBe("Goal failed.");
+
+    actions.deleteGoal.mockResolvedValueOnce({ ok: false, error: "Delete goal failed." });
+    await act(async () => {
+      await expect(result.current.deleteGoal("goal-1")).rejects.toThrow("Delete goal failed.");
+    });
+    expect(result.current.error).toBe("Delete goal failed.");
 
     actions.markStatus.mockResolvedValueOnce({ ok: false, error: "Status failed." });
     await act(async () => {
