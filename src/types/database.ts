@@ -176,6 +176,14 @@ export interface Database {
           source_check_id: string | null;
           added_at: string;
           recheck_at: string;
+          down_payment: number | null;
+          installment_months: number | null;
+          monthly_payment: number | null;
+          is_income_generating: boolean;
+          current_alternative_still_works: boolean;
+          baseline_decision: string | null;
+          baseline_risk_score: number | null;
+          baseline_safe_to_spend: number | null;
         };
         Insert: {
           user_id: string;
@@ -185,6 +193,14 @@ export interface Database {
           payment_method: string;
           source_check_id?: string | null;
           recheck_at: string;
+          down_payment?: number | null;
+          installment_months?: number | null;
+          monthly_payment?: number | null;
+          is_income_generating?: boolean;
+          current_alternative_still_works?: boolean;
+          baseline_decision?: string | null;
+          baseline_risk_score?: number | null;
+          baseline_safe_to_spend?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["cooldown_items"]["Insert"]>;
         Relationships: [];

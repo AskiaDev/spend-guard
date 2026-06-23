@@ -1,0 +1,1305 @@
+diff --git a/src/app/(app)/_components/page-adapters.test.tsx b/src/app/(app)/_components/page-adapters.test.tsx
+index dadb245..973073f 100644
+--- a/src/app/(app)/_components/page-adapters.test.tsx
++++ b/src/app/(app)/_components/page-adapters.test.tsx
+@@ -114,6 +114,7 @@ describe("page adapters", () => {
+       replaceFinancialSetup: vi.fn(),
+       runPurchaseCheck: vi.fn(),
+       addGoalFromCheck: vi.fn(),
++      addGoalFromCooldown: vi.fn(),
+       createGoal: vi.fn(),
+       addCooldownFromCheck: vi.fn(),
+       markPurchaseCheckStatus: vi.fn(),
+@@ -232,7 +233,9 @@ describe("page adapters", () => {
+     const props = vi.mocked(CooldownPanel).mock.calls[0][0];
+     expect(props.items).toBe(financialState.cooldownItems);
+     expect(props.currency).toBe(financialState.snapshot.profile.currency);
++    expect(props.snapshot).toBe(financialState.snapshot);
+     expect(props.onRemove).toBe(financialState.removeCooldownItem);
++    expect(props.onConvertToGoal).toBe(financialState.addGoalFromCooldown);
+   });
+ 
+   it("passes report state and callback identities", () => {
+diff --git a/src/app/(app)/_components/page-adapters.tsx b/src/app/(app)/_components/page-adapters.tsx
+index 8c47d19..0f94804 100644
+--- a/src/app/(app)/_components/page-adapters.tsx
++++ b/src/app/(app)/_components/page-adapters.tsx
+@@ -101,7 +101,9 @@ export function CooldownPageContent() {
+     <CooldownPanel
+       items={state.cooldownItems}
+       currency={state.snapshot.profile.currency}
++      snapshot={state.snapshot}
+       onRemove={state.removeCooldownItem}
++      onConvertToGoal={state.addGoalFromCooldown}
+     />
+   );
+ }
+diff --git a/src/features/cooldown/api/create-cooldown-item.test.ts b/src/features/cooldown/api/create-cooldown-item.test.ts
+new file mode 100644
+index 0000000..2fed63a
+--- /dev/null
++++ b/src/features/cooldown/api/create-cooldown-item.test.ts
+@@ -0,0 +1,132 @@
++import { beforeEach, describe, expect, it, vi } from "vitest";
++import { createCooldownItemAction, deleteCooldownItemAction } from "./create-cooldown-item";
++
++vi.mock("@/lib/supabase/server", () => ({ requireUserId: vi.fn() }));
++
++import { requireUserId } from "@/lib/supabase/server";
++
++const mockedRequireUserId = vi.mocked(requireUserId);
++
++describe("cooldown item actions", () => {
++  beforeEach(() => {
++    vi.clearAllMocks();
++  });
++
++  it("persists the baseline and decision-affecting inputs for the authenticated user", async () => {
++    const insert = vi.fn(async () => ({ error: null }));
++    const supabase = { from: vi.fn(() => ({ insert })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await createCooldownItemAction({
++      itemName: "Laptop",
++      amount: 80_000,
++      urgency: "can_wait",
++      paymentMethod: "installment",
++      downPayment: 20_000,
++      installmentMonths: 12,
++      monthlyPayment: 8_000,
++      isIncomeGenerating: true,
++      currentAlternativeStillWorks: false,
++      sourceCheckId: "check-1",
++      recheckAt: "2026-07-20T00:00:00.000Z",
++      baselineDecision: "WAIT",
++      baselineRiskScore: 55,
++      baselineSafeToSpend: 60_000,
++    });
++
++    expect(result).toEqual({ ok: true, data: null });
++    expect(supabase.from).toHaveBeenCalledWith("cooldown_items");
++    expect(insert).toHaveBeenCalledWith({
++      user_id: "user-1",
++      item_name: "Laptop",
++      amount: 80_000,
++      urgency: "can_wait",
++      payment_method: "installment",
++      source_check_id: "check-1",
++      recheck_at: "2026-07-20T00:00:00.000Z",
++      down_payment: 20_000,
++      installment_months: 12,
++      monthly_payment: 8_000,
++      is_income_generating: true,
++      current_alternative_still_works: false,
++      baseline_decision: "WAIT",
++      baseline_risk_score: 55,
++      baseline_safe_to_spend: 60_000,
++    });
++  });
++
++  it("defaults optional baseline and input fields when omitted (cash, no baseline)", async () => {
++    const insert = vi.fn(async () => ({ error: null }));
++    const supabase = { from: vi.fn(() => ({ insert })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    await createCooldownItemAction({
++      itemName: "Coffee grinder",
++      amount: 4_000,
++      urgency: "want",
++      paymentMethod: "cash",
++      recheckAt: "2026-07-01T00:00:00.000Z",
++    });
++
++    expect(insert).toHaveBeenCalledWith(
++      expect.objectContaining({
++        user_id: "user-1",
++        item_name: "Coffee grinder",
++        source_check_id: null,
++        down_payment: null,
++        installment_months: null,
++        monthly_payment: null,
++        is_income_generating: false,
++        current_alternative_still_works: false,
++        baseline_decision: null,
++        baseline_risk_score: null,
++        baseline_safe_to_spend: null,
++      })
++    );
++  });
++
++  it("rejects invalid payloads before auth or database access", async () => {
++    const result = await createCooldownItemAction({
++      itemName: "",
++      amount: 0,
++      urgency: "want",
++      paymentMethod: "cash",
++      recheckAt: "",
++    });
++
++    expect(result.ok).toBe(false);
++    expect(result).toMatchObject({ error: "Check the cooldown fields." });
++    expect(mockedRequireUserId).not.toHaveBeenCalled();
++  });
++
++  it("returns a friendly error when insertion fails", async () => {
++    const insert = vi.fn(async () => ({ error: { message: "insert failed" } }));
++    const supabase = { from: vi.fn(() => ({ insert })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await createCooldownItemAction({
++      itemName: "Laptop",
++      amount: 80_000,
++      urgency: "can_wait",
++      paymentMethod: "cash",
++      recheckAt: "2026-07-20T00:00:00.000Z",
++    });
++
++    expect(result).toEqual({ ok: false, error: "Unable to add this cooldown item." });
++  });
++
++  it("deletes cooldown items only for the authenticated user", async () => {
++    const eqUser = vi.fn(async () => ({ error: null }));
++    const eqId = vi.fn(() => ({ eq: eqUser }));
++    const remove = vi.fn(() => ({ eq: eqId }));
++    const supabase = { from: vi.fn(() => ({ delete: remove })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await deleteCooldownItemAction("cooldown-1");
++
++    expect(result).toEqual({ ok: true, data: null });
++    expect(supabase.from).toHaveBeenCalledWith("cooldown_items");
++    expect(eqId).toHaveBeenCalledWith("id", "cooldown-1");
++    expect(eqUser).toHaveBeenCalledWith("user_id", "user-1");
++  });
++});
+diff --git a/src/features/cooldown/api/create-cooldown-item.ts b/src/features/cooldown/api/create-cooldown-item.ts
+index 5faed87..e040889 100644
+--- a/src/features/cooldown/api/create-cooldown-item.ts
++++ b/src/features/cooldown/api/create-cooldown-item.ts
+@@ -8,6 +8,11 @@ import type { ActionResult } from "@/types/action-result";
+ const cooldownSchema = purchaseInputSchema.extend({
+   sourceCheckId: z.string().optional(),
+   recheckAt: z.string().min(1),
++  baselineDecision: z
++    .enum(["SAFE_TO_BUY", "BUY_WITH_CAUTION", "WAIT", "NOT_RECOMMENDED"])
++    .optional(),
++  baselineRiskScore: z.coerce.number().int().min(0).max(100).optional(),
++  baselineSafeToSpend: z.coerce.number().min(0).optional(),
+ });
+ 
+ export async function createCooldownItemAction(
+@@ -34,6 +39,14 @@ export async function createCooldownItemAction(
+       payment_method: item.paymentMethod,
+       source_check_id: item.sourceCheckId ?? null,
+       recheck_at: item.recheckAt,
++      down_payment: item.downPayment ?? null,
++      installment_months: item.installmentMonths ?? null,
++      monthly_payment: item.monthlyPayment ?? null,
++      is_income_generating: item.isIncomeGenerating ?? false,
++      current_alternative_still_works: item.currentAlternativeStillWorks ?? false,
++      baseline_decision: item.baselineDecision ?? null,
++      baseline_risk_score: item.baselineRiskScore ?? null,
++      baseline_safe_to_spend: item.baselineSafeToSpend ?? null,
+     });
+ 
+     if (error) {
+diff --git a/src/features/cooldown/components/cooldown-panel.test.tsx b/src/features/cooldown/components/cooldown-panel.test.tsx
+index a882962..b3b61ef 100644
+--- a/src/features/cooldown/components/cooldown-panel.test.tsx
++++ b/src/features/cooldown/components/cooldown-panel.test.tsx
+@@ -2,9 +2,23 @@ import { render, screen, within } from "@testing-library/react";
+ import userEvent from "@testing-library/user-event";
+ import { describe, expect, it, vi } from "vitest";
+ 
+-import type { CooldownItem } from "@/types/finance";
++import type { CooldownItem, FinancialSnapshot } from "@/types/finance";
+ import { CooldownPanel } from "./cooldown-panel";
+ 
++// Strong finances with no debt: a recheck of any reasonable item lands SAFE_TO_BUY.
++const snapshot: FinancialSnapshot = {
++  profile: {
++    currency: "PHP",
++    monthlyIncome: 90_000,
++    currentSavings: 200_000,
++    emergencyFundTarget: 100_000,
++    estimatedVariableExpenses: 10_000,
++  },
++  expenses: [{ id: "rent", label: "Rent", amount: 20_000, dueDay: 1, isRecurring: true }],
++  debts: [],
++  goals: [],
++};
++
+ const cooldownItems: CooldownItem[] = [
+   {
+     id: "cooldown_laptop",
+@@ -27,9 +41,50 @@ const cooldownItems: CooldownItem[] = [
+   },
+ ];
+ 
++// Carries a stored baseline so the badge shows the real decision (WAIT) rather than the
++// need_now heuristic (Buy with Caution), and a recheck against `snapshot` reads as improved.
++const phoneItem: CooldownItem = {
++  id: "cooldown_phone",
++  itemName: "Phone",
++  amount: 5_000,
++  urgency: "need_now",
++  paymentMethod: "cash",
++  addedAt: "2026-06-20T00:00:00.000Z",
++  recheckAt: "2026-06-23",
++  sourceCheckId: "check_phone",
++  baselineDecision: "WAIT",
++  baselineRiskScore: 60,
++  baselineSafeToSpend: 40_000,
++};
++
++function renderPanel(
++  items: CooldownItem[],
++  overrides: {
++    onRemove?: (id: string) => Promise<void>;
++    onConvertToGoal?: (item: CooldownItem) => Promise<unknown> | unknown;
++  } = {}
++) {
++  const onRemove = overrides.onRemove ?? (vi.fn(async () => {}) as (id: string) => Promise<void>);
++  const onConvertToGoal =
++    overrides.onConvertToGoal ??
++    (vi.fn(async () => {}) as (item: CooldownItem) => Promise<unknown> | unknown);
++
++  render(
++    <CooldownPanel
++      items={items}
++      currency="PHP"
++      snapshot={snapshot}
++      onRemove={onRemove}
++      onConvertToGoal={onConvertToGoal}
++    />
++  );
++
++  return { onRemove, onConvertToGoal };
++}
++
+ describe("CooldownPanel", () => {
+   it("shows horizontally navigable tabs, sorting, and labelled example cards when empty", () => {
+-    render(<CooldownPanel items={[]} currency="PHP" onRemove={vi.fn()} />);
++    renderPanel([]);
+ 
+     const tablist = screen.getByRole("tablist", { name: "Cooldown views" });
+     expect(tablist).toHaveClass("overflow-x-auto");
+@@ -44,40 +99,86 @@ describe("CooldownPanel", () => {
+ 
+     const examples = screen.getByRole("region", { name: "Example items" });
+     expect(within(examples).getByText("Example items")).toBeVisible();
+-    expect(
+-      within(examples).getByText("Grocery restock from a supermarket")
+-    ).toBeVisible();
++    expect(within(examples).getByText("Grocery restock from a supermarket")).toBeVisible();
+     expect(
+       within(examples).getByText("Replacement tech from an electronics store")
+     ).toBeVisible();
+     expect(within(examples).getAllByRole("article")).toHaveLength(2);
+   });
+ 
+-  it("renders live cooldown items with status, risk, actions, and labelled controls", () => {
+-    render(<CooldownPanel items={cooldownItems} currency="PHP" onRemove={vi.fn()} />);
++  it("renders live cooldown items with the price-tier hold and active actions", () => {
++    renderPanel(cooldownItems);
+ 
+     const laptop = screen.getByRole("article", { name: "Laptop cooldown item" });
+     expect(within(laptop).getByText("Laptop")).toBeVisible();
+     expect(within(laptop).getByText("₱45,000")).toBeVisible();
+     expect(within(laptop).getByText("Wait")).toBeVisible();
+     expect(within(laptop).getByText("Risk: Can wait")).toBeVisible();
+-    expect(within(laptop).getByText("Cooldown: recheck Jun 27, 2026")).toBeVisible();
+-    expect(within(laptop).getByRole("button", { name: "Recheck Laptop" })).toBeDisabled();
+-    expect(within(laptop).getByRole("button", { name: "Convert Laptop to Goal" })).toBeDisabled();
++    expect(within(laptop).getByText(/7-day hold .* recheck Jun 27, 2026/)).toBeVisible();
++    expect(within(laptop).getByRole("button", { name: "Recheck Laptop" })).toBeEnabled();
++    expect(within(laptop).getByRole("button", { name: "Convert Laptop to Goal" })).toBeEnabled();
+     expect(within(laptop).getByRole("button", { name: "More actions for Laptop" })).toBeDisabled();
+     expect(within(laptop).getByRole("button", { name: "Remove Laptop" })).toBeVisible();
+-    expect(within(laptop).getByText(/recheck and goal conversion are coming soon/i)).toBeVisible();
++    expect(within(laptop).queryByText(/coming soon/i)).not.toBeInTheDocument();
+ 
+     const espresso = screen.getByRole("article", { name: "Espresso machine cooldown item" });
+-    expect(within(espresso).getByText("Espresso machine")).toBeVisible();
+     expect(within(espresso).getByText("Risk: Want")).toBeVisible();
+-    expect(within(espresso).getByText("Cooldown: recheck Jul 5, 2026")).toBeVisible();
++    expect(within(espresso).getByText(/7-day hold .* recheck Jul 5, 2026/)).toBeVisible();
+   });
+ 
+-  it("updates tab selection and filters wishlist items without losing sort controls", async () => {
++  it("shows the stored decision on the badge instead of the urgency heuristic", () => {
++    renderPanel([phoneItem]);
++
++    const phone = screen.getByRole("article", { name: "Phone cooldown item" });
++    // need_now would map to "Buy with Caution" via the heuristic; the stored baseline is "Wait".
++    expect(within(phone).getByText("Wait")).toBeVisible();
++    expect(within(phone).queryByText("Buy with Caution")).not.toBeInTheDocument();
++  });
++
++  it("rechecks against the fresh snapshot and reports an improved decision since added", async () => {
++    const user = userEvent.setup();
++    renderPanel([phoneItem]);
++
++    const phone = screen.getByRole("article", { name: "Phone cooldown item" });
++    await user.click(within(phone).getByRole("button", { name: "Recheck Phone" }));
++
++    const result = within(phone).getByRole("status", { name: "Recheck result for Phone" });
++    expect(result).toHaveTextContent("Looking better");
++    expect(result).toHaveTextContent("Safe to Buy");
++    expect(result).toHaveTextContent(/up ₱/);
++    expect(result).toHaveTextContent("since you added this");
++  });
++
++  it("rechecks legacy items without a baseline and says there is nothing to compare", async () => {
++    const user = userEvent.setup();
++    renderPanel([cooldownItems[0]]);
++
++    const laptop = screen.getByRole("article", { name: "Laptop cooldown item" });
++    await user.click(within(laptop).getByRole("button", { name: "Recheck Laptop" }));
++
++    const result = within(laptop).getByRole("status", { name: "Recheck result for Laptop" });
++    expect(result).toHaveTextContent("Today's check");
++    expect(result).toHaveTextContent("No saved result from when you added this");
++  });
++
++  it("converts a cooldown item into a goal and confirms it", async () => {
+     const user = userEvent.setup();
++    const onConvertToGoal = vi.fn().mockResolvedValue(undefined);
++    renderPanel([phoneItem], { onConvertToGoal });
+ 
+-    render(<CooldownPanel items={cooldownItems} currency="PHP" onRemove={vi.fn()} />);
++    const phone = screen.getByRole("article", { name: "Phone cooldown item" });
++    const convert = within(phone).getByRole("button", { name: "Convert Phone to Goal" });
++    await user.click(convert);
++
++    expect(onConvertToGoal).toHaveBeenCalledOnce();
++    expect(onConvertToGoal).toHaveBeenCalledWith(phoneItem);
++    expect(within(phone).getByText(/added to your goals/i)).toBeVisible();
++    expect(convert).toBeDisabled();
++  });
++
++  it("updates tab selection and filters wishlist items without losing sort controls", async () => {
++    const user = userEvent.setup();
++    renderPanel(cooldownItems);
+ 
+     const wishlistTab = screen.getByRole("tab", { name: "Wishlist" });
+     await user.click(wishlistTab);
+@@ -92,8 +193,7 @@ describe("CooldownPanel", () => {
+ 
+   it("links tabs to a tabpanel and supports arrow-key navigation", async () => {
+     const user = userEvent.setup();
+-
+-    render(<CooldownPanel items={cooldownItems} currency="PHP" onRemove={vi.fn()} />);
++    renderPanel(cooldownItems);
+ 
+     const allTab = screen.getByRole("tab", { name: "All" });
+     const waitingTab = screen.getByRole("tab", { name: "Waiting" });
+@@ -119,7 +219,7 @@ describe("CooldownPanel", () => {
+   });
+ 
+   it("keeps every tab aria-controls reference pointed at a rendered panel", () => {
+-    render(<CooldownPanel items={cooldownItems} currency="PHP" onRemove={vi.fn()} />);
++    renderPanel(cooldownItems);
+ 
+     const controls = screen
+       .getAllByRole("tab")
+@@ -139,22 +239,11 @@ describe("CooldownPanel", () => {
+     process.env.TZ = "America/Los_Angeles";
+ 
+     try {
+-      render(
+-        <CooldownPanel
+-          items={[
+-            {
+-              ...cooldownItems[0],
+-              recheckAt: "2026-06-27T00:00:00.000Z",
+-            },
+-          ]}
+-          currency="PHP"
+-          onRemove={vi.fn()}
+-        />
+-      );
++      renderPanel([{ ...cooldownItems[0], recheckAt: "2026-06-27T00:00:00.000Z" }]);
+ 
+       const laptop = screen.getByRole("article", { name: "Laptop cooldown item" });
+ 
+-      expect(within(laptop).getByText("Cooldown: recheck Jun 27, 2026")).toBeVisible();
++      expect(within(laptop).getByText(/7-day hold .* recheck Jun 27, 2026/)).toBeVisible();
+       expect(within(laptop).queryByText(/Jun 26, 2026/)).not.toBeInTheDocument();
+     } finally {
+       if (originalTimeZone === undefined) {
+@@ -169,7 +258,7 @@ describe("CooldownPanel", () => {
+     const user = userEvent.setup();
+     const onRemove = vi.fn().mockResolvedValue(undefined);
+ 
+-    render(<CooldownPanel items={cooldownItems} currency="PHP" onRemove={onRemove} />);
++    renderPanel(cooldownItems, { onRemove });
+ 
+     await user.click(screen.getByRole("button", { name: "Remove Laptop" }));
+ 
+diff --git a/src/features/cooldown/components/cooldown-panel.tsx b/src/features/cooldown/components/cooldown-panel.tsx
+index a93d855..e6bf7a9 100644
+--- a/src/features/cooldown/components/cooldown-panel.tsx
++++ b/src/features/cooldown/components/cooldown-panel.tsx
+@@ -1,13 +1,29 @@
+ "use client";
+ 
+-import { MoreHorizontal, RotateCcw, Target, TimerReset, Trash2 } from "lucide-react";
+-import type { KeyboardEvent, ReactNode } from "react";
++import {
++  Minus,
++  MoreHorizontal,
++  RotateCcw,
++  Sparkles,
++  Target,
++  TimerReset,
++  Trash2,
++  TrendingDown,
++  TrendingUp,
++} from "lucide-react";
++import type { ComponentType, KeyboardEvent, ReactNode } from "react";
+ import { useMemo, useRef, useState } from "react";
+ 
+ import { StatusBadge } from "@/components/finance/status-badge";
+ import { Button } from "@/components/ui/button";
+ import { Card, CardContent } from "@/components/ui/card";
+ import { exampleOnlyPurchaseReferences } from "@/features/reference-data";
++import { getCooldownDays } from "@/lib/calculations/cooldown";
++import {
++  recheckCooldownItem,
++  type CooldownDecisionTrend,
++  type CooldownRecheckResult,
++} from "@/lib/calculations/cooldown-recheck";
+ import { cn, formatCurrency } from "@/lib/utils";
+ import type {
+   CooldownItem,
+@@ -28,6 +44,36 @@ const tabs: Array<{ id: CooldownTab; label: string }> = [
+ 
+ const itemsPanelId = "cooldown-items-panel";
+ 
++const trendPresentation: Record<
++  CooldownDecisionTrend,
++  { label: string; surface: string; icon: string; Icon: ComponentType<{ className?: string }> }
++> = {
++  improved: {
++    label: "Looking better",
++    surface: "border-safe/30 bg-safe/5",
++    icon: "text-safe",
++    Icon: TrendingUp,
++  },
++  unchanged: {
++    label: "About the same",
++    surface: "border-caution/30 bg-caution/5",
++    icon: "text-caution",
++    Icon: Minus,
++  },
++  worsened: {
++    label: "Looking riskier",
++    surface: "border-risk/30 bg-risk/5",
++    icon: "text-risk",
++    Icon: TrendingDown,
++  },
++  unknown: {
++    label: "Today's check",
++    surface: "border-border bg-muted/30",
++    icon: "text-muted",
++    Icon: Sparkles,
++  },
++};
++
+ const exampleCards = exampleOnlyPurchaseReferences.map((label, index) => ({
+   id: `example_${index}`,
+   label,
+@@ -43,11 +89,15 @@ const exampleCards = exampleOnlyPurchaseReferences.map((label, index) => ({
+ export function CooldownPanel({
+   items,
+   currency,
++  snapshot,
+   onRemove,
++  onConvertToGoal,
+ }: {
+   items: CooldownItem[];
+   currency: FinancialSnapshot["profile"]["currency"];
++  snapshot: FinancialSnapshot;
+   onRemove: (id: string) => Promise<void>;
++  onConvertToGoal: (item: CooldownItem) => Promise<unknown> | unknown;
+ }) {
+   const [activeTab, setActiveTab] = useState<CooldownTab>("all");
+   const [sortMode, setSortMode] = useState<SortMode>("recheck");
+@@ -107,7 +157,7 @@ export function CooldownPanel({
+               Paused purchases
+             </h2>
+             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+-              Sort wants by recheck date and keep the next safe decision visible before buying.
++              Recheck a paused want to see if your money moved in its favor, or turn it into a goal.
+             </p>
+           </div>
+         </div>
+@@ -175,7 +225,9 @@ export function CooldownPanel({
+                 key={item.id}
+                 item={item}
+                 currency={currency}
++                snapshot={snapshot}
+                 onRemove={onRemove}
++                onConvertToGoal={onConvertToGoal}
+               />
+             ))}
+             {visibleItems.length === 0 ? (
+@@ -234,12 +286,32 @@ function ExampleItems({ currency }: { currency: CurrencyCode }) {
+ function CooldownItemCard({
+   item,
+   currency,
++  snapshot,
+   onRemove,
++  onConvertToGoal,
+ }: {
+   item: CooldownItem;
+   currency: CurrencyCode;
++  snapshot: FinancialSnapshot;
+   onRemove: (id: string) => Promise<void>;
++  onConvertToGoal: (item: CooldownItem) => Promise<unknown> | unknown;
+ }) {
++  const [recheck, setRecheck] = useState<CooldownRecheckResult | null>(null);
++  const [isConverting, setIsConverting] = useState(false);
++  const [isConverted, setIsConverted] = useState(false);
++  const cooldownDays = getCooldownDays(item.amount);
++
++  async function handleConvert() {
++    setIsConverting(true);
++
++    try {
++      await onConvertToGoal(item);
++      setIsConverted(true);
++    } finally {
++      setIsConverting(false);
++    }
++  }
++
+   return (
+     <article
+       aria-label={`${item.itemName} cooldown item`}
+@@ -257,13 +329,13 @@ function CooldownItemCard({
+             {formatCurrency(item.amount, currency)}
+           </p>
+         </div>
+-        <StatusBadge decision={getCooldownDecision(item)} />
++        <StatusBadge decision={item.baselineDecision ?? getCooldownDecision(item)} />
+       </div>
+ 
+       <dl className="grid gap-3 text-sm sm:grid-cols-2">
+         <CooldownFact label="Risk">Risk: {formatUrgency(item.urgency)}</CooldownFact>
+         <CooldownFact label="Cooldown">
+-          Cooldown: recheck {formatLongDate(parseDisplayDate(item.recheckAt))}
++          {cooldownDays}-day hold · recheck {formatLongDate(parseDisplayDate(item.recheckAt))}
+         </CooldownFact>
+         <CooldownFact label="Payment">{formatPaymentMethod(item.paymentMethod)}</CooldownFact>
+         <CooldownFact label="Source">
+@@ -271,9 +343,15 @@ function CooldownItemCard({
+         </CooldownFact>
+       </dl>
+ 
+-      <p className="rounded-control bg-muted/40 px-3 py-2 text-xs leading-5 text-muted">
+-        Recheck and goal conversion are coming soon. Remove remains available.
+-      </p>
++      {recheck ? (
++        <RecheckResult itemName={item.itemName} currency={currency} recheck={recheck} />
++      ) : null}
++
++      {isConverted ? (
++        <p role="status" className="text-sm font-medium text-safe">
++          Added to your goals. Track it from the Goals page.
++        </p>
++      ) : null}
+ 
+       <div className="flex flex-wrap gap-2">
+         <Button
+@@ -281,7 +359,7 @@ function CooldownItemCard({
+           variant="secondary"
+           size="sm"
+           aria-label={`Recheck ${item.itemName}`}
+-          disabled
++          onClick={() => setRecheck(recheckCooldownItem(item, snapshot))}
+         >
+           <RotateCcw className="size-4" aria-hidden="true" />
+           Recheck
+@@ -291,10 +369,11 @@ function CooldownItemCard({
+           variant="secondary"
+           size="sm"
+           aria-label={`Convert ${item.itemName} to Goal`}
+-          disabled
++          disabled={isConverting || isConverted}
++          onClick={() => void handleConvert()}
+         >
+           <Target className="size-4" aria-hidden="true" />
+-          Convert to Goal
++          {isConverting ? "Adding..." : "Convert to Goal"}
+         </Button>
+         <Button
+           type="button"
+@@ -319,6 +398,61 @@ function CooldownItemCard({
+   );
+ }
+ 
++function RecheckResult({
++  itemName,
++  currency,
++  recheck,
++}: {
++  itemName: string;
++  currency: CurrencyCode;
++  recheck: CooldownRecheckResult;
++}) {
++  const trend = trendPresentation[recheck.decisionTrend];
++  const TrendIcon = trend.Icon;
++  const delta = recheck.safeToSpendDelta;
++
++  return (
++    <div
++      role="status"
++      aria-label={`Recheck result for ${itemName}`}
++      className={cn("grid gap-3 rounded-control border p-4", trend.surface)}
++    >
++      <div className="flex flex-wrap items-center justify-between gap-2">
++        <span className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
++          <TrendIcon className={cn("size-4 shrink-0", trend.icon)} />
++          {trend.label}
++        </span>
++        <StatusBadge decision={recheck.current.decision} />
++      </div>
++
++      {delta === null ? (
++        <p className="text-sm leading-6 text-muted">
++          No saved result from when you added this, so only today&apos;s check is shown.
++        </p>
++      ) : (
++        <p className="text-sm leading-6 text-foreground">
++          Safe-to-spend{" "}
++          <span className={cn("font-semibold", delta >= 0 ? "text-safe" : "text-risk")}>
++            {delta >= 0 ? "up" : "down"} {formatCurrency(Math.abs(delta), currency)}
++          </span>{" "}
++          since you added this.
++        </p>
++      )}
++
++      {recheck.current.reasons.length > 0 ? (
++        <ul className="grid gap-1.5 text-sm leading-5 text-muted">
++          {recheck.current.reasons.map((reason, index) => (
++            <li key={index} className="flex gap-2">
++              <span aria-hidden="true">•</span>
++              <span>{reason}</span>
++            </li>
++          ))}
++        </ul>
++      ) : null}
++    </div>
++  );
++}
++
+ function getTabId(tab: CooldownTab) {
+   return `cooldown-tab-${tab}`;
+ }
+diff --git a/src/hooks/use-financial-state.test.tsx b/src/hooks/use-financial-state.test.tsx
+index e4de734..fa7e057 100644
+--- a/src/hooks/use-financial-state.test.tsx
++++ b/src/hooks/use-financial-state.test.tsx
+@@ -140,6 +140,15 @@ describe("useFinancialState Supabase mode", () => {
+         priority: "high",
+       });
+       await result.current.addGoalFromCheck(savedCheck!.check);
++      await result.current.addGoalFromCooldown({
++        id: "cooldown-console",
++        itemName: "Console",
++        amount: 24_000,
++        urgency: "need_now",
++        paymentMethod: "cash",
++        addedAt: "2026-06-20T02:00:00.000Z",
++        recheckAt: "2026-06-23T02:00:00.000Z",
++      });
+       await result.current.addCooldownFromCheck(savedCheck!.check);
+       await result.current.markPurchaseCheckStatus(savedCheck!.check, "bought");
+       await result.current.deleteGoal("goal-1");
+@@ -160,6 +169,14 @@ describe("useFinancialState Supabase mode", () => {
+       expect.objectContaining({ label: "Camera upgrade" })
+     );
+     expect(actions.createGoal).toHaveBeenCalledWith(expect.objectContaining({ label: "Phone" }));
++    expect(actions.createGoal).toHaveBeenCalledWith(
++      expect.objectContaining({
++        label: "Console",
++        targetAmount: 24_000,
++        monthlyContribution: 4_000,
++        priority: "high",
++      })
++    );
+     expect(actions.createCooldown).toHaveBeenCalledWith(
+       expect.objectContaining({ sourceCheckId: savedCheck?.check.id })
+     );
+@@ -268,6 +285,22 @@ describe("useFinancialState Supabase mode", () => {
+     });
+     expect(result.current.error).toBe("Goal failed.");
+ 
++    actions.createGoal.mockResolvedValueOnce({ ok: false, error: "Goal failed." });
++    await act(async () => {
++      await expect(
++        result.current.addGoalFromCooldown({
++          id: "cooldown-phone",
++          itemName: "Phone",
++          amount: 25_000,
++          urgency: "want",
++          paymentMethod: "cash",
++          addedAt: "2026-06-20T02:00:00.000Z",
++          recheckAt: "2026-07-20T02:00:00.000Z",
++        })
++      ).rejects.toThrow("Goal failed.");
++    });
++    expect(result.current.error).toBe("Goal failed.");
++
+     actions.deleteGoal.mockResolvedValueOnce({ ok: false, error: "Delete goal failed." });
+     await act(async () => {
+       await expect(result.current.deleteGoal("goal-1")).rejects.toThrow("Delete goal failed.");
+diff --git a/src/hooks/use-financial-state.ts b/src/hooks/use-financial-state.ts
+index 1249e50..489972f 100644
+--- a/src/hooks/use-financial-state.ts
++++ b/src/hooks/use-financial-state.ts
+@@ -21,6 +21,7 @@ import {
+   calculatePurchaseDecision,
+   calculateSafeToSpend,
+ } from "@/lib/calculations/purchase-decision";
++import { getCooldownDays } from "@/lib/calculations/cooldown";
+ import { createAdvisorText } from "@/lib/advisor";
+ import { emptySnapshot } from "@/lib/storage/default-data";
+ import { createId, toIsoDate } from "@/lib/utils";
+@@ -182,9 +183,26 @@ export function useFinancialState() {
+     [createGoal]
+   );
+ 
++  const addGoalFromCooldown = useCallback(
++    async (item: CooldownItem) => {
++      const goal: Goal = {
++        id: createId("goal"),
++        label: item.itemName,
++        targetAmount: item.amount,
++        savedAmount: 0,
++        monthlyContribution: Math.max(1000, Math.ceil(item.amount / 6 / 500) * 500),
++        targetDate: toIsoDate(addMonths(new Date(), 6)),
++        priority: item.urgency === "need_now" ? "high" : "medium",
++      };
++
++      return createGoal(goal);
++    },
++    [createGoal]
++  );
++
+   const addCooldownFromCheck = useCallback(
+     async (check: PurchaseCheck) => {
+-      const days = check.cooldownDays || 7;
++      const days = check.cooldownDays || getCooldownDays(check.amount);
+       const item: CooldownItem = {
+         id: createId("cooldown"),
+         itemName: check.itemName,
+@@ -194,6 +212,14 @@ export function useFinancialState() {
+         sourceCheckId: check.id,
+         addedAt: new Date().toISOString(),
+         recheckAt: addDays(new Date(), days).toISOString(),
++        downPayment: check.downPayment,
++        installmentMonths: check.installmentMonths,
++        monthlyPayment: check.monthlyPayment,
++        isIncomeGenerating: check.isIncomeGenerating,
++        currentAlternativeStillWorks: check.currentAlternativeStillWorks,
++        baselineDecision: check.decision,
++        baselineRiskScore: check.riskScore,
++        baselineSafeToSpend: check.safeToSpend,
+       };
+ 
+       const result = await createCooldownItemAction({
+@@ -203,6 +229,14 @@ export function useFinancialState() {
+         paymentMethod: item.paymentMethod,
+         sourceCheckId: item.sourceCheckId,
+         recheckAt: item.recheckAt,
++        downPayment: item.downPayment,
++        installmentMonths: item.installmentMonths,
++        monthlyPayment: item.monthlyPayment,
++        isIncomeGenerating: item.isIncomeGenerating,
++        currentAlternativeStillWorks: item.currentAlternativeStillWorks,
++        baselineDecision: item.baselineDecision,
++        baselineRiskScore: item.baselineRiskScore,
++        baselineSafeToSpend: item.baselineSafeToSpend,
+       });
+ 
+       if (!result.ok) {
+@@ -305,6 +339,7 @@ export function useFinancialState() {
+     runPurchaseCheck,
+     createGoal,
+     addGoalFromCheck,
++    addGoalFromCooldown,
+     addCooldownFromCheck,
+     markPurchaseCheckStatus,
+     removeCooldownItem,
+diff --git a/src/lib/calculations/cooldown-recheck.test.ts b/src/lib/calculations/cooldown-recheck.test.ts
+new file mode 100644
+index 0000000..6b47ba4
+--- /dev/null
++++ b/src/lib/calculations/cooldown-recheck.test.ts
+@@ -0,0 +1,170 @@
++import { describe, expect, it } from "vitest";
++
++import type { CooldownItem, FinancialSnapshot } from "@/types/finance";
++import { calculatePurchaseDecision } from "./purchase-decision";
++import { cooldownItemToPurchaseInput, recheckCooldownItem } from "./cooldown-recheck";
++
++// Same item under two very different financial situations.
++// Weak: savings 3,000, recurring 10,000, debt 2,000 → safe-to-spend 0 → NOT_RECOMMENDED.
++// Stable: savings 180,000 → safe-to-spend 108,000 → SAFE_TO_BUY.
++const weakSnapshot: FinancialSnapshot = {
++  profile: {
++    currency: "PHP",
++    monthlyIncome: 30_000,
++    currentSavings: 3_000,
++    emergencyFundTarget: 50_000,
++    estimatedVariableExpenses: 5_000,
++  },
++  expenses: [{ id: "rent", label: "Rent", amount: 10_000, dueDay: 1, isRecurring: true }],
++  debts: [
++    { id: "card", label: "Card", outstandingBalance: 20_000, minimumPayment: 2_000, dueDay: 20 },
++  ],
++  goals: [],
++};
++
++const stableSnapshot: FinancialSnapshot = {
++  profile: {
++    currency: "PHP",
++    monthlyIncome: 90_000,
++    currentSavings: 180_000,
++    emergencyFundTarget: 150_000,
++    estimatedVariableExpenses: 12_000,
++  },
++  expenses: [
++    { id: "rent", label: "Rent", amount: 22_000, dueDay: 1, isRecurring: true },
++    { id: "utilities", label: "Utilities", amount: 6_000, dueDay: 18, isRecurring: true },
++  ],
++  debts: [
++    { id: "card", label: "Card", outstandingBalance: 40_000, minimumPayment: 6_000, dueDay: 20 },
++  ],
++  goals: [
++    {
++      id: "travel",
++      label: "Travel",
++      targetAmount: 120_000,
++      savedAmount: 30_000,
++      monthlyContribution: 8_000,
++      priority: "medium",
++    },
++  ],
++};
++
++function makeItem(overrides: Partial<CooldownItem> = {}): CooldownItem {
++  return {
++    id: "cooldown_1",
++    itemName: "Keyboard",
++    amount: 4_500,
++    urgency: "need_this_month",
++    paymentMethod: "cash",
++    addedAt: "2026-06-20T00:00:00.000Z",
++    recheckAt: "2026-06-23T00:00:00.000Z",
++    ...overrides,
++  };
++}
++
++describe("cooldownItemToPurchaseInput", () => {
++  it("carries the decision-affecting purchase inputs", () => {
++    const input = cooldownItemToPurchaseInput(
++      makeItem({
++        paymentMethod: "installment",
++        downPayment: 5_000,
++        installmentMonths: 12,
++        monthlyPayment: 2_000,
++        isIncomeGenerating: true,
++        currentAlternativeStillWorks: true,
++      })
++    );
++
++    expect(input).toMatchObject({
++      itemName: "Keyboard",
++      amount: 4_500,
++      urgency: "need_this_month",
++      paymentMethod: "installment",
++      downPayment: 5_000,
++      installmentMonths: 12,
++      monthlyPayment: 2_000,
++      isIncomeGenerating: true,
++      currentAlternativeStillWorks: true,
++    });
++  });
++});
++
++describe("recheckCooldownItem", () => {
++  it("recomputes the decision from the live engine against the fresh snapshot", () => {
++    const item = makeItem();
++    const result = recheckCooldownItem(item, stableSnapshot);
++
++    expect(result.current).toEqual(
++      calculatePurchaseDecision(stableSnapshot, cooldownItemToPurchaseInput(item))
++    );
++    expect(result.current.decision).toBe("SAFE_TO_BUY");
++    expect(result.current.riskScore).toBe(20);
++    expect(result.current.safeToSpend).toBe(108_000);
++  });
++
++  it("reports an improved decision when finances recovered since added", () => {
++    const item = makeItem({
++      baselineDecision: "NOT_RECOMMENDED",
++      baselineRiskScore: 80,
++      baselineSafeToSpend: 0,
++    });
++
++    const result = recheckCooldownItem(item, stableSnapshot);
++
++    expect(result.decisionTrend).toBe("improved");
++    expect(result.safeToSpendDelta).toBe(108_000);
++    expect(result.baselineDecision).toBe("NOT_RECOMMENDED");
++    expect(result.baselineRiskScore).toBe(80);
++  });
++
++  it("reports a worsened decision when finances deteriorated since added", () => {
++    const item = makeItem({
++      baselineDecision: "SAFE_TO_BUY",
++      baselineRiskScore: 20,
++      baselineSafeToSpend: 108_000,
++    });
++
++    const result = recheckCooldownItem(item, weakSnapshot);
++
++    expect(result.current.decision).toBe("NOT_RECOMMENDED");
++    expect(result.current.safeToSpend).toBe(0);
++    expect(result.decisionTrend).toBe("worsened");
++    expect(result.safeToSpendDelta).toBe(-108_000);
++  });
++
++  it("reports unchanged when the decision rank is the same but still surfaces the safe-to-spend delta", () => {
++    const item = makeItem({
++      baselineDecision: "SAFE_TO_BUY",
++      baselineRiskScore: 20,
++      baselineSafeToSpend: 100_000,
++    });
++
++    const result = recheckCooldownItem(item, stableSnapshot);
++
++    expect(result.decisionTrend).toBe("unchanged");
++    expect(result.safeToSpendDelta).toBe(8_000);
++  });
++
++  it("reports unknown trend and null delta when no baseline was stored (legacy rows)", () => {
++    const result = recheckCooldownItem(makeItem(), stableSnapshot);
++
++    expect(result.decisionTrend).toBe("unknown");
++    expect(result.safeToSpendDelta).toBeNull();
++    expect(result.baselineDecision).toBeNull();
++  });
++
++  it("derives the price-tier cooldown period from the amount", () => {
++    expect(recheckCooldownItem(makeItem({ amount: 1_500 }), stableSnapshot).cooldownDays).toBe(1);
++    expect(recheckCooldownItem(makeItem({ amount: 4_500 }), stableSnapshot).cooldownDays).toBe(3);
++    expect(recheckCooldownItem(makeItem({ amount: 45_000 }), stableSnapshot).cooldownDays).toBe(7);
++    expect(recheckCooldownItem(makeItem({ amount: 80_000 }), stableSnapshot).cooldownDays).toBe(30);
++  });
++
++  it("is deterministic for the same item and snapshot", () => {
++    const item = makeItem({ baselineDecision: "WAIT", baselineSafeToSpend: 50_000 });
++
++    expect(recheckCooldownItem(item, stableSnapshot)).toEqual(
++      recheckCooldownItem(item, stableSnapshot)
++    );
++  });
++});
+diff --git a/src/lib/calculations/cooldown-recheck.ts b/src/lib/calculations/cooldown-recheck.ts
+new file mode 100644
+index 0000000..8fa8761
+--- /dev/null
++++ b/src/lib/calculations/cooldown-recheck.ts
+@@ -0,0 +1,86 @@
++import type {
++  CooldownItem,
++  FinancialSnapshot,
++  PurchaseDecision,
++  PurchaseDecisionResult,
++  PurchaseInput,
++} from "@/types/finance";
++import { getCooldownDays } from "./cooldown";
++import { calculatePurchaseDecision } from "./purchase-decision";
++
++export type CooldownDecisionTrend = "improved" | "unchanged" | "worsened" | "unknown";
++
++export interface CooldownRecheckResult {
++  current: PurchaseDecisionResult;
++  baselineDecision: PurchaseDecision | null;
++  baselineRiskScore: number | null;
++  baselineSafeToSpend: number | null;
++  decisionTrend: CooldownDecisionTrend;
++  safeToSpendDelta: number | null;
++  cooldownDays: number;
++}
++
++// Best to worst. A higher rank means a more permissive decision.
++const DECISION_RANK: Record<PurchaseDecision, number> = {
++  NOT_RECOMMENDED: 0,
++  WAIT: 1,
++  BUY_WITH_CAUTION: 2,
++  SAFE_TO_BUY: 3,
++};
++
++export function cooldownItemToPurchaseInput(item: CooldownItem): PurchaseInput {
++  return {
++    itemName: item.itemName,
++    amount: item.amount,
++    urgency: item.urgency,
++    paymentMethod: item.paymentMethod,
++    downPayment: item.downPayment,
++    installmentMonths: item.installmentMonths,
++    monthlyPayment: item.monthlyPayment,
++    isIncomeGenerating: item.isIncomeGenerating,
++    currentAlternativeStillWorks: item.currentAlternativeStillWorks,
++  };
++}
++
++function compareDecision(
++  current: PurchaseDecision,
++  baseline: PurchaseDecision
++): CooldownDecisionTrend {
++  const delta = DECISION_RANK[current] - DECISION_RANK[baseline];
++
++  if (delta > 0) {
++    return "improved";
++  }
++
++  if (delta < 0) {
++    return "worsened";
++  }
++
++  return "unchanged";
++}
++
++// Recompute the §19 decision for a cooldown item against the current snapshot, holding the
++// purchase intent fixed, and compare it to the baseline captured when the item was added.
++// The same purchase inputs are used both times, so the only variable is the user's finances.
++export function recheckCooldownItem(
++  item: CooldownItem,
++  snapshot: FinancialSnapshot
++): CooldownRecheckResult {
++  const current = calculatePurchaseDecision(snapshot, cooldownItemToPurchaseInput(item));
++  const baselineDecision = item.baselineDecision ?? null;
++  const baselineSafeToSpend = item.baselineSafeToSpend ?? null;
++  const baselineRiskScore = item.baselineRiskScore ?? null;
++
++  return {
++    current,
++    baselineDecision,
++    baselineRiskScore,
++    baselineSafeToSpend,
++    decisionTrend: baselineDecision
++      ? compareDecision(current.decision, baselineDecision)
++      : "unknown",
++    safeToSpendDelta:
++      baselineSafeToSpend === null ? null : current.safeToSpend - baselineSafeToSpend,
++    cooldownDays: getCooldownDays(item.amount),
++  };
++}
+diff --git a/src/lib/supabase/finance-mappers.test.ts b/src/lib/supabase/finance-mappers.test.ts
+index 5598c95..39f73c4 100644
+--- a/src/lib/supabase/finance-mappers.test.ts
++++ b/src/lib/supabase/finance-mappers.test.ts
+@@ -110,6 +110,14 @@ describe("mapFinancialWorkspaceRows", () => {
+           source_check_id: "check-1",
+           added_at: "2026-06-20T01:00:00.000Z",
+           recheck_at: "2026-07-11T01:00:00.000Z",
++          down_payment: 5_000,
++          installment_months: 12,
++          monthly_payment: 2_500,
++          is_income_generating: true,
++          current_alternative_still_works: false,
++          baseline_decision: "WAIT",
++          baseline_risk_score: 50,
++          baseline_safe_to_spend: 20_000,
+         },
+       ],
+       weeklyReports: [
+@@ -157,6 +165,16 @@ describe("mapFinancialWorkspaceRows", () => {
+       reasons: ["This would exceed today's safe-to-spend amount."],
+     });
+     expect(workspace.cooldownItems[0].sourceCheckId).toBe("check-1");
++    expect(workspace.cooldownItems[0]).toMatchObject({
++      downPayment: 5_000,
++      installmentMonths: 12,
++      monthlyPayment: 2_500,
++      isIncomeGenerating: true,
++      currentAlternativeStillWorks: false,
++      baselineDecision: "WAIT",
++      baselineRiskScore: 50,
++      baselineSafeToSpend: 20_000,
++    });
+     expect(workspace.snapshot.goals[0]).toMatchObject({ priority: "high", targetDate: "2026-12-31" });
+     expect(workspace.weeklyReports[0]).toMatchObject({ healthScore: 82, safeToSpend: 20_000 });
+   });
+@@ -249,6 +267,14 @@ describe("mapFinancialWorkspaceRows", () => {
+           source_check_id: null,
+           added_at: "2026-06-20T00:00:00.000Z",
+           recheck_at: "2026-07-20T00:00:00.000Z",
++          down_payment: null,
++          installment_months: null,
++          monthly_payment: null,
++          is_income_generating: false,
++          current_alternative_still_works: false,
++          baseline_decision: null,
++          baseline_risk_score: null,
++          baseline_safe_to_spend: null,
+         },
+       ],
+     });
+@@ -284,6 +310,14 @@ describe("mapFinancialWorkspaceRows", () => {
+       urgency: "want",
+       paymentMethod: "cash",
+       sourceCheckId: undefined,
++      downPayment: undefined,
++      installmentMonths: undefined,
++      monthlyPayment: undefined,
++      isIncomeGenerating: false,
++      currentAlternativeStillWorks: false,
++      baselineDecision: undefined,
++      baselineRiskScore: undefined,
++      baselineSafeToSpend: undefined,
+     });
+   });
+ });
+diff --git a/src/lib/supabase/finance-mappers.ts b/src/lib/supabase/finance-mappers.ts
+index bdc1a37..80fb681 100644
+--- a/src/lib/supabase/finance-mappers.ts
++++ b/src/lib/supabase/finance-mappers.ts
+@@ -153,6 +153,22 @@ export function mapFinancialWorkspaceRows(rows: FinancialWorkspaceRows): Financi
+       sourceCheckId: item.source_check_id ?? undefined,
+       addedAt: item.added_at,
+       recheckAt: item.recheck_at,
++      downPayment: item.down_payment === null ? undefined : Number(item.down_payment),
++      installmentMonths: item.installment_months ?? undefined,
++      monthlyPayment: item.monthly_payment === null ? undefined : Number(item.monthly_payment),
++      isIncomeGenerating: item.is_income_generating,
++      currentAlternativeStillWorks: item.current_alternative_still_works,
++      baselineDecision:
++        item.baseline_decision === null
++          ? undefined
++          : enumValue<PurchaseDecision>(
++              item.baseline_decision,
++              ["SAFE_TO_BUY", "BUY_WITH_CAUTION", "WAIT", "NOT_RECOMMENDED"],
++              "WAIT"
++            ),
++      baselineRiskScore: item.baseline_risk_score ?? undefined,
++      baselineSafeToSpend:
++        item.baseline_safe_to_spend === null ? undefined : Number(item.baseline_safe_to_spend),
+     })),
+     weeklyReports: rows.weeklyReports.map((report) => ({
+       id: report.id,
+diff --git a/src/types/database.ts b/src/types/database.ts
+index 17e17a7..2bc485b 100644
+--- a/src/types/database.ts
++++ b/src/types/database.ts
+@@ -176,6 +176,14 @@ export interface Database {
+           source_check_id: string | null;
+           added_at: string;
+           recheck_at: string;
++          down_payment: number | null;
++          installment_months: number | null;
++          monthly_payment: number | null;
++          is_income_generating: boolean;
++          current_alternative_still_works: boolean;
++          baseline_decision: string | null;
++          baseline_risk_score: number | null;
++          baseline_safe_to_spend: number | null;
+         };
+         Insert: {
+           user_id: string;
+@@ -185,6 +193,14 @@ export interface Database {
+           payment_method: string;
+           source_check_id?: string | null;
+           recheck_at: string;
++          down_payment?: number | null;
++          installment_months?: number | null;
++          monthly_payment?: number | null;
++          is_income_generating?: boolean;
++          current_alternative_still_works?: boolean;
++          baseline_decision?: string | null;
++          baseline_risk_score?: number | null;
++          baseline_safe_to_spend?: number | null;
+         };
+         Update: Partial<Database["public"]["Tables"]["cooldown_items"]["Insert"]>;
+         Relationships: [];
+diff --git a/src/types/finance.ts b/src/types/finance.ts
+index 03c0b29..87beae3 100644
+--- a/src/types/finance.ts
++++ b/src/types/finance.ts
+@@ -107,6 +107,14 @@ export interface CooldownItem {
+   addedAt: string;
+   recheckAt: string;
+   sourceCheckId?: string;
++  downPayment?: number;
++  installmentMonths?: number;
++  monthlyPayment?: number;
++  isIncomeGenerating?: boolean;
++  currentAlternativeStillWorks?: boolean;
++  baselineDecision?: PurchaseDecision;
++  baselineRiskScore?: number;
++  baselineSafeToSpend?: number;
+ }
+ 
+ export interface WeeklyReport {
+diff --git a/supabase/migrations/20260623003000_cooldown_recheck_baseline.sql b/supabase/migrations/20260623003000_cooldown_recheck_baseline.sql
+new file mode 100644
+index 0000000..600f490
+--- /dev/null
++++ b/supabase/migrations/20260623003000_cooldown_recheck_baseline.sql
+@@ -0,0 +1,49 @@
++-- Phase 6 — Cooldown completion.
++-- Capture, at add-time, the baseline a recheck compares against (decision, risk score,
++-- safe-to-spend) plus the decision-affecting purchase inputs, so `Recheck` can recompute
++-- the §19 decision against a fresh snapshot and honestly report whether things improved.
++-- Additive only: every column is nullable or defaulted, so existing rows stay valid.
++
++alter table public.cooldown_items
++  add column if not exists down_payment numeric(12,2),
++  add column if not exists installment_months integer,
++  add column if not exists monthly_payment numeric(12,2),
++  add column if not exists is_income_generating boolean not null default false,
++  add column if not exists current_alternative_still_works boolean not null default false,
++  add column if not exists baseline_decision text,
++  add column if not exists baseline_risk_score integer,
++  add column if not exists baseline_safe_to_spend numeric(12,2);
++
++alter table public.cooldown_items
++  add constraint cooldown_items_down_payment_nonnegative
++    check (down_payment is null or down_payment >= 0),
++  add constraint cooldown_items_installment_months_positive
++    check (installment_months is null or installment_months > 0),
++  add constraint cooldown_items_monthly_payment_nonnegative
++    check (monthly_payment is null or monthly_payment >= 0),
++  add constraint cooldown_items_baseline_decision_check
++    check (
++      baseline_decision is null
++      or baseline_decision in ('SAFE_TO_BUY', 'BUY_WITH_CAUTION', 'WAIT', 'NOT_RECOMMENDED')
++    ),
++  add constraint cooldown_items_baseline_risk_score_range
++    check (baseline_risk_score is null or (baseline_risk_score between 0 and 100)),
++  add constraint cooldown_items_baseline_safe_to_spend_nonnegative
++    check (baseline_safe_to_spend is null or baseline_safe_to_spend >= 0);
++
++-- Rollback, if needed:
++-- alter table public.cooldown_items
++--   drop constraint if exists cooldown_items_down_payment_nonnegative,
++--   drop constraint if exists cooldown_items_installment_months_positive,
++--   drop constraint if exists cooldown_items_monthly_payment_nonnegative,
++--   drop constraint if exists cooldown_items_baseline_decision_check,
++--   drop constraint if exists cooldown_items_baseline_risk_score_range,
++--   drop constraint if exists cooldown_items_baseline_safe_to_spend_nonnegative,
++--   drop column if exists baseline_safe_to_spend,
++--   drop column if exists baseline_risk_score,
++--   drop column if exists baseline_decision,
++--   drop column if exists current_alternative_still_works,
++--   drop column if exists is_income_generating,
++--   drop column if exists monthly_payment,
++--   drop column if exists installment_months,
++--   drop column if exists down_payment;

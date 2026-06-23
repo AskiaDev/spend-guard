@@ -8,6 +8,11 @@ import type { ActionResult } from "@/types/action-result";
 const cooldownSchema = purchaseInputSchema.extend({
   sourceCheckId: z.string().optional(),
   recheckAt: z.string().min(1),
+  baselineDecision: z
+    .enum(["SAFE_TO_BUY", "BUY_WITH_CAUTION", "WAIT", "NOT_RECOMMENDED"])
+    .optional(),
+  baselineRiskScore: z.coerce.number().int().min(0).max(100).optional(),
+  baselineSafeToSpend: z.coerce.number().min(0).optional(),
 });
 
 export async function createCooldownItemAction(
@@ -34,6 +39,14 @@ export async function createCooldownItemAction(
       payment_method: item.paymentMethod,
       source_check_id: item.sourceCheckId ?? null,
       recheck_at: item.recheckAt,
+      down_payment: item.downPayment ?? null,
+      installment_months: item.installmentMonths ?? null,
+      monthly_payment: item.monthlyPayment ?? null,
+      is_income_generating: item.isIncomeGenerating ?? false,
+      current_alternative_still_works: item.currentAlternativeStillWorks ?? false,
+      baseline_decision: item.baselineDecision ?? null,
+      baseline_risk_score: item.baselineRiskScore ?? null,
+      baseline_safe_to_spend: item.baselineSafeToSpend ?? null,
     });
 
     if (error) {

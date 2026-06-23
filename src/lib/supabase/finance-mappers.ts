@@ -153,6 +153,22 @@ export function mapFinancialWorkspaceRows(rows: FinancialWorkspaceRows): Financi
       sourceCheckId: item.source_check_id ?? undefined,
       addedAt: item.added_at,
       recheckAt: item.recheck_at,
+      downPayment: item.down_payment === null ? undefined : Number(item.down_payment),
+      installmentMonths: item.installment_months ?? undefined,
+      monthlyPayment: item.monthly_payment === null ? undefined : Number(item.monthly_payment),
+      isIncomeGenerating: item.is_income_generating,
+      currentAlternativeStillWorks: item.current_alternative_still_works,
+      baselineDecision:
+        item.baseline_decision === null
+          ? undefined
+          : enumValue<PurchaseDecision>(
+              item.baseline_decision,
+              ["SAFE_TO_BUY", "BUY_WITH_CAUTION", "WAIT", "NOT_RECOMMENDED"],
+              "WAIT"
+            ),
+      baselineRiskScore: item.baseline_risk_score ?? undefined,
+      baselineSafeToSpend:
+        item.baseline_safe_to_spend === null ? undefined : Number(item.baseline_safe_to_spend),
     })),
     weeklyReports: rows.weeklyReports.map((report) => ({
       id: report.id,

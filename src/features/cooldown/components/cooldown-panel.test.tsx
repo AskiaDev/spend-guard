@@ -2,8 +2,22 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import type { CooldownItem } from "@/types/finance";
+import type { CooldownItem, FinancialSnapshot } from "@/types/finance";
 import { CooldownPanel } from "./cooldown-panel";
+
+// Strong finances with no debt: a recheck of any reasonable item lands SAFE_TO_BUY.
+const snapshot: FinancialSnapshot = {
+  profile: {
+    currency: "PHP",
+    monthlyIncome: 90_000,
+    currentSavings: 200_000,
+    emergencyFundTarget: 100_000,
+    estimatedVariableExpenses: 10_000,
+  },
+  expenses: [{ id: "rent", label: "Rent", amount: 20_000, dueDay: 1, isRecurring: true }],
+  debts: [],
+  goals: [],
+};
 
 const cooldownItems: CooldownItem[] = [
   {
@@ -27,9 +41,50 @@ const cooldownItems: CooldownItem[] = [
   },
 ];
 
+// Carries a stored baseline so the badge shows the real decision (WAIT) rather than the
+// need_now heuristic (Buy with Caution), and a recheck against `snapshot` reads as improved.
+const phoneItem: CooldownItem = {
+  id: "cooldown_phone",
+  itemName: "Phone",
+  amount: 5_000,
+  urgency: "need_now",
+  paymentMethod: "cash",
+  addedAt: "2026-06-20T00:00:00.000Z",
+  recheckAt: "2026-06-23",
+  sourceCheckId: "check_phone",
+  baselineDecision: "WAIT",
+  baselineRiskScore: 60,
+  baselineSafeToSpend: 40_000,
+};
+
+function renderPanel(
+  items: CooldownItem[],
+  overrides: {
+    onRemove?: (id: string) => Promise<void>;
+    onConvertToGoal?: (item: CooldownItem) => Promise<unknown> | unknown;
+  } = {}
+) {
+  const onRemove = overrides.onRemove ?? (vi.fn(async () => {}) as (id: string) => Promise<void>);
+  const onConvertToGoal =
+    overrides.onConvertToGoal ??
+    (vi.fn(async () => {}) as (item: CooldownItem) => Promise<unknown> | unknown);
+
+  render(
+    <CooldownPanel
+      items={items}
+      currency="PHP"
+      snapshot={snapshot}
+      onRemove={onRemove}
+      onConvertToGoal={onConvertToGoal}
+    />
+  );
+
+  return { onRemove, onConvertToGoal };
+}
+
 describe("CooldownPanel", () => {
   it("shows horizontally navigable tabs, sorting, and labelled example cards when empty", () => {
-    render(<CooldownPanel items={[]} currency="PHP" onRemove={vi.fn()} />);
+    renderPanel([]);
 
     const tablist = screen.getByRole("tablist", { name: "Cooldown views" });
     expect(tablist).toHaveClass("overflow-x-auto");
@@ -44,40 +99,86 @@ describe("CooldownPanel", () => {
 
     const examples = screen.getByRole("region", { name: "Example items" });
     expect(within(examples).getByText("Example items")).toBeVisible();
-    expect(
-      within(examples).getByText("Grocery restock from a supermarket")
-    ).toBeVisible();
+    expect(within(examples).getByText("Grocery restock from a supermarket")).toBeVisible();
     expect(
       within(examples).getByText("Replacement tech from an electronics store")
     ).toBeVisible();
     expect(within(examples).getAllByRole("article")).toHaveLength(2);
   });
 
-  it("renders live cooldown items with status, risk, actions, and labelled controls", () => {
-    render(<CooldownPanel items={cooldownItems} currency="PHP" onRemove={vi.fn()} />);
+  it("renders live cooldown items with the price-tier hold and active actions", () => {
+    renderPanel(cooldownItems);
 
     const laptop = screen.getByRole("article", { name: "Laptop cooldown item" });
     expect(within(laptop).getByText("Laptop")).toBeVisible();
     expect(within(laptop).getByText("₱45,000")).toBeVisible();
     expect(within(laptop).getByText("Wait")).toBeVisible();
     expect(within(laptop).getByText("Risk: Can wait")).toBeVisible();
-    expect(within(laptop).getByText("Cooldown: recheck Jun 27, 2026")).toBeVisible();
-    expect(within(laptop).getByRole("button", { name: "Recheck Laptop" })).toBeDisabled();
-    expect(within(laptop).getByRole("button", { name: "Convert Laptop to Goal" })).toBeDisabled();
+    expect(within(laptop).getByText(/7-day hold .* recheck Jun 27, 2026/)).toBeVisible();
+    expect(within(laptop).getByRole("button", { name: "Recheck Laptop" })).toBeEnabled();
+    expect(within(laptop).getByRole("button", { name: "Convert Laptop to Goal" })).toBeEnabled();
     expect(within(laptop).getByRole("button", { name: "More actions for Laptop" })).toBeDisabled();
     expect(within(laptop).getByRole("button", { name: "Remove Laptop" })).toBeVisible();
-    expect(within(laptop).getByText(/recheck and goal conversion are coming soon/i)).toBeVisible();
+    expect(within(laptop).queryByText(/coming soon/i)).not.toBeInTheDocument();
 
     const espresso = screen.getByRole("article", { name: "Espresso machine cooldown item" });
-    expect(within(espresso).getByText("Espresso machine")).toBeVisible();
     expect(within(espresso).getByText("Risk: Want")).toBeVisible();
-    expect(within(espresso).getByText("Cooldown: recheck Jul 5, 2026")).toBeVisible();
+    expect(within(espresso).getByText(/7-day hold .* recheck Jul 5, 2026/)).toBeVisible();
+  });
+
+  it("shows the stored decision on the badge instead of the urgency heuristic", () => {
+    renderPanel([phoneItem]);
+
+    const phone = screen.getByRole("article", { name: "Phone cooldown item" });
+    // need_now would map to "Buy with Caution" via the heuristic; the stored baseline is "Wait".
+    expect(within(phone).getByText("Wait")).toBeVisible();
+    expect(within(phone).queryByText("Buy with Caution")).not.toBeInTheDocument();
+  });
+
+  it("rechecks against the fresh snapshot and reports an improved decision since added", async () => {
+    const user = userEvent.setup();
+    renderPanel([phoneItem]);
+
+    const phone = screen.getByRole("article", { name: "Phone cooldown item" });
+    await user.click(within(phone).getByRole("button", { name: "Recheck Phone" }));
+
+    const result = within(phone).getByRole("status", { name: "Recheck result for Phone" });
+    expect(result).toHaveTextContent("Looking better");
+    expect(result).toHaveTextContent("Safe to Buy");
+    expect(result).toHaveTextContent(/up ₱/);
+    expect(result).toHaveTextContent("since you added this");
+  });
+
+  it("rechecks legacy items without a baseline and says there is nothing to compare", async () => {
+    const user = userEvent.setup();
+    renderPanel([cooldownItems[0]]);
+
+    const laptop = screen.getByRole("article", { name: "Laptop cooldown item" });
+    await user.click(within(laptop).getByRole("button", { name: "Recheck Laptop" }));
+
+    const result = within(laptop).getByRole("status", { name: "Recheck result for Laptop" });
+    expect(result).toHaveTextContent("Today's check");
+    expect(result).toHaveTextContent("No saved result from when you added this");
+  });
+
+  it("converts a cooldown item into a goal and confirms it", async () => {
+    const user = userEvent.setup();
+    const onConvertToGoal = vi.fn().mockResolvedValue(undefined);
+    renderPanel([phoneItem], { onConvertToGoal });
+
+    const phone = screen.getByRole("article", { name: "Phone cooldown item" });
+    const convert = within(phone).getByRole("button", { name: "Convert Phone to Goal" });
+    await user.click(convert);
+
+    expect(onConvertToGoal).toHaveBeenCalledOnce();
+    expect(onConvertToGoal).toHaveBeenCalledWith(phoneItem);
+    expect(within(phone).getByText(/added to your goals/i)).toBeVisible();
+    expect(convert).toBeDisabled();
   });
 
   it("updates tab selection and filters wishlist items without losing sort controls", async () => {
     const user = userEvent.setup();
-
-    render(<CooldownPanel items={cooldownItems} currency="PHP" onRemove={vi.fn()} />);
+    renderPanel(cooldownItems);
 
     const wishlistTab = screen.getByRole("tab", { name: "Wishlist" });
     await user.click(wishlistTab);
@@ -92,8 +193,7 @@ describe("CooldownPanel", () => {
 
   it("links tabs to a tabpanel and supports arrow-key navigation", async () => {
     const user = userEvent.setup();
-
-    render(<CooldownPanel items={cooldownItems} currency="PHP" onRemove={vi.fn()} />);
+    renderPanel(cooldownItems);
 
     const allTab = screen.getByRole("tab", { name: "All" });
     const waitingTab = screen.getByRole("tab", { name: "Waiting" });
@@ -119,7 +219,7 @@ describe("CooldownPanel", () => {
   });
 
   it("keeps every tab aria-controls reference pointed at a rendered panel", () => {
-    render(<CooldownPanel items={cooldownItems} currency="PHP" onRemove={vi.fn()} />);
+    renderPanel(cooldownItems);
 
     const controls = screen
       .getAllByRole("tab")
@@ -139,22 +239,11 @@ describe("CooldownPanel", () => {
     process.env.TZ = "America/Los_Angeles";
 
     try {
-      render(
-        <CooldownPanel
-          items={[
-            {
-              ...cooldownItems[0],
-              recheckAt: "2026-06-27T00:00:00.000Z",
-            },
-          ]}
-          currency="PHP"
-          onRemove={vi.fn()}
-        />
-      );
+      renderPanel([{ ...cooldownItems[0], recheckAt: "2026-06-27T00:00:00.000Z" }]);
 
       const laptop = screen.getByRole("article", { name: "Laptop cooldown item" });
 
-      expect(within(laptop).getByText("Cooldown: recheck Jun 27, 2026")).toBeVisible();
+      expect(within(laptop).getByText(/7-day hold .* recheck Jun 27, 2026/)).toBeVisible();
       expect(within(laptop).queryByText(/Jun 26, 2026/)).not.toBeInTheDocument();
     } finally {
       if (originalTimeZone === undefined) {
@@ -169,7 +258,7 @@ describe("CooldownPanel", () => {
     const user = userEvent.setup();
     const onRemove = vi.fn().mockResolvedValue(undefined);
 
-    render(<CooldownPanel items={cooldownItems} currency="PHP" onRemove={onRemove} />);
+    renderPanel(cooldownItems, { onRemove });
 
     await user.click(screen.getByRole("button", { name: "Remove Laptop" }));
 

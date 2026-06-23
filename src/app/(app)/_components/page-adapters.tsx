@@ -101,7 +101,9 @@ export function CooldownPageContent() {
     <CooldownPanel
       items={state.cooldownItems}
       currency={state.snapshot.profile.currency}
+      snapshot={state.snapshot}
       onRemove={state.removeCooldownItem}
+      onConvertToGoal={state.addGoalFromCooldown}
     />
   );
 }

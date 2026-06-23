@@ -21,6 +21,7 @@ import {
   calculatePurchaseDecision,
   calculateSafeToSpend,
 } from "@/lib/calculations/purchase-decision";
+import { getCooldownDays } from "@/lib/calculations/cooldown";
 import { createAdvisorText } from "@/lib/advisor";
 import { emptySnapshot } from "@/lib/storage/default-data";
 import { createId, toIsoDate } from "@/lib/utils";
@@ -182,9 +183,26 @@ export function useFinancialState() {
     [createGoal]
   );
 
+  const addGoalFromCooldown = useCallback(
+    async (item: CooldownItem) => {
+      const goal: Goal = {
+        id: createId("goal"),
+        label: item.itemName,
+        targetAmount: item.amount,
+        savedAmount: 0,
+        monthlyContribution: Math.max(1000, Math.ceil(item.amount / 6 / 500) * 500),
+        targetDate: toIsoDate(addMonths(new Date(), 6)),
+        priority: item.urgency === "need_now" ? "high" : "medium",
+      };
+
+      return createGoal(goal);
+    },
+    [createGoal]
+  );
+
   const addCooldownFromCheck = useCallback(
     async (check: PurchaseCheck) => {
-      const days = check.cooldownDays || 7;
+      const days = check.cooldownDays || getCooldownDays(check.amount);
       const item: CooldownItem = {
         id: createId("cooldown"),
         itemName: check.itemName,
@@ -194,6 +212,14 @@ export function useFinancialState() {
         sourceCheckId: check.id,
         addedAt: new Date().toISOString(),
         recheckAt: addDays(new Date(), days).toISOString(),
+        downPayment: check.downPayment,
+        installmentMonths: check.installmentMonths,
+        monthlyPayment: check.monthlyPayment,
+        isIncomeGenerating: check.isIncomeGenerating,
+        currentAlternativeStillWorks: check.currentAlternativeStillWorks,
+        baselineDecision: check.decision,
+        baselineRiskScore: check.riskScore,
+        baselineSafeToSpend: check.safeToSpend,
       };
 
       const result = await createCooldownItemAction({
@@ -203,6 +229,14 @@ export function useFinancialState() {
         paymentMethod: item.paymentMethod,
         sourceCheckId: item.sourceCheckId,
         recheckAt: item.recheckAt,
+        downPayment: item.downPayment,
+        installmentMonths: item.installmentMonths,
+        monthlyPayment: item.monthlyPayment,
+        isIncomeGenerating: item.isIncomeGenerating,
+        currentAlternativeStillWorks: item.currentAlternativeStillWorks,
+        baselineDecision: item.baselineDecision,
+        baselineRiskScore: item.baselineRiskScore,
+        baselineSafeToSpend: item.baselineSafeToSpend,
       });
 
       if (!result.ok) {
@@ -305,6 +339,7 @@ export function useFinancialState() {
     runPurchaseCheck,
     createGoal,
     addGoalFromCheck,
+    addGoalFromCooldown,
     addCooldownFromCheck,
     markPurchaseCheckStatus,
     removeCooldownItem,

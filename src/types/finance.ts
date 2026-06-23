@@ -107,6 +107,14 @@ export interface CooldownItem {
   addedAt: string;
   recheckAt: string;
   sourceCheckId?: string;
+  downPayment?: number;
+  installmentMonths?: number;
+  monthlyPayment?: number;
+  isIncomeGenerating?: boolean;
+  currentAlternativeStillWorks?: boolean;
+  baselineDecision?: PurchaseDecision;
+  baselineRiskScore?: number;
+  baselineSafeToSpend?: number;
 }
 
 export interface WeeklyReport {

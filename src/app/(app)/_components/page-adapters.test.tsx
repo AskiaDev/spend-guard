@@ -114,6 +114,7 @@ describe("page adapters", () => {
       replaceFinancialSetup: vi.fn(),
       runPurchaseCheck: vi.fn(),
       addGoalFromCheck: vi.fn(),
+      addGoalFromCooldown: vi.fn(),
       createGoal: vi.fn(),
       addCooldownFromCheck: vi.fn(),
       markPurchaseCheckStatus: vi.fn(),
@@ -232,7 +233,9 @@ describe("page adapters", () => {
     const props = vi.mocked(CooldownPanel).mock.calls[0][0];
     expect(props.items).toBe(financialState.cooldownItems);
     expect(props.currency).toBe(financialState.snapshot.profile.currency);
+    expect(props.snapshot).toBe(financialState.snapshot);
     expect(props.onRemove).toBe(financialState.removeCooldownItem);
+    expect(props.onConvertToGoal).toBe(financialState.addGoalFromCooldown);
   });
 
   it("passes report state and callback identities", () => {

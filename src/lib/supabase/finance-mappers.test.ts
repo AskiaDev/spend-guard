@@ -110,6 +110,14 @@ describe("mapFinancialWorkspaceRows", () => {
           source_check_id: "check-1",
           added_at: "2026-06-20T01:00:00.000Z",
           recheck_at: "2026-07-11T01:00:00.000Z",
+          down_payment: 5_000,
+          installment_months: 12,
+          monthly_payment: 2_500,
+          is_income_generating: true,
+          current_alternative_still_works: false,
+          baseline_decision: "WAIT",
+          baseline_risk_score: 50,
+          baseline_safe_to_spend: 20_000,
         },
       ],
       weeklyReports: [
@@ -157,6 +165,16 @@ describe("mapFinancialWorkspaceRows", () => {
       reasons: ["This would exceed today's safe-to-spend amount."],
     });
     expect(workspace.cooldownItems[0].sourceCheckId).toBe("check-1");
+    expect(workspace.cooldownItems[0]).toMatchObject({
+      downPayment: 5_000,
+      installmentMonths: 12,
+      monthlyPayment: 2_500,
+      isIncomeGenerating: true,
+      currentAlternativeStillWorks: false,
+      baselineDecision: "WAIT",
+      baselineRiskScore: 50,
+      baselineSafeToSpend: 20_000,
+    });
     expect(workspace.snapshot.goals[0]).toMatchObject({ priority: "high", targetDate: "2026-12-31" });
     expect(workspace.weeklyReports[0]).toMatchObject({ healthScore: 82, safeToSpend: 20_000 });
   });
@@ -249,6 +267,14 @@ describe("mapFinancialWorkspaceRows", () => {
           source_check_id: null,
           added_at: "2026-06-20T00:00:00.000Z",
           recheck_at: "2026-07-20T00:00:00.000Z",
+          down_payment: null,
+          installment_months: null,
+          monthly_payment: null,
+          is_income_generating: false,
+          current_alternative_still_works: false,
+          baseline_decision: null,
+          baseline_risk_score: null,
+          baseline_safe_to_spend: null,
         },
       ],
     });
@@ -284,6 +310,14 @@ describe("mapFinancialWorkspaceRows", () => {
       urgency: "want",
       paymentMethod: "cash",
       sourceCheckId: undefined,
+      downPayment: undefined,
+      installmentMonths: undefined,
+      monthlyPayment: undefined,
+      isIncomeGenerating: false,
+      currentAlternativeStillWorks: false,
+      baselineDecision: undefined,
+      baselineRiskScore: undefined,
+      baselineSafeToSpend: undefined,
     });
   });
 });

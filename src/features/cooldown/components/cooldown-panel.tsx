@@ -1,13 +1,29 @@
 "use client";
 
-import { MoreHorizontal, RotateCcw, Target, TimerReset, Trash2 } from "lucide-react";
-import type { KeyboardEvent, ReactNode } from "react";
+import {
+  Minus,
+  MoreHorizontal,
+  RotateCcw,
+  Sparkles,
+  Target,
+  TimerReset,
+  Trash2,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
+import type { ComponentType, KeyboardEvent, ReactNode } from "react";
 import { useMemo, useRef, useState } from "react";
 
 import { StatusBadge } from "@/components/finance/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { exampleOnlyPurchaseReferences } from "@/features/reference-data";
+import { getCooldownDays } from "@/lib/calculations/cooldown";
+import {
+  recheckCooldownItem,
+  type CooldownDecisionTrend,
+  type CooldownRecheckResult,
+} from "@/lib/calculations/cooldown-recheck";
 import { cn, formatCurrency } from "@/lib/utils";
 import type {
   CooldownItem,
@@ -28,6 +44,36 @@ const tabs: Array<{ id: CooldownTab; label: string }> = [
 
 const itemsPanelId = "cooldown-items-panel";
 
+const trendPresentation: Record<
+  CooldownDecisionTrend,
+  { label: string; surface: string; icon: string; Icon: ComponentType<{ className?: string }> }
+> = {
+  improved: {
+    label: "Looking better",
+    surface: "border-safe/30 bg-safe/5",
+    icon: "text-safe",
+    Icon: TrendingUp,
+  },
+  unchanged: {
+    label: "About the same",
+    surface: "border-caution/30 bg-caution/5",
+    icon: "text-caution",
+    Icon: Minus,
+  },
+  worsened: {
+    label: "Looking riskier",
+    surface: "border-risk/30 bg-risk/5",
+    icon: "text-risk",
+    Icon: TrendingDown,
+  },
+  unknown: {
+    label: "Today's check",
+    surface: "border-border bg-muted/30",
+    icon: "text-muted",
+    Icon: Sparkles,
+  },
+};
+
 const exampleCards = exampleOnlyPurchaseReferences.map((label, index) => ({
   id: `example_${index}`,
   label,
@@ -43,11 +89,15 @@ const exampleCards = exampleOnlyPurchaseReferences.map((label, index) => ({
 export function CooldownPanel({
   items,
   currency,
+  snapshot,
   onRemove,
+  onConvertToGoal,
 }: {
   items: CooldownItem[];
   currency: FinancialSnapshot["profile"]["currency"];
+  snapshot: FinancialSnapshot;
   onRemove: (id: string) => Promise<void>;
+  onConvertToGoal: (item: CooldownItem) => Promise<unknown> | unknown;
 }) {
   const [activeTab, setActiveTab] = useState<CooldownTab>("all");
   const [sortMode, setSortMode] = useState<SortMode>("recheck");
@@ -107,7 +157,7 @@ export function CooldownPanel({
               Paused purchases
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-              Sort wants by recheck date and keep the next safe decision visible before buying.
+              Recheck a paused want to see if your money moved in its favor, or turn it into a goal.
             </p>
           </div>
         </div>
@@ -175,7 +225,9 @@ export function CooldownPanel({
                 key={item.id}
                 item={item}
                 currency={currency}
+                snapshot={snapshot}
                 onRemove={onRemove}
+                onConvertToGoal={onConvertToGoal}
               />
             ))}
             {visibleItems.length === 0 ? (
@@ -234,12 +286,32 @@ function ExampleItems({ currency }: { currency: CurrencyCode }) {
 function CooldownItemCard({
   item,
   currency,
+  snapshot,
   onRemove,
+  onConvertToGoal,
 }: {
   item: CooldownItem;
   currency: CurrencyCode;
+  snapshot: FinancialSnapshot;
   onRemove: (id: string) => Promise<void>;
+  onConvertToGoal: (item: CooldownItem) => Promise<unknown> | unknown;
 }) {
+  const [recheck, setRecheck] = useState<CooldownRecheckResult | null>(null);
+  const [isConverting, setIsConverting] = useState(false);
+  const [isConverted, setIsConverted] = useState(false);
+  const cooldownDays = getCooldownDays(item.amount);
+
+  async function handleConvert() {
+    setIsConverting(true);
+
+    try {
+      await onConvertToGoal(item);
+      setIsConverted(true);
+    } finally {
+      setIsConverting(false);
+    }
+  }
+
   return (
     <article
       aria-label={`${item.itemName} cooldown item`}
@@ -257,13 +329,13 @@ function CooldownItemCard({
             {formatCurrency(item.amount, currency)}
           </p>
         </div>
-        <StatusBadge decision={getCooldownDecision(item)} />
+        <StatusBadge decision={item.baselineDecision ?? getCooldownDecision(item)} />
       </div>
 
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
         <CooldownFact label="Risk">Risk: {formatUrgency(item.urgency)}</CooldownFact>
         <CooldownFact label="Cooldown">
-          Cooldown: recheck {formatLongDate(parseDisplayDate(item.recheckAt))}
+          {cooldownDays}-day hold · recheck {formatLongDate(parseDisplayDate(item.recheckAt))}
         </CooldownFact>
         <CooldownFact label="Payment">{formatPaymentMethod(item.paymentMethod)}</CooldownFact>
         <CooldownFact label="Source">
@@ -271,9 +343,15 @@ function CooldownItemCard({
         </CooldownFact>
       </dl>
 
-      <p className="rounded-control bg-muted/40 px-3 py-2 text-xs leading-5 text-muted">
-        Recheck and goal conversion are coming soon. Remove remains available.
-      </p>
+      {recheck ? (
+        <RecheckResult itemName={item.itemName} currency={currency} recheck={recheck} />
+      ) : null}
+
+      {isConverted ? (
+        <p role="status" className="text-sm font-medium text-safe">
+          Added to your goals. Track it from the Goals page.
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         <Button
@@ -281,7 +359,7 @@ function CooldownItemCard({
           variant="secondary"
           size="sm"
           aria-label={`Recheck ${item.itemName}`}
-          disabled
+          onClick={() => setRecheck(recheckCooldownItem(item, snapshot))}
         >
           <RotateCcw className="size-4" aria-hidden="true" />
           Recheck
@@ -291,10 +369,11 @@ function CooldownItemCard({
           variant="secondary"
           size="sm"
           aria-label={`Convert ${item.itemName} to Goal`}
-          disabled
+          disabled={isConverting || isConverted}
+          onClick={() => void handleConvert()}
         >
           <Target className="size-4" aria-hidden="true" />
-          Convert to Goal
+          {isConverting ? "Adding..." : "Convert to Goal"}
         </Button>
         <Button
           type="button"
@@ -316,6 +395,61 @@ function CooldownItemCard({
         </Button>
       </div>
     </article>
+  );
+}
+
+function RecheckResult({
+  itemName,
+  currency,
+  recheck,
+}: {
+  itemName: string;
+  currency: CurrencyCode;
+  recheck: CooldownRecheckResult;
+}) {
+  const trend = trendPresentation[recheck.decisionTrend];
+  const TrendIcon = trend.Icon;
+  const delta = recheck.safeToSpendDelta;
+
+  return (
+    <div
+      role="status"
+      aria-label={`Recheck result for ${itemName}`}
+      className={cn("grid gap-3 rounded-control border p-4", trend.surface)}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+          <TrendIcon className={cn("size-4 shrink-0", trend.icon)} />
+          {trend.label}
+        </span>
+        <StatusBadge decision={recheck.current.decision} />
+      </div>
+
+      {delta === null ? (
+        <p className="text-sm leading-6 text-muted">
+          No saved result from when you added this, so only today&apos;s check is shown.
+        </p>
+      ) : (
+        <p className="text-sm leading-6 text-foreground">
+          Safe-to-spend{" "}
+          <span className={cn("font-semibold", delta >= 0 ? "text-safe" : "text-risk")}>
+            {delta >= 0 ? "up" : "down"} {formatCurrency(Math.abs(delta), currency)}
+          </span>{" "}
+          since you added this.
+        </p>
+      )}
+
+      {recheck.current.reasons.length > 0 ? (
+        <ul className="grid gap-1.5 text-sm leading-5 text-muted">
+          {recheck.current.reasons.map((reason, index) => (
+            <li key={index} className="flex gap-2">
+              <span aria-hidden="true">•</span>
+              <span>{reason}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 

@@ -140,6 +140,15 @@ describe("useFinancialState Supabase mode", () => {
         priority: "high",
       });
       await result.current.addGoalFromCheck(savedCheck!.check);
+      await result.current.addGoalFromCooldown({
+        id: "cooldown-console",
+        itemName: "Console",
+        amount: 24_000,
+        urgency: "need_now",
+        paymentMethod: "cash",
+        addedAt: "2026-06-20T02:00:00.000Z",
+        recheckAt: "2026-06-23T02:00:00.000Z",
+      });
       await result.current.addCooldownFromCheck(savedCheck!.check);
       await result.current.markPurchaseCheckStatus(savedCheck!.check, "bought");
       await result.current.deleteGoal("goal-1");
@@ -160,6 +169,14 @@ describe("useFinancialState Supabase mode", () => {
       expect.objectContaining({ label: "Camera upgrade" })
     );
     expect(actions.createGoal).toHaveBeenCalledWith(expect.objectContaining({ label: "Phone" }));
+    expect(actions.createGoal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        label: "Console",
+        targetAmount: 24_000,
+        monthlyContribution: 4_000,
+        priority: "high",
+      })
+    );
     expect(actions.createCooldown).toHaveBeenCalledWith(
       expect.objectContaining({ sourceCheckId: savedCheck?.check.id })
     );
@@ -265,6 +282,22 @@ describe("useFinancialState Supabase mode", () => {
     actions.createGoal.mockResolvedValueOnce({ ok: false, error: "Goal failed." });
     await act(async () => {
       await expect(result.current.addGoalFromCheck(check)).rejects.toThrow("Goal failed.");
+    });
+    expect(result.current.error).toBe("Goal failed.");
+
+    actions.createGoal.mockResolvedValueOnce({ ok: false, error: "Goal failed." });
+    await act(async () => {
+      await expect(
+        result.current.addGoalFromCooldown({
+          id: "cooldown-phone",
+          itemName: "Phone",
+          amount: 25_000,
+          urgency: "want",
+          paymentMethod: "cash",
+          addedAt: "2026-06-20T02:00:00.000Z",
+          recheckAt: "2026-07-20T02:00:00.000Z",
+        })
+      ).rejects.toThrow("Goal failed.");
     });
     expect(result.current.error).toBe("Goal failed.");
 
