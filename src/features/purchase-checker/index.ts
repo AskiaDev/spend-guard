@@ -1,1 +1,2 @@
-export { PurchaseCheckerPanel } from "./components/purchase-checker-panel";
+export { PurchaseCheckerWizard } from "./components/purchase-checker-wizard";
+export { PurchaseResult } from "./components/purchase-result";

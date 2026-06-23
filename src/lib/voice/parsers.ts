@@ -46,7 +46,7 @@ export function parseInstallmentTerms(input: string): {
 }
 
 function extractItemName(input: string): string | undefined {
-  const match = input.match(/buy\s+(?:a|an|the)?\s*([a-z0-9 -]+?)\s+(?:for|at|worth|on)/i);
+  const match = input.match(/buy\s+(?:an|a|the)?\s*([a-z0-9 -]+?)\s+(?:for|at|worth|on)/i);
   return match?.[1]?.trim();
 }
 

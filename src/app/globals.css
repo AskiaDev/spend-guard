@@ -1,15 +1,35 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f8f4;
-  --foreground: #18181b;
+  --background: #f6f8fb;
+  --surface: #ffffff;
+  --border: #dfe5ee;
+  --foreground: #172033;
+  --muted: #64748b;
+  --primary: #155eef;
+  --safe: #15803d;
+  --caution: #b45309;
+  --risk: #dc2626;
+  --advisor: #eaf2ff;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-safe: var(--safe);
+  --color-caution: var(--caution);
+  --color-risk: var(--risk);
+  --color-advisor: var(--advisor);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --radius-control: 0.75rem;
+  --radius-card: 1.25rem;
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px rgb(15 23 42 / 0.05);
+  --shadow-elevated: 0 12px 32px rgb(15 23 42 / 0.1);
 }
 
 body {
@@ -23,4 +43,15 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
 }

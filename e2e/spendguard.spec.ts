@@ -1,58 +1,136 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
-test("manual purchase check can become a goal, cooldown item, and report", async ({ page }) => {
-  await page.goto("/");
+async function expectNoHydrationSkeleton(page: Page) {
+  await expect(page.getByRole("status", { name: "Loading local financial workspace..." })).toBeHidden();
+}
 
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+async function completePurchaseWizard(page: Page, itemName = "iPhone Pro Max 1TB") {
+  await page.getByLabel("Product name").fill(itemName);
+  await page.getByLabel("Price").fill("170000");
+  await page.getByLabel("Category").selectOption("phone");
+  await page.getByRole("button", { name: "Continue" }).click();
 
-  await page.getByRole("button", { name: "Profile" }).click();
-  await page.getByLabel("Monthly income").fill("90000");
-  await page.getByLabel("Current savings").fill("180000");
-  await page.getByLabel("Emergency target").fill("150000");
-  await page.getByLabel("Fixed monthly expenses").fill("28000");
-  await page.getByLabel("Debt minimums").fill("6000");
-  await page.getByLabel("Goal contribution").fill("8000");
-  await page.getByRole("button", { name: "Save profile" }).click();
+  await expect(page.getByRole("heading", { name: "Motivation" })).toBeVisible();
+  await page.getByLabel("Reason for purchase").fill("Work camera and family photos");
+  await page.getByLabel("Urgency").selectOption("can_wait");
+  await page.getByLabel("Best alternative").fill("Keep current phone for six more months");
+  await page.getByRole("radio", { name: /no, this is personal use/i }).check();
+  await page.getByRole("button", { name: "Continue" }).click();
 
-  await page.getByRole("button", { name: "Can I Buy This?" }).click();
-  await page.getByLabel("Purchase").fill("Replacement keyboard");
-  await page.getByLabel("Amount").fill("4500");
-  await page.getByLabel("Urgency").selectOption("need_this_month");
-  await page.getByRole("button", { name: "Check purchase" }).click();
+  await expect(page.getByRole("heading", { name: "Payment" })).toBeVisible();
+  await page.getByRole("radio", { name: /installment/i }).check();
+  await page.getByLabel("Monthly payment").fill("6000");
+  await page.getByLabel("Term (months)").fill("24");
+  await page.getByRole("button", { name: "Analyze Purchase" }).click();
+}
 
-  await expect(page.getByText("safe to buy")).toBeVisible();
+test("desktop purchase journey saves a check, goal, and cooldown item", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/checker");
+
+  await expect(page.getByRole("heading", { level: 1, name: "Purchase Checker" })).toBeVisible();
+  await expectNoHydrationSkeleton(page);
+
+  await completePurchaseWizard(page);
+
+  await expect(page).toHaveURL(/\/checker\/result$/);
+  await expect(page.getByText("Wait").first()).toBeVisible();
   await expect(
-    page.getByText("The purchase fits inside today's safe-to-spend amount.", { exact: true })
+    page.getByText("Waiting would give your monthly plan more room and reduce pressure on your priorities.")
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Convert to goal" }).click();
-  await page.getByRole("button", { name: "Add cooldown" }).click();
+  const addToGoal = page.getByRole("button", { name: "Add to Goal" });
+  await addToGoal.click();
+  await expect(addToGoal).toBeEnabled();
 
-  await page.getByRole("button", { name: "Goals" }).click();
-  await expect(page.getByText("Replacement keyboard")).toBeVisible();
+  const addToCooldown = page.getByRole("button", { name: "Add to Cooldown" });
+  await addToCooldown.click();
+  await expect(addToCooldown).toBeEnabled();
 
-  await page.getByRole("button", { name: "Cooldown" }).click();
-  await expect(page.getByText("Replacement keyboard")).toBeVisible();
+  await page.goto("/goals");
+  await expect(page.getByRole("heading", { level: 1, name: "Savings goals" })).toBeVisible();
+  await expect(page.getByRole("article", { name: "iPhone Pro Max 1TB goal" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Reports" }).click();
-  await page.getByRole("button", { name: "Generate report" }).click();
-  await expect(page.getByText(/Health score is/i)).toBeVisible();
+  await page.goto("/cooldown");
+  await expect(page.getByRole("heading", { level: 1, name: "Cooldown / Wishlist" })).toBeVisible();
+  await expect(
+    page.getByRole("article", { name: "iPhone Pro Max 1TB cooldown item" })
+  ).toBeVisible();
 });
 
-test("voice transcript parsing requires explicit confirmation", async ({ page }) => {
-  await page.goto("/");
-  await page.getByRole("button", { name: "Can I Buy This?" }).click();
+test("voice review journey uses typed transcript fallback and reaches the result route", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/voice");
+
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Voice Purchase Checker" })
+  ).toBeVisible();
+  await expectNoHydrationSkeleton(page);
 
   await page
-    .getByLabel("Voice transcript")
-    .fill("Can I buy a phone for 25k on installment, 12 months at 2500 per month? I can wait.");
-  await page.getByRole("button", { name: "Parse transcript" }).click();
+    .getByLabel("Purchase transcript")
+    .fill(
+      "Can I buy an iPhone Pro Max 1TB for ₱170,000 on installment with a ₱50,000 down payment, 24 months at ₱6,000 per month? I can wait."
+    );
+  await page.getByRole("button", { name: "Review extracted details" }).click();
 
-  await expect(page.getByText("Review the extracted fields before analysis.")).toBeVisible();
-  await expect(page.getByText("₱25,000")).toBeVisible();
-  await page.getByRole("button", { name: "Confirm fields" }).click();
+  await expect(page.getByRole("heading", { name: "Review extracted details" })).toBeVisible();
+  await page.getByLabel("Product name").fill("iPhone Pro Max 1TB edited");
+  await page.getByRole("button", { name: "Analyze purchase" }).click();
 
-  await expect(page.getByLabel("Purchase")).toHaveValue("phone");
-  await expect(page.getByLabel("Amount")).toHaveValue("25000");
-  await expect(page.getByLabel("Payment", { exact: true })).toHaveValue("installment");
+  await expect(page).toHaveURL(/\/checker\/result$/);
+  await expect(page.getByRole("region", { name: "Purchase summary" })).toContainText(
+    "iPhone Pro Max 1TB edited"
+  );
+});
+
+test("mobile onboarding keeps values through Back and updates dashboard amounts", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/onboarding");
+
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Let’s set up SpendGuard for you" })
+  ).toBeVisible();
+  await expectNoHydrationSkeleton(page);
+
+  await page.getByLabel("Monthly income").fill("90000");
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  await expect(page.getByRole("heading", { name: "Savings" })).toBeVisible();
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page.getByLabel("Monthly income")).toHaveValue("90000");
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  await page.getByLabel("Current savings").fill("130000");
+  await page.getByLabel("Emergency fund target").fill("240000");
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  await page.getByLabel("Housing").fill("25000");
+  await page.getByLabel("Utilities and internet").fill("7000");
+  await page.getByLabel("Food and transport").fill("15000");
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  await page.getByLabel("Debt name").fill("Credit card");
+  await page.getByLabel("Outstanding balance").fill("40000");
+  await page.getByLabel("Minimum monthly payment").fill("6000");
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  await page.getByLabel("Phone upgrade fund").check();
+  await page.getByLabel("Travel fund").check();
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  await expect(page.getByRole("heading", { name: "Review your setup" })).toBeVisible();
+  await page.getByRole("button", { name: "Finish Setup" }).click();
+  await expect(page.getByRole("button", { name: "Finish Setup" })).toBeEnabled();
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1, name: "Good morning, Miguel!" })).toBeVisible();
+  await expect(page.getByLabel("Current Savings card")).toContainText("₱130,000");
+  await expect(page.getByLabel("Monthly Expenses card")).toContainText("₱47,000");
+  await expect(page.getByRole("heading", { name: "Phone upgrade fund" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Travel fund" })).toBeVisible();
 });
