@@ -14,8 +14,10 @@ const activeCheck: PurchaseCheck = {
   installmentMonths: 24,
   monthlyPayment: 6000,
   decision: "NOT_RECOMMENDED",
+  riskScore: 95,
   safeToSpend: 20000,
   monthlyFreeCashFlow: 10000,
+  savingsAfterPurchase: 120000,
   cooldownDays: 30,
   advisorText: "Waiting protects your emergency savings and keeps your monthly plan flexible.",
   reasons: [

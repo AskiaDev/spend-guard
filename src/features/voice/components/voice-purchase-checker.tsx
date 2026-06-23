@@ -131,6 +131,7 @@ function buildPurchaseCandidate(draft: ReviewDraft) {
   };
 
   if (financedPaymentMethods.includes(draft.paymentMethod)) {
+    purchase.downPayment = draft.downPayment;
     purchase.installmentMonths = draft.installmentMonths;
     purchase.monthlyPayment = draft.monthlyPayment;
   }
@@ -567,8 +568,8 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
                     onChange={(value) => updateReviewField("downPayment", value)}
                   />
                   <p className="text-xs text-muted sm:col-span-2">
-                    Down payment is reference-only and is not included in SpendGuard analysis
-                    until the finance model supports it.
+                    Down payment is included in the savings-after-purchase check for financed
+                    purchases.
                   </p>
 
                   <div className="grid gap-2">

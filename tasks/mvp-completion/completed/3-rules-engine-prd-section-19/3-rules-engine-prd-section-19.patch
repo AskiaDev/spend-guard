@@ -1,0 +1,1936 @@
+diff --git a/src/app/(app)/_components/page-adapters.test.tsx b/src/app/(app)/_components/page-adapters.test.tsx
+index f7a6ccd..ae6eebc 100644
+--- a/src/app/(app)/_components/page-adapters.test.tsx
++++ b/src/app/(app)/_components/page-adapters.test.tsx
+@@ -74,8 +74,10 @@ describe("page adapters", () => {
+           urgency: "can_wait",
+           paymentMethod: "cash",
+           decision: "WAIT",
++          riskScore: 50,
+           safeToSpend: 20000,
+           monthlyFreeCashFlow: 10000,
++          savingsAfterPurchase: 75000,
+           cooldownDays: 7,
+           advisorText: "Wait before buying.",
+           reasons: ["Purchase exceeds safe-to-spend."],
+diff --git a/src/features/dashboard/components/dashboard-overview.test.tsx b/src/features/dashboard/components/dashboard-overview.test.tsx
+index e4fba5a..c1878b9 100644
+--- a/src/features/dashboard/components/dashboard-overview.test.tsx
++++ b/src/features/dashboard/components/dashboard-overview.test.tsx
+@@ -20,8 +20,10 @@ const checks: PurchaseCheck[] = [
+     paymentMethod: "cash",
+     createdAt: "2026-06-20T00:00:00.000Z",
+     decision: "SAFE_TO_BUY",
++    riskScore: 20,
+     safeToSpend: 20000,
+     monthlyFreeCashFlow: 10000,
++    savingsAfterPurchase: 15500,
+     cooldownDays: 0,
+     advisorText: "This fits inside your current monthly plan.",
+     reasons: ["The purchase fits inside today's safe-to-spend amount."],
+@@ -34,8 +36,10 @@ const checks: PurchaseCheck[] = [
+     paymentMethod: "credit_card",
+     createdAt: "2026-06-18T00:00:00.000Z",
+     decision: "WAIT",
++    riskScore: 50,
+     safeToSpend: 20000,
+     monthlyFreeCashFlow: 10000,
++    savingsAfterPurchase: 95000,
+     cooldownDays: 21,
+     advisorText: "Wait until your emergency buffer is closer to target.",
+     reasons: ["The purchase is above today's safe-to-spend amount."],
+diff --git a/src/features/purchase-checker/api/save-purchase-check.test.ts b/src/features/purchase-checker/api/save-purchase-check.test.ts
+index b1f3ce5..7213901 100644
+--- a/src/features/purchase-checker/api/save-purchase-check.test.ts
++++ b/src/features/purchase-checker/api/save-purchase-check.test.ts
+@@ -17,14 +17,19 @@ describe("savePurchaseCheck", () => {
+       itemName: "Phone",
+       amount: 25_000,
+       urgency: "can_wait" as const,
+-      paymentMethod: "cash" as const,
++      paymentMethod: "installment" as const,
++      downPayment: 5_000,
++      isIncomeGenerating: true,
++      currentAlternativeStillWorks: false,
+     };
+     const check = {
+       ...purchase,
+       decision: "WAIT" as const,
++      riskScore: 50,
+       safeToSpend: 20_000,
+       monthlyFreeCashFlow: 30_000,
+-      cooldownDays: 21,
++      savingsAfterPurchase: 15_000,
++      cooldownDays: 7,
+       advisorText: "Wait before buying.",
+       reasons: ["This would exceed today's safe-to-spend amount."],
+     };
+@@ -40,6 +45,12 @@ describe("savePurchaseCheck", () => {
+       expect.objectContaining({
+         user_id: "user-1",
+         item_name: "Phone",
++        down_payment: 5_000,
++        is_income_generating: true,
++        current_alternative_still_works: false,
++        risk_score: 50,
++        savings_after_purchase: 15_000,
++        cooldown_days: 7,
+       })
+     );
+   });
+diff --git a/src/features/purchase-checker/api/save-purchase-check.ts b/src/features/purchase-checker/api/save-purchase-check.ts
+index ea8b3ad..4116f2c 100644
+--- a/src/features/purchase-checker/api/save-purchase-check.ts
++++ b/src/features/purchase-checker/api/save-purchase-check.ts
+@@ -26,11 +26,17 @@ export async function savePurchaseCheck(
+       amount: purchase.amount,
+       urgency: purchase.urgency,
+       payment_method: purchase.paymentMethod,
++      down_payment: purchase.downPayment ?? null,
+       installment_months: purchase.installmentMonths ?? null,
+       monthly_payment: purchase.monthlyPayment ?? null,
++      is_income_generating: purchase.isIncomeGenerating ?? false,
++      current_alternative_still_works: purchase.currentAlternativeStillWorks ?? false,
+       decision: check.decision,
++      risk_score: check.riskScore,
+       safe_to_spend: check.safeToSpend,
+       monthly_free_cash_flow: check.monthlyFreeCashFlow,
++      savings_after_purchase: check.savingsAfterPurchase,
++      cooldown_days: check.cooldownDays,
+       advisor_text: check.advisorText,
+       reasons: check.reasons,
+     })
+diff --git a/src/features/purchase-checker/components/purchase-checker-wizard.test.tsx b/src/features/purchase-checker/components/purchase-checker-wizard.test.tsx
+index 48435bf..80bdcf0 100644
+--- a/src/features/purchase-checker/components/purchase-checker-wizard.test.tsx
++++ b/src/features/purchase-checker/components/purchase-checker-wizard.test.tsx
+@@ -35,6 +35,7 @@ async function completeStepTwo(user: ReturnType<typeof userEvent.setup>) {
+   await user.type(screen.getByLabelText(/reason for purchase/i), "work and family photos");
+   await user.selectOptions(screen.getByLabelText(/urgency/i), "can_wait");
+   await user.type(screen.getByLabelText(/best alternative/i), "keep current phone");
++  await user.click(screen.getByRole("radio", { name: /yes, it still works/i }));
+   await user.click(screen.getByRole("radio", { name: /no, this is personal use/i }));
+   await user.click(screen.getByRole("button", { name: /continue/i }));
+ }
+@@ -125,7 +126,7 @@ describe("PurchaseCheckerWizard", () => {
+     expect(screen.queryByRole("heading", { name: /payment/i })).not.toBeInTheDocument();
+   });
+ 
+-  it("preserves reason, urgency, alternative, and income-generation choices across steps", async () => {
++  it("preserves reason, urgency, alternative, current-alternative, and income-generation choices across steps", async () => {
+     const user = userEvent.setup();
+ 
+     render(<PurchaseCheckerWizard onRunCheck={vi.fn()} />);
+@@ -134,6 +135,7 @@ describe("PurchaseCheckerWizard", () => {
+     await user.type(screen.getByLabelText(/reason for purchase/i), "work and family photos");
+     await user.selectOptions(screen.getByLabelText(/urgency/i), "can_wait");
+     await user.type(screen.getByLabelText(/best alternative/i), "keep current phone");
++    await user.click(screen.getByRole("radio", { name: /yes, it still works/i }));
+     await user.click(screen.getByRole("radio", { name: /no, this is personal use/i }));
+     await user.click(screen.getByRole("button", { name: /continue/i }));
+ 
+@@ -144,6 +146,7 @@ describe("PurchaseCheckerWizard", () => {
+     expect(screen.getByLabelText(/reason for purchase/i)).toHaveValue("work and family photos");
+     expect(screen.getByLabelText(/urgency/i)).toHaveValue("can_wait");
+     expect(screen.getByLabelText(/best alternative/i)).toHaveValue("keep current phone");
++    expect(screen.getByRole("radio", { name: /yes, it still works/i })).toBeChecked();
+     expect(screen.getByRole("radio", { name: /no, this is personal use/i })).toBeChecked();
+   });
+ 
+@@ -155,6 +158,7 @@ describe("PurchaseCheckerWizard", () => {
+     await completeStepOne(user);
+     await user.type(screen.getByLabelText(/reason for purchase/i), "work and family photos");
+     await user.type(screen.getByLabelText(/best alternative/i), "keep current phone");
++    await user.click(screen.getByRole("radio", { name: /yes, it still works/i }));
+     await user.click(screen.getByRole("button", { name: /continue/i }));
+ 
+     const incomeGroup = screen.getByRole("group", { name: /income generation/i });
+@@ -168,6 +172,28 @@ describe("PurchaseCheckerWizard", () => {
+     expect(describedBy?.split(/\s+/)).toContain(error.id);
+   });
+ 
++  it("links current-alternative validation to the radio group", async () => {
++    const user = userEvent.setup();
++
++    render(<PurchaseCheckerWizard onRunCheck={vi.fn()} />);
++
++    await completeStepOne(user);
++    await user.type(screen.getByLabelText(/reason for purchase/i), "work and family photos");
++    await user.type(screen.getByLabelText(/best alternative/i), "keep current phone");
++    await user.click(screen.getByRole("radio", { name: /no, this is personal use/i }));
++    await user.click(screen.getByRole("button", { name: /continue/i }));
++
++    const alternativeGroup = screen.getByRole("group", { name: /current alternative/i });
++    const error = screen.getByText(/choose whether the current alternative still works/i);
++    const describedBy = alternativeGroup.getAttribute("aria-describedby");
++
++    expect(alternativeGroup).toHaveAttribute("aria-invalid", "true");
++    expect(error).toBeVisible();
++    expect(error).toHaveAttribute("id");
++    expect(error.id).not.toBe("");
++    expect(describedBy?.split(/\s+/)).toContain(error.id);
++  });
++
+   it("reveals installment fields for financed payments and hides them for cash", async () => {
+     const user = userEvent.setup();
+ 
+@@ -226,6 +252,8 @@ describe("PurchaseCheckerWizard", () => {
+       urgency: "can_wait",
+       paymentMethod: "loan",
+       monthlyPayment: 4500,
++      currentAlternativeStillWorks: true,
++      isIncomeGenerating: false,
+     });
+     expect(pushSpy).not.toHaveBeenCalled();
+ 
+@@ -253,6 +281,8 @@ describe("PurchaseCheckerWizard", () => {
+       amount: 170000,
+       urgency: "can_wait",
+       paymentMethod: "cash",
++      currentAlternativeStillWorks: true,
++      isIncomeGenerating: false,
+     });
+   });
+ 
+@@ -279,8 +309,11 @@ describe("PurchaseCheckerWizard", () => {
+       amount: 170000,
+       urgency: "can_wait",
+       paymentMethod: "installment",
++      downPayment: 26000,
+       installmentMonths: 24,
+       monthlyPayment: 6000,
++      currentAlternativeStillWorks: true,
++      isIncomeGenerating: false,
+     });
+     expect(pushSpy).not.toHaveBeenCalled();
+ 
+diff --git a/src/features/purchase-checker/components/purchase-checker-wizard.tsx b/src/features/purchase-checker/components/purchase-checker-wizard.tsx
+index 7930737..0f59a89 100644
+--- a/src/features/purchase-checker/components/purchase-checker-wizard.tsx
++++ b/src/features/purchase-checker/components/purchase-checker-wizard.tsx
+@@ -17,6 +17,7 @@ interface PurchaseCheckerWizardProps {
+ }
+ 
+ type IncomeGenerationChoice = "yes" | "no" | "";
++type AlternativeWorksChoice = "yes" | "no" | "";
+ 
+ interface PurchaseWizardValues {
+   itemName: string;
+@@ -25,6 +26,7 @@ interface PurchaseWizardValues {
+   reason: string;
+   urgency: PurchaseUrgency;
+   alternative: string;
++  currentAlternativeWorks: AlternativeWorksChoice;
+   incomeGeneration: IncomeGenerationChoice;
+   paymentMethod: PaymentMethod;
+   downPayment?: number;
+@@ -45,6 +47,7 @@ const errorIds: Record<keyof PurchaseWizardValues, string> = {
+   reason: "purchase-reason-error",
+   urgency: "purchase-urgency-error",
+   alternative: "purchase-alternative-error",
++  currentAlternativeWorks: "purchase-current-alternative-error",
+   incomeGeneration: "purchase-income-generation-error",
+   paymentMethod: "purchase-payment-method-error",
+   downPayment: "purchase-down-payment-error",
+@@ -105,12 +108,19 @@ function buildPurchaseInput(values: PurchaseWizardValues): PurchaseInput {
+     amount: values.amount,
+     urgency: values.urgency,
+     paymentMethod: values.paymentMethod,
++    currentAlternativeStillWorks: values.currentAlternativeWorks === "yes",
++    isIncomeGenerating: values.incomeGeneration === "yes",
+   };
+ 
+   if (isFinancedPaymentMethod(values.paymentMethod)) {
++    const downPayment = positiveNumberOrUndefined(values.downPayment);
+     const installmentMonths = positiveNumberOrUndefined(values.installmentMonths);
+     const monthlyPayment = positiveNumberOrUndefined(values.monthlyPayment);
+ 
++    if (downPayment) {
++      purchase.downPayment = downPayment;
++    }
++
+     if (installmentMonths) {
+       purchase.installmentMonths = installmentMonths;
+     }
+@@ -144,6 +154,7 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
+       reason: "",
+       urgency: "want",
+       alternative: "",
++      currentAlternativeWorks: "",
+       incomeGeneration: "",
+       paymentMethod: "cash",
+       downPayment: undefined,
+@@ -188,6 +199,10 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
+       nextErrors.alternative = "Add the best alternative.";
+     }
+ 
++    if (!values.currentAlternativeWorks) {
++      nextErrors.currentAlternativeWorks = "Choose whether the current alternative still works.";
++    }
++
+     if (!values.incomeGeneration) {
+       nextErrors.incomeGeneration = "Choose whether this can generate income.";
+     }
+@@ -387,6 +402,35 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
+                 </div>
+               </div>
+ 
++              <fieldset
++                aria-describedby={
++                  errors.currentAlternativeWorks ? errorIds.currentAlternativeWorks : undefined
++                }
++                aria-invalid={errors.currentAlternativeWorks ? "true" : undefined}
++                className="grid gap-3"
++              >
++                <legend className="text-xs font-semibold uppercase tracking-normal text-slate-600">
++                  Current alternative
++                </legend>
++                <div className="grid gap-3 md:grid-cols-2">
++                  <RadioCard
++                    description="The current option can still cover the need."
++                    label="Yes, it still works"
++                    value="yes"
++                    {...register("currentAlternativeWorks")}
++                  />
++                  <RadioCard
++                    description="The current option no longer covers the need."
++                    label="No, it does not work"
++                    value="no"
++                    {...register("currentAlternativeWorks")}
++                  />
++                </div>
++                <FieldErrorText id={errorIds.currentAlternativeWorks}>
++                  {errors.currentAlternativeWorks}
++                </FieldErrorText>
++              </fieldset>
++
+               <fieldset
+                 aria-describedby={
+                   errors.incomeGeneration ? errorIds.incomeGeneration : undefined
+diff --git a/src/features/purchase-checker/components/purchase-result.test.tsx b/src/features/purchase-checker/components/purchase-result.test.tsx
+index e1c7940..0f5e409 100644
+--- a/src/features/purchase-checker/components/purchase-result.test.tsx
++++ b/src/features/purchase-checker/components/purchase-result.test.tsx
+@@ -14,8 +14,10 @@ const activeCheck: PurchaseCheck = {
+   installmentMonths: 24,
+   monthlyPayment: 6000,
+   decision: "NOT_RECOMMENDED",
++  riskScore: 95,
+   safeToSpend: 20000,
+   monthlyFreeCashFlow: 10000,
++  savingsAfterPurchase: 120000,
+   cooldownDays: 30,
+   advisorText: "Waiting protects your emergency savings and keeps your monthly plan flexible.",
+   reasons: [
+diff --git a/src/features/purchase-checker/components/purchase-result.tsx b/src/features/purchase-checker/components/purchase-result.tsx
+index 29e3b64..d7ed2de 100644
+--- a/src/features/purchase-checker/components/purchase-result.tsx
++++ b/src/features/purchase-checker/components/purchase-result.tsx
+@@ -36,8 +36,10 @@ const examplePurchaseCheck: PurchaseCheck = {
+   installmentMonths: 24,
+   monthlyPayment: 6000,
+   decision: "NOT_RECOMMENDED",
++  riskScore: 95,
+   safeToSpend: 20000,
+   monthlyFreeCashFlow: 10000,
++  savingsAfterPurchase: 120000,
+   cooldownDays: 30,
+   advisorText:
+     "Waiting protects your emergency savings and keeps your monthly plan flexible.",
+diff --git a/src/features/voice/components/voice-purchase-checker.test.tsx b/src/features/voice/components/voice-purchase-checker.test.tsx
+index 8be4744..0bd2f5f 100644
+--- a/src/features/voice/components/voice-purchase-checker.test.tsx
++++ b/src/features/voice/components/voice-purchase-checker.test.tsx
+@@ -199,9 +199,7 @@ describe("VoicePurchaseChecker", () => {
+     expect(screen.getByLabelText(/monthly payment/i)).toHaveValue(6000);
+     expect(screen.getByLabelText(/term.*months/i)).toHaveValue(24);
+     expect(
+-      screen.getByText(
+-        /down payment is reference-only and is not included in spendguard analysis until the finance model supports it/i
+-      )
++      screen.getByText(/down payment is included in the savings-after-purchase check/i)
+     ).toBeVisible();
+ 
+     await user.clear(screen.getByLabelText(/product name/i));
+@@ -235,7 +233,7 @@ describe("VoicePurchaseChecker", () => {
+     expect(within(review).queryByText("₱0")).not.toBeInTheDocument();
+   });
+ 
+-  it("maps only PurchaseInput fields, awaits analysis, and then navigates to the result", async () => {
++  it("maps reviewed PurchaseInput fields, awaits analysis, and then navigates to the result", async () => {
+     const user = userEvent.setup();
+     let resolveAnalysis: (value: unknown) => void = () => {};
+     const analysis = new Promise((resolve) => {
+@@ -262,10 +260,10 @@ describe("VoicePurchaseChecker", () => {
+       amount: 170000,
+       urgency: "can_wait",
+       paymentMethod: "installment",
++      downPayment: 50000,
+       installmentMonths: 24,
+       monthlyPayment: 6000,
+     });
+-    expect(onRunCheck.mock.calls[0][0]).not.toHaveProperty("downPayment");
+     expect(pushSpy).not.toHaveBeenCalled();
+ 
+     resolveAnalysis({});
+diff --git a/src/features/voice/components/voice-purchase-checker.tsx b/src/features/voice/components/voice-purchase-checker.tsx
+index fb893fd..035a61c 100644
+--- a/src/features/voice/components/voice-purchase-checker.tsx
++++ b/src/features/voice/components/voice-purchase-checker.tsx
+@@ -131,6 +131,7 @@ function buildPurchaseCandidate(draft: ReviewDraft) {
+   };
+ 
+   if (financedPaymentMethods.includes(draft.paymentMethod)) {
++    purchase.downPayment = draft.downPayment;
+     purchase.installmentMonths = draft.installmentMonths;
+     purchase.monthlyPayment = draft.monthlyPayment;
+   }
+@@ -567,8 +568,8 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
+                     onChange={(value) => updateReviewField("downPayment", value)}
+                   />
+                   <p className="text-xs text-muted sm:col-span-2">
+-                    Down payment is reference-only and is not included in SpendGuard analysis
+-                    until the finance model supports it.
++                    Down payment is included in the savings-after-purchase check for financed
++                    purchases.
+                   </p>
+ 
+                   <div className="grid gap-2">
+diff --git a/src/hooks/use-financial-state.test.tsx b/src/hooks/use-financial-state.test.tsx
+index 374d14d..a851b9f 100644
+--- a/src/hooks/use-financial-state.test.tsx
++++ b/src/hooks/use-financial-state.test.tsx
+@@ -120,7 +120,7 @@ describe("useFinancialState Supabase mode", () => {
+     expect(savedCheck?.check.id).toBe("4fd8e28f-798a-4d71-b279-3ea9473c9ba3");
+     expect(actions.saveCheck).toHaveBeenCalledWith(
+       expect.objectContaining({ itemName: "Phone" }),
+-      expect.objectContaining({ decision: "WAIT", cooldownDays: 21 })
++      expect.objectContaining({ decision: "WAIT", cooldownDays: 7 })
+     );
+ 
+     await act(async () => {
+@@ -183,8 +183,10 @@ describe("useFinancialState Supabase mode", () => {
+       paymentMethod: "cash" as const,
+       createdAt: "2026-06-20T02:00:00.000Z",
+       decision: "WAIT" as const,
++      riskScore: 50,
+       safeToSpend: 0,
+       monthlyFreeCashFlow: 0,
++      savingsAfterPurchase: 0,
+       cooldownDays: 30,
+       advisorText: "Wait.",
+       reasons: ["This would exceed today's safe-to-spend amount."],
+diff --git a/src/hooks/use-financial-state.ts b/src/hooks/use-financial-state.ts
+index a08b734..1f155f4 100644
+--- a/src/hooks/use-financial-state.ts
++++ b/src/hooks/use-financial-state.ts
+@@ -96,8 +96,10 @@ export function useFinancialState() {
+       const checkWithoutIdentity: Omit<PurchaseCheck, "id" | "createdAt"> = {
+         ...purchase,
+         decision: result.decision,
++        riskScore: result.riskScore,
+         safeToSpend: result.safeToSpend,
+         monthlyFreeCashFlow: result.monthlyFreeCashFlow,
++        savingsAfterPurchase: result.savingsAfterPurchase,
+         cooldownDays: result.cooldownDays,
+         advisorText,
+         reasons: result.reasons,
+diff --git a/src/lib/advisor/litert-lm.test.ts b/src/lib/advisor/litert-lm.test.ts
+index dfa7ebf..9baf472 100644
+--- a/src/lib/advisor/litert-lm.test.ts
++++ b/src/lib/advisor/litert-lm.test.ts
+@@ -3,12 +3,14 @@ import { createLiteRtAdvice } from "./litert-lm";
+ 
+ const result = {
+   decision: "WAIT" as const,
++  riskScore: 60,
+   safeToSpend: 10_000,
+   monthlyFreeCashFlow: 20_000,
+   emergencyProgress: 0.5,
+   debtPressure: 0.1,
+   goalDelayMonths: 2,
+   cooldownDays: 14,
++  savingsAfterPurchase: 5_000,
+   healthScore: 60,
+   reasons: ["The purchase exceeds safe-to-spend."],
+ };
+diff --git a/src/lib/calculations/cashflow.test.ts b/src/lib/calculations/cashflow.test.ts
+new file mode 100644
+index 0000000..f98f437
+--- /dev/null
++++ b/src/lib/calculations/cashflow.test.ts
+@@ -0,0 +1,43 @@
++import { describe, expect, it } from "vitest";
++
++import {
++  calculateMonthlyFreeCashFlow,
++  calculateSafeToSpend,
++} from "./cashflow";
++
++describe("PRD cash-flow calculations", () => {
++  it("calculates safe-to-spend from protected savings and 30-day commitments", () => {
++    expect(
++      calculateSafeToSpend({
++        currentSavings: 120_000,
++        emergencyBuffer: 24_000,
++        upcomingBills30Days: 32_000,
++        upcomingDebt30Days: 9_000,
++        reservedGoalAmount: 10_000,
++      })
++    ).toBe(45_000);
++  });
++
++  it("never returns negative safe-to-spend", () => {
++    expect(
++      calculateSafeToSpend({
++        currentSavings: 20_000,
++        emergencyBuffer: 20_000,
++        upcomingBills30Days: 15_000,
++        upcomingDebt30Days: 5_000,
++        reservedGoalAmount: 5_000,
++      })
++    ).toBe(0);
++  });
++
++  it("subtracts fixed expenses, estimated variable expenses, and minimum debt payments from income", () => {
++    expect(
++      calculateMonthlyFreeCashFlow({
++        monthlyIncome: 90_000,
++        fixedExpenses: 28_000,
++        estimatedVariableExpenses: 12_000,
++        minimumDebtPayments: 6_000,
++      })
++    ).toBe(44_000);
++  });
++});
+diff --git a/src/lib/calculations/cashflow.ts b/src/lib/calculations/cashflow.ts
+new file mode 100644
+index 0000000..9c13961
+--- /dev/null
++++ b/src/lib/calculations/cashflow.ts
+@@ -0,0 +1,34 @@
++export interface SafeToSpendInput {
++  currentSavings: number;
++  emergencyBuffer: number;
++  upcomingBills30Days: number;
++  upcomingDebt30Days: number;
++  reservedGoalAmount: number;
++}
++
++export interface MonthlyFreeCashFlowInput {
++  monthlyIncome: number;
++  fixedExpenses: number;
++  estimatedVariableExpenses: number;
++  minimumDebtPayments: number;
++}
++
++export function calculateSafeToSpend(input: SafeToSpendInput): number {
++  const safeToSpend =
++    input.currentSavings -
++    input.emergencyBuffer -
++    input.upcomingBills30Days -
++    input.upcomingDebt30Days -
++    input.reservedGoalAmount;
++
++  return Math.max(0, safeToSpend);
++}
++
++export function calculateMonthlyFreeCashFlow(input: MonthlyFreeCashFlowInput): number {
++  return (
++    input.monthlyIncome -
++    input.fixedExpenses -
++    input.estimatedVariableExpenses -
++    input.minimumDebtPayments
++  );
++}
+diff --git a/src/lib/calculations/cooldown.test.ts b/src/lib/calculations/cooldown.test.ts
+new file mode 100644
+index 0000000..9fddf58
+--- /dev/null
++++ b/src/lib/calculations/cooldown.test.ts
+@@ -0,0 +1,25 @@
++import { describe, expect, it } from "vitest";
++
++import { getCooldownDays } from "./cooldown";
++import { calculateCooldownDays } from "./purchase-decision";
++
++describe("PRD cooldown recommendations", () => {
++  it("uses price tiers from PRD section 19.5", () => {
++    expect(getCooldownDays(1_999)).toBe(1);
++    expect(getCooldownDays(2_000)).toBe(3);
++    expect(getCooldownDays(9_999)).toBe(3);
++    expect(getCooldownDays(10_000)).toBe(7);
++    expect(getCooldownDays(49_999)).toBe(7);
++    expect(getCooldownDays(50_000)).toBe(30);
++  });
++
++  it("keeps the legacy helper signature while ignoring urgency and safe-to-spend", () => {
++    expect(
++      calculateCooldownDays({
++        amount: 50_000,
++        safeToSpend: 100_000,
++        urgency: "need_now",
++      })
++    ).toBe(30);
++  });
++});
+diff --git a/src/lib/calculations/cooldown.ts b/src/lib/calculations/cooldown.ts
+new file mode 100644
+index 0000000..8efc6f9
+--- /dev/null
++++ b/src/lib/calculations/cooldown.ts
+@@ -0,0 +1,27 @@
++import type { PurchaseUrgency } from "@/types/finance";
++
++export function getCooldownDays(price: number): number {
++  if (price < 2_000) {
++    return 1;
++  }
++
++  if (price < 10_000) {
++    return 3;
++  }
++
++  if (price < 50_000) {
++    return 7;
++  }
++
++  return 30;
++}
++
++export function calculateCooldownDays({
++  amount,
++}: {
++  amount: number;
++  safeToSpend?: number;
++  urgency?: PurchaseUrgency;
++}): number {
++  return getCooldownDays(amount);
++}
+diff --git a/src/lib/calculations/debt-pressure.test.ts b/src/lib/calculations/debt-pressure.test.ts
+new file mode 100644
+index 0000000..4d46032
+--- /dev/null
++++ b/src/lib/calculations/debt-pressure.test.ts
+@@ -0,0 +1,35 @@
++import { describe, expect, it } from "vitest";
++
++import { calculateDebtPressure, calculateDebtPressureScore } from "./debt-pressure";
++
++describe("debt pressure calculations", () => {
++  it("calculates bounded debt pressure from income and minimum payments", () => {
++    expect(
++      calculateDebtPressure({
++        monthlyIncome: 100_000,
++        minimumDebtPayments: 20_000,
++      })
++    ).toBe(0.2);
++  });
++
++  it("handles zero-income branches for health-score inputs", () => {
++    expect(
++      calculateDebtPressure({
++        monthlyIncome: 0,
++        minimumDebtPayments: 0,
++      })
++    ).toBe(0);
++    expect(
++      calculateDebtPressure({
++        monthlyIncome: 0,
++        minimumDebtPayments: 1,
++      })
++    ).toBe(1);
++    expect(
++      calculateDebtPressureScore({
++        monthlyIncome: 0,
++        minimumDebtPayments: 1,
++      })
++    ).toBe(0);
++  });
++});
+diff --git a/src/lib/calculations/debt-pressure.ts b/src/lib/calculations/debt-pressure.ts
+new file mode 100644
+index 0000000..8d33829
+--- /dev/null
++++ b/src/lib/calculations/debt-pressure.ts
+@@ -0,0 +1,21 @@
++const clamp = (value: number, min: number, max: number) =>
++  Math.min(Math.max(value, min), max);
++
++export interface DebtPressureInput {
++  monthlyIncome: number;
++  minimumDebtPayments: number;
++}
++
++export function calculateDebtPressure(input: DebtPressureInput): number {
++  if (input.monthlyIncome <= 0) {
++    return input.minimumDebtPayments > 0 ? 1 : 0;
++  }
++
++  return clamp(input.minimumDebtPayments / input.monthlyIncome, 0, 1);
++}
++
++export function calculateDebtPressureScore(input: DebtPressureInput): number {
++  const pressure = calculateDebtPressure(input);
++
++  return Math.round((1 - clamp(pressure / 0.45, 0, 1)) * 100);
++}
+diff --git a/src/lib/calculations/emergency-fund.test.ts b/src/lib/calculations/emergency-fund.test.ts
+new file mode 100644
+index 0000000..ee1c1fe
+--- /dev/null
++++ b/src/lib/calculations/emergency-fund.test.ts
+@@ -0,0 +1,47 @@
++import { describe, expect, it } from "vitest";
++
++import {
++  calculateEmergencyBuffer,
++  calculateEmergencyFundProgress,
++} from "./emergency-fund";
++
++describe("PRD emergency-fund calculations", () => {
++  it("calculates emergency fund progress as a bounded percentage", () => {
++    expect(
++      calculateEmergencyFundProgress({
++        currentSavings: 120_000,
++        emergencyFundTarget: 180_000,
++      })
++    ).toBe(67);
++    expect(
++      calculateEmergencyFundProgress({
++        currentSavings: 250_000,
++        emergencyFundTarget: 180_000,
++      })
++    ).toBe(100);
++  });
++
++  it("returns zero progress when the target is not positive", () => {
++    expect(
++      calculateEmergencyFundProgress({
++        currentSavings: 10_000,
++        emergencyFundTarget: 0,
++      })
++    ).toBe(0);
++  });
++
++  it("derives the snapshot emergency buffer from the PRD protected-savings example", () => {
++    expect(
++      calculateEmergencyBuffer({
++        currentSavings: 24_000,
++        emergencyFundTarget: 100_000,
++      })
++    ).toBe(20_000);
++    expect(
++      calculateEmergencyBuffer({
++        currentSavings: 5_000,
++        emergencyFundTarget: 100_000,
++      })
++    ).toBe(5_000);
++  });
++});
+diff --git a/src/lib/calculations/emergency-fund.ts b/src/lib/calculations/emergency-fund.ts
+new file mode 100644
+index 0000000..405f358
+--- /dev/null
++++ b/src/lib/calculations/emergency-fund.ts
+@@ -0,0 +1,26 @@
++const clamp = (value: number, min: number, max: number) =>
++  Math.min(Math.max(value, min), max);
++
++export interface EmergencyFundInput {
++  currentSavings: number;
++  emergencyFundTarget: number;
++}
++
++export function calculateEmergencyFundProgress(input: EmergencyFundInput): number {
++  if (input.emergencyFundTarget <= 0) {
++    return 0;
++  }
++
++  return Math.min(
++    100,
++    Math.round((input.currentSavings / input.emergencyFundTarget) * 100)
++  );
++}
++
++export function calculateEmergencyBuffer(input: EmergencyFundInput): number {
++  if (input.emergencyFundTarget <= 0 || input.currentSavings <= 0) {
++    return 0;
++  }
++
++  return clamp(input.emergencyFundTarget * 0.2, 0, input.currentSavings);
++}
+diff --git a/src/lib/calculations/goal-impact.test.ts b/src/lib/calculations/goal-impact.test.ts
+new file mode 100644
+index 0000000..f00f027
+--- /dev/null
++++ b/src/lib/calculations/goal-impact.test.ts
+@@ -0,0 +1,34 @@
++import { describe, expect, it } from "vitest";
++
++import { calculateGoalDelayMonths, calculateGoalProgressScore } from "./goal-impact";
++import type { Goal } from "@/types/finance";
++
++const goals: Goal[] = [
++  {
++    id: "goal-1",
++    label: "Laptop",
++    targetAmount: 100_000,
++    savedAmount: 25_000,
++    monthlyContribution: 5_000,
++    priority: "medium",
++  },
++  {
++    id: "goal-2",
++    label: "Emergency",
++    targetAmount: 50_000,
++    savedAmount: 50_000,
++    monthlyContribution: 5_000,
++    priority: "high",
++  },
++];
++
++describe("goal impact calculations", () => {
++  it("calculates purchase delay from active monthly goal funding", () => {
++    expect(calculateGoalDelayMonths({ goals, purchaseAmount: 25_000 })).toBe(3);
++  });
++
++  it("calculates bounded aggregate goal progress", () => {
++    expect(calculateGoalProgressScore(goals)).toBe(50);
++    expect(calculateGoalProgressScore([])).toBe(0);
++  });
++});
+diff --git a/src/lib/calculations/goal-impact.ts b/src/lib/calculations/goal-impact.ts
+new file mode 100644
+index 0000000..49f8ee5
+--- /dev/null
++++ b/src/lib/calculations/goal-impact.ts
+@@ -0,0 +1,38 @@
++import type { Goal } from "@/types/finance";
++
++const clamp = (value: number, min: number, max: number) =>
++  Math.min(Math.max(value, min), max);
++
++const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
++
++export function calculateReservedGoalAmount(goals: Goal[]): number {
++  return sum(goals.map((goal) => goal.monthlyContribution));
++}
++
++export function calculateGoalDelayMonths({
++  goals,
++  purchaseAmount,
++}: {
++  goals: Goal[];
++  purchaseAmount: number;
++}): number {
++  const monthlyGoalFunding = calculateReservedGoalAmount(goals);
++
++  if (monthlyGoalFunding <= 0) {
++    return 0;
++  }
++
++  return Math.ceil(purchaseAmount / monthlyGoalFunding);
++}
++
++export function calculateGoalProgressScore(goals: Goal[]): number {
++  const totalTarget = sum(goals.map((goal) => goal.targetAmount));
++
++  if (totalTarget <= 0) {
++    return 0;
++  }
++
++  const totalSaved = sum(goals.map((goal) => goal.savedAmount));
++
++  return Math.round(clamp(totalSaved / totalTarget, 0, 1) * 100);
++}
+diff --git a/src/lib/calculations/health-score.test.ts b/src/lib/calculations/health-score.test.ts
+new file mode 100644
+index 0000000..b27532d
+--- /dev/null
++++ b/src/lib/calculations/health-score.test.ts
+@@ -0,0 +1,24 @@
++import { describe, expect, it } from "vitest";
++
++import { calculateHealthScore, getHealthStatus } from "./health-score";
++
++describe("PRD health score", () => {
++  it("applies the section 19.6 weights", () => {
++    expect(
++      calculateHealthScore({
++        emergencyFundProgress: 80,
++        debtPressureScore: 70,
++        cashFlowScore: 60,
++        goalProgressScore: 50,
++        purchaseDisciplineScore: 40,
++      })
++    ).toBe(65);
++  });
++
++  it("maps health score status boundaries", () => {
++    expect(getHealthStatus(80)).toBe("Strong");
++    expect(getHealthStatus(60)).toBe("Stable");
++    expect(getHealthStatus(40)).toBe("Caution");
++    expect(getHealthStatus(39)).toBe("Risky");
++  });
++});
+diff --git a/src/lib/calculations/health-score.ts b/src/lib/calculations/health-score.ts
+new file mode 100644
+index 0000000..b801e26
+--- /dev/null
++++ b/src/lib/calculations/health-score.ts
+@@ -0,0 +1,38 @@
++export type HealthStatus = "Strong" | "Stable" | "Caution" | "Risky";
++
++const clamp = (value: number, min: number, max: number) =>
++  Math.min(Math.max(value, min), max);
++
++export interface HealthScoreInput {
++  emergencyFundProgress: number;
++  debtPressureScore: number;
++  cashFlowScore: number;
++  goalProgressScore: number;
++  purchaseDisciplineScore: number;
++}
++
++export function calculateHealthScore(input: HealthScoreInput): number {
++  return Math.round(
++    clamp(input.emergencyFundProgress, 0, 100) * 0.3 +
++      clamp(input.debtPressureScore, 0, 100) * 0.25 +
++      clamp(input.cashFlowScore, 0, 100) * 0.2 +
++      clamp(input.goalProgressScore, 0, 100) * 0.15 +
++      clamp(input.purchaseDisciplineScore, 0, 100) * 0.1
++  );
++}
++
++export function getHealthStatus(score: number): HealthStatus {
++  if (score >= 80) {
++    return "Strong";
++  }
++
++  if (score >= 60) {
++    return "Stable";
++  }
++
++  if (score >= 40) {
++    return "Caution";
++  }
++
++  return "Risky";
++}
+diff --git a/src/lib/calculations/purchase-decision.test.ts b/src/lib/calculations/purchase-decision.test.ts
+index 791f893..f365796 100644
+--- a/src/lib/calculations/purchase-decision.test.ts
++++ b/src/lib/calculations/purchase-decision.test.ts
+@@ -1,32 +1,34 @@
+ import { describe, expect, it } from "vitest";
+ 
+ import {
+-  calculateCooldownDays,
+   calculateEmergencyProgress,
+   calculateFinancialHealthScore,
+   calculateMonthlyFreeCashFlow,
+   calculatePurchaseDecision,
+   calculateSafeToSpend,
++  evaluatePurchase,
+ } from "./purchase-decision";
+ import type { FinancialSnapshot, PurchaseInput } from "@/types/finance";
+ 
+ const stableSnapshot: FinancialSnapshot = {
+   profile: {
+     currency: "PHP",
+-    monthlyIncome: 90000,
+-    currentSavings: 180000,
+-    emergencyFundTarget: 150000,
++    monthlyIncome: 90_000,
++    currentSavings: 180_000,
++    emergencyFundTarget: 150_000,
++    estimatedVariableExpenses: 12_000,
+   },
+   expenses: [
+-    { id: "rent", label: "Rent", amount: 22000, dueDay: 1, isRecurring: true },
+-    { id: "utilities", label: "Utilities", amount: 6000, dueDay: 18, isRecurring: true },
++    { id: "rent", label: "Rent", amount: 22_000, dueDay: 1, isRecurring: true },
++    { id: "utilities", label: "Utilities", amount: 6_000, dueDay: 18, isRecurring: true },
++    { id: "repair", label: "One-time repair", amount: 5_000, dueDay: 18, isRecurring: false },
+   ],
+   debts: [
+     {
+       id: "card",
+       label: "Credit card",
+-      outstandingBalance: 40000,
+-      minimumPayment: 6000,
++      outstandingBalance: 40_000,
++      minimumPayment: 6_000,
+       dueDay: 20,
+       interestRate: 0.32,
+     },
+@@ -35,136 +37,188 @@ const stableSnapshot: FinancialSnapshot = {
+     {
+       id: "travel",
+       label: "Travel fund",
+-      targetAmount: 120000,
+-      savedAmount: 30000,
+-      monthlyContribution: 8000,
++      targetAmount: 120_000,
++      savedAmount: 30_000,
++      monthlyContribution: 8_000,
+       targetDate: "2026-12-31",
+       priority: "medium",
+     },
+   ],
+ };
+ 
+-describe("finance calculations", () => {
+-  it("calculates safe-to-spend as savings after emergency buffer, upcoming obligations, and reserved goals", () => {
+-    expect(calculateSafeToSpend(stableSnapshot)).toBe(18000);
++describe("purchase decision compatibility wrapper", () => {
++  it("derives PRD safe-to-spend inputs from the current financial snapshot", () => {
++    expect(calculateSafeToSpend(stableSnapshot)).toBe(108_000);
+   });
+ 
+-  it("calculates free cash flow from income less recurring expenses, debt minimums, and goal contributions", () => {
+-    expect(calculateMonthlyFreeCashFlow(stableSnapshot)).toBe(48000);
++  it("calculates free cash flow using estimated variable expenses and minimum debt payments", () => {
++    expect(calculateMonthlyFreeCashFlow(stableSnapshot)).toBe(44_000);
+   });
+ 
+-  it("calculates emergency progress and financial health as bounded values", () => {
++  it("keeps legacy emergency progress as a 0-1 ratio and health score as 0-100", () => {
+     expect(calculateEmergencyProgress(stableSnapshot)).toBe(1);
+-    expect(calculateFinancialHealthScore(stableSnapshot)).toBeGreaterThanOrEqual(80);
++    expect(calculateFinancialHealthScore(stableSnapshot)).toBeGreaterThanOrEqual(70);
+     expect(calculateFinancialHealthScore(stableSnapshot)).toBeLessThanOrEqual(100);
+   });
+ 
+-  it("marks a low-impact needed cash purchase as safe to buy", () => {
++  it("returns PRD risk-score details with the existing app result shape", () => {
+     const purchase: PurchaseInput = {
+       itemName: "Replacement keyboard",
+-      amount: 4500,
++      amount: 4_500,
+       urgency: "need_this_month",
+       paymentMethod: "cash",
+     };
+ 
+     const result = calculatePurchaseDecision(stableSnapshot, purchase);
+ 
+-    expect(result.decision).toBe("SAFE_TO_BUY");
+-    expect(result.safeToSpend).toBe(18000);
+-    expect(result.cooldownDays).toBe(0);
+-    expect(result.reasons).toContain("The purchase fits inside today's safe-to-spend amount.");
+-  });
+-
+-  it("recommends waiting when a want exceeds safe-to-spend and slows goals", () => {
+-    const purchase: PurchaseInput = {
+-      itemName: "Gaming monitor",
+-      amount: 36000,
+-      urgency: "want",
+-      paymentMethod: "cash",
+-    };
+-
+-    const result = calculatePurchaseDecision(stableSnapshot, purchase);
+-
+-    expect(result.decision).toBe("WAIT");
+-    expect(result.cooldownDays).toBe(14);
+-    expect(result.goalDelayMonths).toBe(5);
+-    expect(result.reasons).toContain("This would exceed today's safe-to-spend amount.");
++    expect(result).toMatchObject({
++      decision: "SAFE_TO_BUY",
++      riskScore: 20,
++      safeToSpend: 108_000,
++      monthlyFreeCashFlow: 44_000,
++      savingsAfterPurchase: 175_500,
++      cooldownDays: 3,
++    });
++    expect(result.reasons).toContain("You have debt due within the next 30 days.");
+   });
+ 
+-  it("rejects installment purchases when monthly payments consume the remaining monthly free cash flow", () => {
+-    const purchase: PurchaseInput = {
+-      itemName: "Phone upgrade",
+-      amount: 96000,
+-      urgency: "want",
++  it("uses down payment for savings-after-purchase on non-cash purchases", () => {
++    const result = calculatePurchaseDecision(stableSnapshot, {
++      itemName: "Laptop",
++      amount: 80_000,
++      urgency: "can_wait",
+       paymentMethod: "installment",
++      downPayment: 20_000,
++      monthlyPayment: 8_000,
+       installmentMonths: 12,
+-      monthlyPayment: 70000,
+-    };
+-
+-    const result = calculatePurchaseDecision(stableSnapshot, purchase);
++    });
+ 
+-    expect(result.decision).toBe("NOT_RECOMMENDED");
+-    expect(result.reasons).toContain("The monthly payment is higher than available monthly free cash flow.");
++    expect(result.savingsAfterPurchase).toBe(160_000);
++    expect(result.riskScore).toBe(45);
++    expect(result.decision).toBe("BUY_WITH_CAUTION");
+   });
++});
+ 
+-  it("uses larger cooldowns for wants that are far outside the safe amount", () => {
+-    expect(calculateCooldownDays({ amount: 5000, safeToSpend: 12000, urgency: "want" })).toBe(3);
+-    expect(calculateCooldownDays({ amount: 18000, safeToSpend: 12000, urgency: "want" })).toBe(14);
+-    expect(calculateCooldownDays({ amount: 50000, safeToSpend: 12000, urgency: "want" })).toBe(30);
++describe("PRD purchase risk scoring", () => {
++  it("uses exact decision threshold ties", () => {
++    expect(
++      evaluatePurchase({
++        price: 200,
++        currentSavings: 100,
++        safeToSpend: 100,
++        emergencyBuffer: 150,
++        upcomingDebt30Days: 0,
++        monthlyFreeCashFlow: 1_000,
++        paymentMethod: "installment",
++        urgency: "need_this_month",
++        isIncomeGenerating: false,
++        currentAlternativeStillWorks: false,
++      })
++    ).toMatchObject({ riskScore: 75, decision: "NOT_RECOMMENDED" });
++
++    expect(
++      evaluatePurchase({
++        price: 200,
++        currentSavings: 500,
++        safeToSpend: 100,
++        emergencyBuffer: 100,
++        upcomingDebt30Days: 1,
++        monthlyFreeCashFlow: 1_000,
++        paymentMethod: "cash",
++        urgency: "need_this_month",
++        isIncomeGenerating: false,
++        currentAlternativeStillWorks: false,
++      })
++    ).toMatchObject({ riskScore: 50, decision: "WAIT" });
++
++    expect(
++      evaluatePurchase({
++        price: 200,
++        currentSavings: 500,
++        safeToSpend: 100,
++        emergencyBuffer: 100,
++        upcomingDebt30Days: 0,
++        monthlyFreeCashFlow: 1_000,
++        paymentMethod: "cash",
++        urgency: "need_this_month",
++        isIncomeGenerating: false,
++        currentAlternativeStillWorks: false,
++      })
++    ).toMatchObject({ riskScore: 30, decision: "BUY_WITH_CAUTION" });
+   });
+ 
+-  it("handles empty targets and missing income without division errors", () => {
+-    const snapshot: FinancialSnapshot = {
+-      profile: {
+-        currency: "PHP",
+-        monthlyIncome: 0,
+-        currentSavings: 0,
+-        emergencyFundTarget: 0,
+-      },
+-      expenses: [],
+-      debts: [],
+-      goals: [],
+-    };
+-
+-    expect(calculateEmergencyProgress(snapshot)).toBe(1);
+-    expect(calculateFinancialHealthScore(snapshot)).toBe(40);
++  it("scores installment pressure at the PRD cutoffs", () => {
++    expect(
++      evaluatePurchase({
++        price: 1_000,
++        currentSavings: 10_000,
++        safeToSpend: 10_000,
++        emergencyBuffer: 2_000,
++        upcomingDebt30Days: 0,
++        monthlyFreeCashFlow: 1_000,
++        paymentMethod: "installment",
++        urgency: "need_this_month",
++        isIncomeGenerating: false,
++        currentAlternativeStillWorks: false,
++        installmentMonthlyAmount: 150,
++      })
++    ).toMatchObject({ riskScore: 25, decision: "SAFE_TO_BUY" });
++
++    expect(
++      evaluatePurchase({
++        price: 1_000,
++        currentSavings: 10_000,
++        safeToSpend: 10_000,
++        emergencyBuffer: 2_000,
++        upcomingDebt30Days: 0,
++        monthlyFreeCashFlow: 1_000,
++        paymentMethod: "installment",
++        urgency: "need_this_month",
++        isIncomeGenerating: false,
++        currentAlternativeStillWorks: false,
++        installmentMonthlyAmount: 300,
++      })
++    ).toMatchObject({ riskScore: 35, decision: "BUY_WITH_CAUTION" });
+   });
+ 
+-  it("downgrades a need-now purchase outside safe-to-spend to caution instead of approving it", () => {
+-    const result = calculatePurchaseDecision(stableSnapshot, {
+-      itemName: "Urgent repair",
+-      amount: 24000,
+-      urgency: "need_now",
+-      paymentMethod: "cash",
++  it("does not approve new financing when monthly free cash flow is zero or negative", () => {
++    const result = evaluatePurchase({
++      price: 1_000,
++      currentSavings: 10_000,
++      safeToSpend: 10_000,
++      emergencyBuffer: 2_000,
++      upcomingDebt30Days: 0,
++      monthlyFreeCashFlow: 0,
++      paymentMethod: "installment",
++      urgency: "need_this_month",
++      isIncomeGenerating: false,
++      currentAlternativeStillWorks: false,
++      installmentMonthlyAmount: 100,
+     });
+ 
+-    expect(result.decision).toBe("BUY_WITH_CAUTION");
+-    expect(result.cooldownDays).toBe(0);
++    expect(result).toMatchObject({ riskScore: 75, decision: "NOT_RECOMMENDED" });
++    expect(result.reasons).toContain(
++      "There is no monthly free cash flow available for a new payment."
++    );
+   });
+ 
+-  it("rejects wants when debt pressure is already high", () => {
+-    const result = calculatePurchaseDecision(
+-      {
+-        ...stableSnapshot,
+-        debts: [
+-          {
+-            id: "loan",
+-            label: "Loan",
+-            outstandingBalance: 200000,
+-            minimumPayment: 42000,
+-            dueDay: 10,
+-          },
+-        ],
+-      },
+-      {
+-        itemName: "Camera",
+-        amount: 5000,
+-        urgency: "want",
+-        paymentMethod: "cash",
+-      }
+-    );
++  it("adds want and working-alternative risk while reducing income-generating risk", () => {
++    const result = evaluatePurchase({
++      price: 3_000,
++      currentSavings: 50_000,
++      safeToSpend: 50_000,
++      emergencyBuffer: 10_000,
++      upcomingDebt30Days: 0,
++      monthlyFreeCashFlow: 20_000,
++      paymentMethod: "cash",
++      urgency: "want",
++      isIncomeGenerating: true,
++      currentAlternativeStillWorks: true,
++    });
+ 
+-    expect(result.decision).toBe("NOT_RECOMMENDED");
+-    expect(result.reasons).toContain("Debt payments are taking a large share of monthly income.");
++    expect(result.riskScore).toBe(5);
++    expect(result.reasons).toContain("This appears to be a want, not an urgent need.");
++    expect(result.reasons).toContain("Your current alternative still works.");
++    expect(result.reasons).toContain("This may support your work or income.");
+   });
+ });
+diff --git a/src/lib/calculations/purchase-decision.ts b/src/lib/calculations/purchase-decision.ts
+index 69c8c6a..d701bad 100644
+--- a/src/lib/calculations/purchase-decision.ts
++++ b/src/lib/calculations/purchase-decision.ts
+@@ -1,171 +1,214 @@
+ import type {
+   FinancialSnapshot,
++  PaymentMethod,
+   PurchaseDecision,
+   PurchaseDecisionResult,
+   PurchaseInput,
+   PurchaseUrgency,
+ } from "@/types/finance";
++import {
++  calculateMonthlyFreeCashFlow as calculateMonthlyFreeCashFlowFromInput,
++  calculateSafeToSpend as calculateSafeToSpendFromInput,
++} from "./cashflow";
++import { calculateCooldownDays } from "./cooldown";
++import {
++  calculateDebtPressure as calculateDebtPressureFromInput,
++  calculateDebtPressureScore,
++} from "./debt-pressure";
++import {
++  calculateEmergencyBuffer,
++  calculateEmergencyFundProgress,
++} from "./emergency-fund";
++import {
++  calculateGoalDelayMonths as calculateGoalDelayMonthsFromGoals,
++  calculateGoalProgressScore,
++  calculateReservedGoalAmount,
++} from "./goal-impact";
++import { calculateHealthScore } from "./health-score";
+ 
+ const clamp = (value: number, min: number, max: number) =>
+   Math.min(Math.max(value, min), max);
+ 
+ const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
+ 
+-export function calculateMonthlyFreeCashFlow(snapshot: FinancialSnapshot): number {
+-  const recurringExpenses = sum(
++export interface PurchaseEvaluationInput {
++  price: number;
++  currentSavings: number;
++  safeToSpend: number;
++  emergencyBuffer: number;
++  upcomingDebt30Days: number;
++  monthlyFreeCashFlow: number;
++  paymentMethod: PaymentMethod;
++  urgency: PurchaseUrgency;
++  isIncomeGenerating: boolean;
++  currentAlternativeStillWorks: boolean;
++  downPayment?: number;
++  installmentMonthlyAmount?: number;
++  installmentTermMonths?: number;
++}
++
++export interface PurchaseEvaluationResult {
++  decision: PurchaseDecision;
++  riskScore: number;
++  reasons: string[];
++  savingsAfterPurchase: number;
++}
++
++function recurringExpenseTotal(snapshot: FinancialSnapshot): number {
++  return sum(
+     snapshot.expenses
+       .filter((expense) => expense.isRecurring)
+       .map((expense) => expense.amount)
+   );
+-  const debtMinimums = sum(snapshot.debts.map((debt) => debt.minimumPayment));
+-  const goalContributions = sum(snapshot.goals.map((goal) => goal.monthlyContribution));
++}
+ 
+-  return snapshot.profile.monthlyIncome - recurringExpenses - debtMinimums - goalContributions;
++function minimumDebtPayments(snapshot: FinancialSnapshot): number {
++  return sum(snapshot.debts.map((debt) => debt.minimumPayment));
+ }
+ 
+-export function calculateEmergencyProgress(snapshot: FinancialSnapshot): number {
+-  if (snapshot.profile.emergencyFundTarget <= 0) {
+-    return 1;
+-  }
++export function calculateMonthlyFreeCashFlow(snapshot: FinancialSnapshot): number {
++  return calculateMonthlyFreeCashFlowFromInput({
++    monthlyIncome: snapshot.profile.monthlyIncome,
++    fixedExpenses: recurringExpenseTotal(snapshot),
++    estimatedVariableExpenses: snapshot.profile.estimatedVariableExpenses ?? 0,
++    minimumDebtPayments: minimumDebtPayments(snapshot),
++  });
++}
+ 
+-  return clamp(
+-    snapshot.profile.currentSavings / snapshot.profile.emergencyFundTarget,
+-    0,
+-    1
+-  );
++export function calculateEmergencyProgress(snapshot: FinancialSnapshot): number {
++  return calculateEmergencyFundProgress(snapshot.profile) / 100;
+ }
+ 
+ export function calculateDebtPressure(snapshot: FinancialSnapshot): number {
+-  if (snapshot.profile.monthlyIncome <= 0) {
+-    return 1;
+-  }
+-
+-  return clamp(
+-    sum(snapshot.debts.map((debt) => debt.minimumPayment)) / snapshot.profile.monthlyIncome,
+-    0,
+-    1
+-  );
++  return calculateDebtPressureFromInput({
++    monthlyIncome: snapshot.profile.monthlyIncome,
++    minimumDebtPayments: minimumDebtPayments(snapshot),
++  });
+ }
+ 
+ export function calculateSafeToSpend(snapshot: FinancialSnapshot): number {
+-  const emergencyBuffer = Math.min(
+-    snapshot.profile.currentSavings,
+-    snapshot.profile.emergencyFundTarget * 0.8
+-  );
+-  const upcomingBills30Days = sum(
+-    snapshot.expenses
+-      .filter((expense) => expense.isRecurring)
+-      .map((expense) => expense.amount)
+-  );
+-  const upcomingDebt30Days = sum(snapshot.debts.map((debt) => debt.minimumPayment));
+-  const reservedGoalAmount = sum(snapshot.goals.map((goal) => goal.monthlyContribution));
+-
+-  return Math.max(
+-    0,
+-    Math.round(
+-      snapshot.profile.currentSavings -
+-        emergencyBuffer -
+-        upcomingBills30Days -
+-        upcomingDebt30Days -
+-        reservedGoalAmount
+-    )
+-  );
++  return calculateSafeToSpendFromInput({
++    currentSavings: snapshot.profile.currentSavings,
++    emergencyBuffer: calculateEmergencyBuffer(snapshot.profile),
++    upcomingBills30Days: recurringExpenseTotal(snapshot),
++    upcomingDebt30Days: minimumDebtPayments(snapshot),
++    reservedGoalAmount: calculateReservedGoalAmount(snapshot.goals),
++  });
+ }
+ 
+ export function calculateFinancialHealthScore(snapshot: FinancialSnapshot): number {
+-  const emergencyScore = calculateEmergencyProgress(snapshot) * 40;
+   const monthlyFreeCashFlow = calculateMonthlyFreeCashFlow(snapshot);
+   const cashFlowRatio =
+     snapshot.profile.monthlyIncome > 0
+       ? clamp(monthlyFreeCashFlow / snapshot.profile.monthlyIncome, 0, 0.4) / 0.4
+       : 0;
+-  const cashFlowScore = cashFlowRatio * 30;
+-  const debtPressure = calculateDebtPressure(snapshot);
+-  const debtScore = (1 - clamp(debtPressure / 0.45, 0, 1)) * 20;
+-  const savingsScore = snapshot.profile.currentSavings > 0 ? 10 : 0;
+ 
+-  return Math.round(clamp(emergencyScore + cashFlowScore + debtScore + savingsScore, 0, 100));
++  return calculateHealthScore({
++    emergencyFundProgress: calculateEmergencyFundProgress(snapshot.profile),
++    debtPressureScore: calculateDebtPressureScore({
++      monthlyIncome: snapshot.profile.monthlyIncome,
++      minimumDebtPayments: minimumDebtPayments(snapshot),
++    }),
++    cashFlowScore: cashFlowRatio * 100,
++    goalProgressScore: calculateGoalProgressScore(snapshot.goals),
++    purchaseDisciplineScore: 100,
++  });
+ }
+ 
+ export function calculateGoalDelayMonths(
+   snapshot: FinancialSnapshot,
+   purchase: PurchaseInput
+ ): number {
+-  const monthlyGoalFunding = sum(snapshot.goals.map((goal) => goal.monthlyContribution));
++  return calculateGoalDelayMonthsFromGoals({
++    goals: snapshot.goals,
++    purchaseAmount: purchase.amount,
++  });
++}
+ 
+-  if (monthlyGoalFunding <= 0) {
+-    return 0;
+-  }
++export { calculateCooldownDays };
+ 
+-  return Math.ceil(purchase.amount / monthlyGoalFunding);
+-}
++export function evaluatePurchase(input: PurchaseEvaluationInput): PurchaseEvaluationResult {
++  const reasons: string[] = [];
++  const savingsAfterPurchase =
++    input.paymentMethod === "cash"
++      ? input.currentSavings - input.price
++      : input.currentSavings - (input.downPayment ?? 0);
+ 
+-export function calculateCooldownDays({
+-  amount,
+-  safeToSpend,
+-  urgency,
+-}: {
+-  amount: number;
+-  safeToSpend: number;
+-  urgency: PurchaseUrgency;
+-}): number {
+-  if (urgency === "need_now") {
+-    return 0;
+-  }
++  let riskScore = 0;
+ 
+-  if (urgency === "need_this_month" && amount <= safeToSpend) {
+-    return 0;
++  if (input.price > input.safeToSpend) {
++    riskScore += 30;
++    reasons.push("The purchase is higher than your safe-to-spend amount.");
+   }
+ 
+-  if (urgency === "can_wait") {
+-    return amount <= safeToSpend ? 7 : 21;
++  if (savingsAfterPurchase < input.emergencyBuffer) {
++    riskScore += 30;
++    reasons.push("The purchase would break your emergency buffer.");
+   }
+ 
+-  const ratio = safeToSpend > 0 ? amount / safeToSpend : Number.POSITIVE_INFINITY;
+-
+-  if (ratio <= 1) {
+-    return 3;
++  if (input.upcomingDebt30Days > 0) {
++    riskScore += 20;
++    reasons.push("You have debt due within the next 30 days.");
+   }
+ 
+-  if (ratio <= 2) {
+-    return 14;
++  if (input.paymentMethod !== "cash") {
++    riskScore += 15;
++    reasons.push("This purchase adds future payment pressure.");
+   }
+ 
+-  return 30;
+-}
+-
+-function decide(snapshot: FinancialSnapshot, purchase: PurchaseInput): PurchaseDecision {
+-  const safeToSpend = calculateSafeToSpend(snapshot);
+-  const monthlyFreeCashFlow = calculateMonthlyFreeCashFlow(snapshot);
+-  const debtPressure = calculateDebtPressure(snapshot);
+-  const emergencyProgress = calculateEmergencyProgress(snapshot);
+-  const monthlyPayment = purchase.monthlyPayment ?? 0;
+-
+-  if (monthlyPayment > monthlyFreeCashFlow) {
+-    return "NOT_RECOMMENDED";
++  if (input.installmentMonthlyAmount && input.installmentMonthlyAmount > 0) {
++    if (input.monthlyFreeCashFlow <= 0) {
++      riskScore += 40;
++      reasons.push("There is no monthly free cash flow available for a new payment.");
++    }
++
++    const installmentPressure =
++      input.installmentMonthlyAmount / Math.max(1, input.monthlyFreeCashFlow);
++
++    if (installmentPressure >= 0.3) {
++      riskScore += 20;
++      reasons.push("The monthly installment takes a large part of your free cash flow.");
++    } else if (installmentPressure >= 0.15) {
++      riskScore += 10;
++      reasons.push("The monthly installment will reduce your saving capacity.");
++    }
+   }
+ 
+-  if (debtPressure >= 0.45 && purchase.urgency === "want") {
+-    return "NOT_RECOMMENDED";
++  if (input.urgency === "want") {
++    riskScore += 10;
++    reasons.push("This appears to be a want, not an urgent need.");
+   }
+ 
+-  if (purchase.amount > safeToSpend && purchase.urgency === "want") {
+-    return "WAIT";
++  if (input.currentAlternativeStillWorks) {
++    riskScore += 10;
++    reasons.push("Your current alternative still works.");
+   }
+ 
+-  if (purchase.amount > safeToSpend && purchase.urgency === "can_wait") {
+-    return "WAIT";
++  if (input.isIncomeGenerating) {
++    riskScore -= 15;
++    reasons.push("This may support your work or income.");
+   }
+ 
+-  if (purchase.amount <= safeToSpend * 0.35 && emergencyProgress >= 0.75 && debtPressure < 0.35) {
+-    return "SAFE_TO_BUY";
+-  }
++  riskScore = clamp(riskScore, 0, 100);
++
++  let decision: PurchaseDecision;
+ 
+-  if (purchase.amount <= safeToSpend && monthlyFreeCashFlow > 0) {
+-    return "BUY_WITH_CAUTION";
++  if (riskScore >= 75) {
++    decision = "NOT_RECOMMENDED";
++  } else if (riskScore >= 50) {
++    decision = "WAIT";
++  } else if (riskScore >= 30) {
++    decision = "BUY_WITH_CAUTION";
++  } else {
++    decision = "SAFE_TO_BUY";
+   }
+ 
+-  return purchase.urgency === "need_now" ? "BUY_WITH_CAUTION" : "WAIT";
++  return {
++    decision,
++    riskScore,
++    reasons,
++    savingsAfterPurchase,
++  };
+ }
+ 
+ export function calculatePurchaseDecision(
+@@ -176,47 +219,48 @@ export function calculatePurchaseDecision(
+   const monthlyFreeCashFlow = calculateMonthlyFreeCashFlow(snapshot);
+   const emergencyProgress = calculateEmergencyProgress(snapshot);
+   const debtPressure = calculateDebtPressure(snapshot);
+-  const decision = decide(snapshot, purchase);
++  const emergencyBuffer = calculateEmergencyBuffer(snapshot.profile);
++  const upcomingDebt30Days = minimumDebtPayments(snapshot);
++  const evaluation = evaluatePurchase({
++    price: purchase.amount,
++    currentSavings: snapshot.profile.currentSavings,
++    safeToSpend,
++    emergencyBuffer,
++    upcomingDebt30Days,
++    monthlyFreeCashFlow,
++    paymentMethod: purchase.paymentMethod,
++    urgency: purchase.urgency,
++    isIncomeGenerating: purchase.isIncomeGenerating ?? false,
++    currentAlternativeStillWorks: purchase.currentAlternativeStillWorks ?? false,
++    downPayment: purchase.downPayment,
++    installmentMonthlyAmount: purchase.monthlyPayment,
++    installmentTermMonths: purchase.installmentMonths,
++  });
+   const cooldownDays = calculateCooldownDays({
+     amount: purchase.amount,
+     safeToSpend,
+     urgency: purchase.urgency,
+   });
+   const goalDelayMonths = calculateGoalDelayMonths(snapshot, purchase);
+-  const reasons: string[] = [];
+-
+-  if (purchase.amount <= safeToSpend) {
+-    reasons.push("The purchase fits inside today's safe-to-spend amount.");
+-  } else {
+-    reasons.push("This would exceed today's safe-to-spend amount.");
+-  }
+-
+-  if ((purchase.monthlyPayment ?? 0) > monthlyFreeCashFlow) {
+-    reasons.push("The monthly payment is higher than available monthly free cash flow.");
+-  } else if (purchase.monthlyPayment) {
+-    reasons.push("The monthly payment fits inside current monthly free cash flow.");
+-  }
+-
+-  if (emergencyProgress < 1) {
+-    reasons.push("Your emergency fund is still below target.");
+-  }
+-
+-  if (debtPressure >= 0.35) {
+-    reasons.push("Debt payments are taking a large share of monthly income.");
+-  }
++  const reasons =
++    evaluation.reasons.length > 0
++      ? [...evaluation.reasons]
++      : ["No major risk triggers were found in the current plan."];
+ 
+   if (goalDelayMonths > 0 && purchase.urgency !== "need_now") {
+     reasons.push(`Buying now could delay current goals by about ${goalDelayMonths} months.`);
+   }
+ 
+   return {
+-    decision,
++    decision: evaluation.decision,
++    riskScore: evaluation.riskScore,
+     safeToSpend,
+     monthlyFreeCashFlow,
+     emergencyProgress,
+     debtPressure,
+     goalDelayMonths,
+     cooldownDays,
++    savingsAfterPurchase: evaluation.savingsAfterPurchase,
+     healthScore: calculateFinancialHealthScore(snapshot),
+     reasons,
+   };
+diff --git a/src/lib/schemas/finance.test.ts b/src/lib/schemas/finance.test.ts
+index b99df02..efa1ea1 100644
+--- a/src/lib/schemas/finance.test.ts
++++ b/src/lib/schemas/finance.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, expect, it } from "vitest";
+-import { financialProfileSchema } from "./finance";
++import { financialProfileSchema, purchaseInputSchema } from "./finance";
+ 
+ describe("financialProfileSchema", () => {
+   it("parses profile completeness fields and applies safe defaults", () => {
+@@ -61,3 +61,28 @@ describe("financialProfileSchema", () => {
+     ).toThrow();
+   });
+ });
++
++describe("purchaseInputSchema", () => {
++  it("accepts PRD purchase decision fields", () => {
++    const parsed = purchaseInputSchema.parse({
++      itemName: "Phone",
++      amount: "25000",
++      urgency: "can_wait",
++      paymentMethod: "installment",
++      downPayment: "5000",
++      installmentMonths: "12",
++      monthlyPayment: "2500",
++      isIncomeGenerating: "true",
++      currentAlternativeStillWorks: "false",
++    });
++
++    expect(parsed).toMatchObject({
++      amount: 25_000,
++      downPayment: 5_000,
++      installmentMonths: 12,
++      monthlyPayment: 2_500,
++      isIncomeGenerating: true,
++      currentAlternativeStillWorks: false,
++    });
++  });
++});
+diff --git a/src/lib/schemas/finance.ts b/src/lib/schemas/finance.ts
+index 8a62847..f9f6c40 100644
+--- a/src/lib/schemas/finance.ts
++++ b/src/lib/schemas/finance.ts
+@@ -10,6 +10,21 @@ const optionalInstallmentMonths = z.preprocess(
+   z.coerce.number().int().min(1).max(60).optional()
+ );
+ const optionalMoney = z.preprocess(emptyToUndefined, money.optional());
++const optionalBoolean = z.preprocess((value) => {
++  if (value === "" || value === null || value === undefined) {
++    return undefined;
++  }
++
++  if (value === "true") {
++    return true;
++  }
++
++  if (value === "false") {
++    return false;
++  }
++
++  return value;
++}, z.boolean().optional());
+ 
+ export const payFrequencySchema = z
+   .enum(PAY_FREQUENCIES)
+@@ -61,8 +76,11 @@ export const purchaseInputSchema = z
+     amount: money.refine((value) => value > 0, "Enter a purchase amount."),
+     urgency: z.enum(["need_now", "need_this_month", "can_wait", "want"]),
+     paymentMethod: z.enum(["cash", "installment", "credit_card", "loan", "bnpl"]),
++    downPayment: optionalMoney,
+     installmentMonths: optionalInstallmentMonths,
+     monthlyPayment: optionalMoney,
++    isIncomeGenerating: optionalBoolean,
++    currentAlternativeStillWorks: optionalBoolean,
+   })
+   .superRefine((value, context) => {
+     if (
+diff --git a/src/lib/supabase/finance-mappers.test.ts b/src/lib/supabase/finance-mappers.test.ts
+index c046542..4370462 100644
+--- a/src/lib/supabase/finance-mappers.test.ts
++++ b/src/lib/supabase/finance-mappers.test.ts
+@@ -74,11 +74,17 @@ describe("mapFinancialWorkspaceRows", () => {
+           amount: 25_000,
+           urgency: "can_wait",
+           payment_method: "installment",
++          down_payment: 5_000,
+           installment_months: 12,
+           monthly_payment: 2_500,
++          is_income_generating: true,
++          current_alternative_still_works: false,
+           decision: "WAIT",
++          risk_score: 50,
+           safe_to_spend: 20_000,
+           monthly_free_cash_flow: 59_500,
++          savings_after_purchase: 175_000,
++          cooldown_days: 21,
+           advisor_text: "Wait before buying.",
+           reasons: ["This would exceed today's safe-to-spend amount.", 42],
+           created_at: "2026-06-20T01:00:00.000Z",
+@@ -124,6 +130,11 @@ describe("mapFinancialWorkspaceRows", () => {
+     expect(workspace.checks[0]).toMatchObject({
+       id: "check-1",
+       paymentMethod: "installment",
++      downPayment: 5_000,
++      isIncomeGenerating: true,
++      currentAlternativeStillWorks: false,
++      riskScore: 50,
++      savingsAfterPurchase: 175_000,
+       cooldownDays: 21,
+       reasons: ["This would exceed today's safe-to-spend amount."],
+     });
+@@ -184,11 +195,17 @@ describe("mapFinancialWorkspaceRows", () => {
+           amount: 1_000,
+           urgency: "unexpected",
+           payment_method: "unexpected",
++          down_payment: null,
+           installment_months: null,
+           monthly_payment: null,
++          is_income_generating: false,
++          current_alternative_still_works: false,
+           decision: "unexpected",
++          risk_score: 0,
+           safe_to_spend: 0,
+           monthly_free_cash_flow: 0,
++          savings_after_purchase: 0,
++          cooldown_days: 1,
+           advisor_text: "Wait.",
+           reasons: { invalid: true },
+           created_at: "2026-06-20T00:00:00.000Z",
+@@ -221,6 +238,10 @@ describe("mapFinancialWorkspaceRows", () => {
+       decision: "WAIT",
+       installmentMonths: undefined,
+       monthlyPayment: undefined,
++      downPayment: undefined,
++      riskScore: 0,
++      savingsAfterPurchase: 0,
++      cooldownDays: 1,
+       reasons: [],
+     });
+     expect(workspace.cooldownItems[0]).toMatchObject({
+diff --git a/src/lib/supabase/finance-mappers.ts b/src/lib/supabase/finance-mappers.ts
+index 45f9579..31da3c3 100644
+--- a/src/lib/supabase/finance-mappers.ts
++++ b/src/lib/supabase/finance-mappers.ts
+@@ -101,17 +101,23 @@ export function mapFinancialWorkspaceRows(rows: FinancialWorkspaceRows): Financi
+           ["cash", "installment", "credit_card", "loan", "bnpl"],
+           "cash"
+         ),
++        downPayment: check.down_payment === null ? undefined : Number(check.down_payment),
+         installmentMonths: check.installment_months ?? undefined,
+         monthlyPayment: check.monthly_payment === null ? undefined : Number(check.monthly_payment),
++        isIncomeGenerating: check.is_income_generating,
++        currentAlternativeStillWorks: check.current_alternative_still_works,
+         createdAt: check.created_at,
+         decision: enumValue<PurchaseDecision>(
+           check.decision,
+           ["SAFE_TO_BUY", "BUY_WITH_CAUTION", "WAIT", "NOT_RECOMMENDED"],
+           "WAIT"
+         ),
++        riskScore: check.risk_score,
+         safeToSpend,
+         monthlyFreeCashFlow: Number(check.monthly_free_cash_flow),
+-        cooldownDays: calculateCooldownDays({ amount, safeToSpend, urgency }),
++        savingsAfterPurchase: Number(check.savings_after_purchase),
++        cooldownDays:
++          check.cooldown_days ?? calculateCooldownDays({ amount, safeToSpend, urgency }),
+         advisorText: check.advisor_text,
+         reasons: stringReasons(check.reasons),
+       };
+diff --git a/src/types/database.ts b/src/types/database.ts
+index 2b90c77..1aff5f8 100644
+--- a/src/types/database.ts
++++ b/src/types/database.ts
+@@ -109,11 +109,17 @@ export interface Database {
+           amount: number;
+           urgency: string;
+           payment_method: string;
++          down_payment: number | null;
+           installment_months: number | null;
+           monthly_payment: number | null;
++          is_income_generating: boolean;
++          current_alternative_still_works: boolean;
+           decision: string;
++          risk_score: number;
+           safe_to_spend: number;
+           monthly_free_cash_flow: number;
++          savings_after_purchase: number;
++          cooldown_days: number;
+           advisor_text: string;
+           reasons: Json;
+           created_at: string;
+@@ -124,11 +130,17 @@ export interface Database {
+           amount: number;
+           urgency: string;
+           payment_method: string;
++          down_payment?: number | null;
+           installment_months?: number | null;
+           monthly_payment?: number | null;
++          is_income_generating?: boolean;
++          current_alternative_still_works?: boolean;
+           decision: string;
++          risk_score: number;
+           safe_to_spend: number;
+           monthly_free_cash_flow: number;
++          savings_after_purchase: number;
++          cooldown_days: number;
+           advisor_text: string;
+           reasons: Json;
+         };
+diff --git a/src/types/finance.ts b/src/types/finance.ts
+index 5123de7..43ecba6 100644
+--- a/src/types/finance.ts
++++ b/src/types/finance.ts
+@@ -65,16 +65,21 @@ export interface PurchaseInput {
+   amount: number;
+   urgency: PurchaseUrgency;
+   paymentMethod: PaymentMethod;
++  downPayment?: number;
+   installmentMonths?: number;
+   monthlyPayment?: number;
++  isIncomeGenerating?: boolean;
++  currentAlternativeStillWorks?: boolean;
+ }
+ 
+ export interface PurchaseCheck extends PurchaseInput {
+   id: string;
+   createdAt: string;
+   decision: PurchaseDecision;
++  riskScore: number;
+   safeToSpend: number;
+   monthlyFreeCashFlow: number;
++  savingsAfterPurchase: number;
+   cooldownDays: number;
+   advisorText: string;
+   reasons: string[];
+@@ -116,12 +121,14 @@ export interface FinancialWorkspace {
+ 
+ export interface PurchaseDecisionResult {
+   decision: PurchaseDecision;
++  riskScore: number;
+   safeToSpend: number;
+   monthlyFreeCashFlow: number;
+   emergencyProgress: number;
+   debtPressure: number;
+   goalDelayMonths: number;
+   cooldownDays: number;
++  savingsAfterPurchase: number;
+   healthScore: number;
+   reasons: string[];
+ }
+diff --git a/supabase/migrations/20260623001000_purchase_check_prd19_results.sql b/supabase/migrations/20260623001000_purchase_check_prd19_results.sql
+new file mode 100644
+index 0000000..c876696
+--- /dev/null
++++ b/supabase/migrations/20260623001000_purchase_check_prd19_results.sql
+@@ -0,0 +1,36 @@
++alter table public.purchase_checks
++  add column if not exists down_payment numeric(12,2),
++  add column if not exists is_income_generating boolean not null default false,
++  add column if not exists current_alternative_still_works boolean not null default false,
++  add column if not exists risk_score integer not null default 0,
++  add column if not exists savings_after_purchase numeric(12,2) not null default 0,
++  add column if not exists cooldown_days integer not null default 0;
++
++alter table public.purchase_checks
++  add constraint purchase_checks_down_payment_nonnegative
++    check (down_payment is null or down_payment >= 0),
++  add constraint purchase_checks_risk_score_range
++    check (risk_score >= 0 and risk_score <= 100),
++  add constraint purchase_checks_cooldown_days_nonnegative
++    check (cooldown_days >= 0);
++
++update public.purchase_checks
++set cooldown_days = case
++  when amount < 2000 then 1
++  when amount < 10000 then 3
++  when amount < 50000 then 7
++  else 30
++end
++where cooldown_days = 0;
++
++-- Rollback, if needed:
++-- alter table public.purchase_checks
++--   drop constraint if exists purchase_checks_down_payment_nonnegative,
++--   drop constraint if exists purchase_checks_risk_score_range,
++--   drop constraint if exists purchase_checks_cooldown_days_nonnegative,
++--   drop column if exists cooldown_days,
++--   drop column if exists savings_after_purchase,
++--   drop column if exists risk_score,
++--   drop column if exists current_alternative_still_works,
++--   drop column if exists is_income_generating,
++--   drop column if exists down_payment;

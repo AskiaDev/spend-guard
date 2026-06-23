@@ -1,32 +1,34 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  calculateCooldownDays,
   calculateEmergencyProgress,
   calculateFinancialHealthScore,
   calculateMonthlyFreeCashFlow,
   calculatePurchaseDecision,
   calculateSafeToSpend,
+  evaluatePurchase,
 } from "./purchase-decision";
 import type { FinancialSnapshot, PurchaseInput } from "@/types/finance";
 
 const stableSnapshot: FinancialSnapshot = {
   profile: {
     currency: "PHP",
-    monthlyIncome: 90000,
-    currentSavings: 180000,
-    emergencyFundTarget: 150000,
+    monthlyIncome: 90_000,
+    currentSavings: 180_000,
+    emergencyFundTarget: 150_000,
+    estimatedVariableExpenses: 12_000,
   },
   expenses: [
-    { id: "rent", label: "Rent", amount: 22000, dueDay: 1, isRecurring: true },
-    { id: "utilities", label: "Utilities", amount: 6000, dueDay: 18, isRecurring: true },
+    { id: "rent", label: "Rent", amount: 22_000, dueDay: 1, isRecurring: true },
+    { id: "utilities", label: "Utilities", amount: 6_000, dueDay: 18, isRecurring: true },
+    { id: "repair", label: "One-time repair", amount: 5_000, dueDay: 18, isRecurring: false },
   ],
   debts: [
     {
       id: "card",
       label: "Credit card",
-      outstandingBalance: 40000,
-      minimumPayment: 6000,
+      outstandingBalance: 40_000,
+      minimumPayment: 6_000,
       dueDay: 20,
       interestRate: 0.32,
     },
@@ -35,136 +37,188 @@ const stableSnapshot: FinancialSnapshot = {
     {
       id: "travel",
       label: "Travel fund",
-      targetAmount: 120000,
-      savedAmount: 30000,
-      monthlyContribution: 8000,
+      targetAmount: 120_000,
+      savedAmount: 30_000,
+      monthlyContribution: 8_000,
       targetDate: "2026-12-31",
       priority: "medium",
     },
   ],
 };
 
-describe("finance calculations", () => {
-  it("calculates safe-to-spend as savings after emergency buffer, upcoming obligations, and reserved goals", () => {
-    expect(calculateSafeToSpend(stableSnapshot)).toBe(18000);
+describe("purchase decision compatibility wrapper", () => {
+  it("derives PRD safe-to-spend inputs from the current financial snapshot", () => {
+    expect(calculateSafeToSpend(stableSnapshot)).toBe(108_000);
   });
 
-  it("calculates free cash flow from income less recurring expenses, debt minimums, and goal contributions", () => {
-    expect(calculateMonthlyFreeCashFlow(stableSnapshot)).toBe(48000);
+  it("calculates free cash flow using estimated variable expenses and minimum debt payments", () => {
+    expect(calculateMonthlyFreeCashFlow(stableSnapshot)).toBe(44_000);
   });
 
-  it("calculates emergency progress and financial health as bounded values", () => {
+  it("keeps legacy emergency progress as a 0-1 ratio and health score as 0-100", () => {
     expect(calculateEmergencyProgress(stableSnapshot)).toBe(1);
-    expect(calculateFinancialHealthScore(stableSnapshot)).toBeGreaterThanOrEqual(80);
+    expect(calculateFinancialHealthScore(stableSnapshot)).toBeGreaterThanOrEqual(70);
     expect(calculateFinancialHealthScore(stableSnapshot)).toBeLessThanOrEqual(100);
   });
 
-  it("marks a low-impact needed cash purchase as safe to buy", () => {
+  it("returns PRD risk-score details with the existing app result shape", () => {
     const purchase: PurchaseInput = {
       itemName: "Replacement keyboard",
-      amount: 4500,
+      amount: 4_500,
       urgency: "need_this_month",
       paymentMethod: "cash",
     };
 
     const result = calculatePurchaseDecision(stableSnapshot, purchase);
 
-    expect(result.decision).toBe("SAFE_TO_BUY");
-    expect(result.safeToSpend).toBe(18000);
-    expect(result.cooldownDays).toBe(0);
-    expect(result.reasons).toContain("The purchase fits inside today's safe-to-spend amount.");
+    expect(result).toMatchObject({
+      decision: "SAFE_TO_BUY",
+      riskScore: 20,
+      safeToSpend: 108_000,
+      monthlyFreeCashFlow: 44_000,
+      savingsAfterPurchase: 175_500,
+      cooldownDays: 3,
+    });
+    expect(result.reasons).toContain("You have debt due within the next 30 days.");
   });
 
-  it("recommends waiting when a want exceeds safe-to-spend and slows goals", () => {
-    const purchase: PurchaseInput = {
-      itemName: "Gaming monitor",
-      amount: 36000,
-      urgency: "want",
-      paymentMethod: "cash",
-    };
-
-    const result = calculatePurchaseDecision(stableSnapshot, purchase);
-
-    expect(result.decision).toBe("WAIT");
-    expect(result.cooldownDays).toBe(14);
-    expect(result.goalDelayMonths).toBe(5);
-    expect(result.reasons).toContain("This would exceed today's safe-to-spend amount.");
-  });
-
-  it("rejects installment purchases when monthly payments consume the remaining monthly free cash flow", () => {
-    const purchase: PurchaseInput = {
-      itemName: "Phone upgrade",
-      amount: 96000,
-      urgency: "want",
-      paymentMethod: "installment",
-      installmentMonths: 12,
-      monthlyPayment: 70000,
-    };
-
-    const result = calculatePurchaseDecision(stableSnapshot, purchase);
-
-    expect(result.decision).toBe("NOT_RECOMMENDED");
-    expect(result.reasons).toContain("The monthly payment is higher than available monthly free cash flow.");
-  });
-
-  it("uses larger cooldowns for wants that are far outside the safe amount", () => {
-    expect(calculateCooldownDays({ amount: 5000, safeToSpend: 12000, urgency: "want" })).toBe(3);
-    expect(calculateCooldownDays({ amount: 18000, safeToSpend: 12000, urgency: "want" })).toBe(14);
-    expect(calculateCooldownDays({ amount: 50000, safeToSpend: 12000, urgency: "want" })).toBe(30);
-  });
-
-  it("handles empty targets and missing income without division errors", () => {
-    const snapshot: FinancialSnapshot = {
-      profile: {
-        currency: "PHP",
-        monthlyIncome: 0,
-        currentSavings: 0,
-        emergencyFundTarget: 0,
-      },
-      expenses: [],
-      debts: [],
-      goals: [],
-    };
-
-    expect(calculateEmergencyProgress(snapshot)).toBe(1);
-    expect(calculateFinancialHealthScore(snapshot)).toBe(40);
-  });
-
-  it("downgrades a need-now purchase outside safe-to-spend to caution instead of approving it", () => {
+  it("uses down payment for savings-after-purchase on non-cash purchases", () => {
     const result = calculatePurchaseDecision(stableSnapshot, {
-      itemName: "Urgent repair",
-      amount: 24000,
-      urgency: "need_now",
-      paymentMethod: "cash",
+      itemName: "Laptop",
+      amount: 80_000,
+      urgency: "can_wait",
+      paymentMethod: "installment",
+      downPayment: 20_000,
+      monthlyPayment: 8_000,
+      installmentMonths: 12,
     });
 
+    expect(result.savingsAfterPurchase).toBe(160_000);
+    expect(result.riskScore).toBe(45);
     expect(result.decision).toBe("BUY_WITH_CAUTION");
-    expect(result.cooldownDays).toBe(0);
+  });
+});
+
+describe("PRD purchase risk scoring", () => {
+  it("uses exact decision threshold ties", () => {
+    expect(
+      evaluatePurchase({
+        price: 200,
+        currentSavings: 100,
+        safeToSpend: 100,
+        emergencyBuffer: 150,
+        upcomingDebt30Days: 0,
+        monthlyFreeCashFlow: 1_000,
+        paymentMethod: "installment",
+        urgency: "need_this_month",
+        isIncomeGenerating: false,
+        currentAlternativeStillWorks: false,
+      })
+    ).toMatchObject({ riskScore: 75, decision: "NOT_RECOMMENDED" });
+
+    expect(
+      evaluatePurchase({
+        price: 200,
+        currentSavings: 500,
+        safeToSpend: 100,
+        emergencyBuffer: 100,
+        upcomingDebt30Days: 1,
+        monthlyFreeCashFlow: 1_000,
+        paymentMethod: "cash",
+        urgency: "need_this_month",
+        isIncomeGenerating: false,
+        currentAlternativeStillWorks: false,
+      })
+    ).toMatchObject({ riskScore: 50, decision: "WAIT" });
+
+    expect(
+      evaluatePurchase({
+        price: 200,
+        currentSavings: 500,
+        safeToSpend: 100,
+        emergencyBuffer: 100,
+        upcomingDebt30Days: 0,
+        monthlyFreeCashFlow: 1_000,
+        paymentMethod: "cash",
+        urgency: "need_this_month",
+        isIncomeGenerating: false,
+        currentAlternativeStillWorks: false,
+      })
+    ).toMatchObject({ riskScore: 30, decision: "BUY_WITH_CAUTION" });
   });
 
-  it("rejects wants when debt pressure is already high", () => {
-    const result = calculatePurchaseDecision(
-      {
-        ...stableSnapshot,
-        debts: [
-          {
-            id: "loan",
-            label: "Loan",
-            outstandingBalance: 200000,
-            minimumPayment: 42000,
-            dueDay: 10,
-          },
-        ],
-      },
-      {
-        itemName: "Camera",
-        amount: 5000,
-        urgency: "want",
-        paymentMethod: "cash",
-      }
-    );
+  it("scores installment pressure at the PRD cutoffs", () => {
+    expect(
+      evaluatePurchase({
+        price: 1_000,
+        currentSavings: 10_000,
+        safeToSpend: 10_000,
+        emergencyBuffer: 2_000,
+        upcomingDebt30Days: 0,
+        monthlyFreeCashFlow: 1_000,
+        paymentMethod: "installment",
+        urgency: "need_this_month",
+        isIncomeGenerating: false,
+        currentAlternativeStillWorks: false,
+        installmentMonthlyAmount: 150,
+      })
+    ).toMatchObject({ riskScore: 25, decision: "SAFE_TO_BUY" });
 
-    expect(result.decision).toBe("NOT_RECOMMENDED");
-    expect(result.reasons).toContain("Debt payments are taking a large share of monthly income.");
+    expect(
+      evaluatePurchase({
+        price: 1_000,
+        currentSavings: 10_000,
+        safeToSpend: 10_000,
+        emergencyBuffer: 2_000,
+        upcomingDebt30Days: 0,
+        monthlyFreeCashFlow: 1_000,
+        paymentMethod: "installment",
+        urgency: "need_this_month",
+        isIncomeGenerating: false,
+        currentAlternativeStillWorks: false,
+        installmentMonthlyAmount: 300,
+      })
+    ).toMatchObject({ riskScore: 35, decision: "BUY_WITH_CAUTION" });
+  });
+
+  it("does not approve new financing when monthly free cash flow is zero or negative", () => {
+    const result = evaluatePurchase({
+      price: 1_000,
+      currentSavings: 10_000,
+      safeToSpend: 10_000,
+      emergencyBuffer: 2_000,
+      upcomingDebt30Days: 0,
+      monthlyFreeCashFlow: 0,
+      paymentMethod: "installment",
+      urgency: "need_this_month",
+      isIncomeGenerating: false,
+      currentAlternativeStillWorks: false,
+      installmentMonthlyAmount: 100,
+    });
+
+    expect(result).toMatchObject({ riskScore: 75, decision: "NOT_RECOMMENDED" });
+    expect(result.reasons).toContain(
+      "There is no monthly free cash flow available for a new payment."
+    );
+  });
+
+  it("adds want and working-alternative risk while reducing income-generating risk", () => {
+    const result = evaluatePurchase({
+      price: 3_000,
+      currentSavings: 50_000,
+      safeToSpend: 50_000,
+      emergencyBuffer: 10_000,
+      upcomingDebt30Days: 0,
+      monthlyFreeCashFlow: 20_000,
+      paymentMethod: "cash",
+      urgency: "want",
+      isIncomeGenerating: true,
+      currentAlternativeStillWorks: true,
+    });
+
+    expect(result.riskScore).toBe(5);
+    expect(result.reasons).toContain("This appears to be a want, not an urgent need.");
+    expect(result.reasons).toContain("Your current alternative still works.");
+    expect(result.reasons).toContain("This may support your work or income.");
   });
 });

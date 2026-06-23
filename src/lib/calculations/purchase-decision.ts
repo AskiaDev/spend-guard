@@ -1,171 +1,214 @@
 import type {
   FinancialSnapshot,
+  PaymentMethod,
   PurchaseDecision,
   PurchaseDecisionResult,
   PurchaseInput,
   PurchaseUrgency,
 } from "@/types/finance";
+import {
+  calculateMonthlyFreeCashFlow as calculateMonthlyFreeCashFlowFromInput,
+  calculateSafeToSpend as calculateSafeToSpendFromInput,
+} from "./cashflow";
+import { calculateCooldownDays } from "./cooldown";
+import {
+  calculateDebtPressure as calculateDebtPressureFromInput,
+  calculateDebtPressureScore,
+} from "./debt-pressure";
+import {
+  calculateEmergencyBuffer,
+  calculateEmergencyFundProgress,
+} from "./emergency-fund";
+import {
+  calculateGoalDelayMonths as calculateGoalDelayMonthsFromGoals,
+  calculateGoalProgressScore,
+  calculateReservedGoalAmount,
+} from "./goal-impact";
+import { calculateHealthScore } from "./health-score";
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
 const sum = (values: number[]) => values.reduce((total, value) => total + value, 0);
 
-export function calculateMonthlyFreeCashFlow(snapshot: FinancialSnapshot): number {
-  const recurringExpenses = sum(
+export interface PurchaseEvaluationInput {
+  price: number;
+  currentSavings: number;
+  safeToSpend: number;
+  emergencyBuffer: number;
+  upcomingDebt30Days: number;
+  monthlyFreeCashFlow: number;
+  paymentMethod: PaymentMethod;
+  urgency: PurchaseUrgency;
+  isIncomeGenerating: boolean;
+  currentAlternativeStillWorks: boolean;
+  downPayment?: number;
+  installmentMonthlyAmount?: number;
+  installmentTermMonths?: number;
+}
+
+export interface PurchaseEvaluationResult {
+  decision: PurchaseDecision;
+  riskScore: number;
+  reasons: string[];
+  savingsAfterPurchase: number;
+}
+
+function recurringExpenseTotal(snapshot: FinancialSnapshot): number {
+  return sum(
     snapshot.expenses
       .filter((expense) => expense.isRecurring)
       .map((expense) => expense.amount)
   );
-  const debtMinimums = sum(snapshot.debts.map((debt) => debt.minimumPayment));
-  const goalContributions = sum(snapshot.goals.map((goal) => goal.monthlyContribution));
+}
 
-  return snapshot.profile.monthlyIncome - recurringExpenses - debtMinimums - goalContributions;
+function minimumDebtPayments(snapshot: FinancialSnapshot): number {
+  return sum(snapshot.debts.map((debt) => debt.minimumPayment));
+}
+
+export function calculateMonthlyFreeCashFlow(snapshot: FinancialSnapshot): number {
+  return calculateMonthlyFreeCashFlowFromInput({
+    monthlyIncome: snapshot.profile.monthlyIncome,
+    fixedExpenses: recurringExpenseTotal(snapshot),
+    estimatedVariableExpenses: snapshot.profile.estimatedVariableExpenses ?? 0,
+    minimumDebtPayments: minimumDebtPayments(snapshot),
+  });
 }
 
 export function calculateEmergencyProgress(snapshot: FinancialSnapshot): number {
-  if (snapshot.profile.emergencyFundTarget <= 0) {
-    return 1;
-  }
-
-  return clamp(
-    snapshot.profile.currentSavings / snapshot.profile.emergencyFundTarget,
-    0,
-    1
-  );
+  return calculateEmergencyFundProgress(snapshot.profile) / 100;
 }
 
 export function calculateDebtPressure(snapshot: FinancialSnapshot): number {
-  if (snapshot.profile.monthlyIncome <= 0) {
-    return 1;
-  }
-
-  return clamp(
-    sum(snapshot.debts.map((debt) => debt.minimumPayment)) / snapshot.profile.monthlyIncome,
-    0,
-    1
-  );
+  return calculateDebtPressureFromInput({
+    monthlyIncome: snapshot.profile.monthlyIncome,
+    minimumDebtPayments: minimumDebtPayments(snapshot),
+  });
 }
 
 export function calculateSafeToSpend(snapshot: FinancialSnapshot): number {
-  const emergencyBuffer = Math.min(
-    snapshot.profile.currentSavings,
-    snapshot.profile.emergencyFundTarget * 0.8
-  );
-  const upcomingBills30Days = sum(
-    snapshot.expenses
-      .filter((expense) => expense.isRecurring)
-      .map((expense) => expense.amount)
-  );
-  const upcomingDebt30Days = sum(snapshot.debts.map((debt) => debt.minimumPayment));
-  const reservedGoalAmount = sum(snapshot.goals.map((goal) => goal.monthlyContribution));
-
-  return Math.max(
-    0,
-    Math.round(
-      snapshot.profile.currentSavings -
-        emergencyBuffer -
-        upcomingBills30Days -
-        upcomingDebt30Days -
-        reservedGoalAmount
-    )
-  );
+  return calculateSafeToSpendFromInput({
+    currentSavings: snapshot.profile.currentSavings,
+    emergencyBuffer: calculateEmergencyBuffer(snapshot.profile),
+    upcomingBills30Days: recurringExpenseTotal(snapshot),
+    upcomingDebt30Days: minimumDebtPayments(snapshot),
+    reservedGoalAmount: calculateReservedGoalAmount(snapshot.goals),
+  });
 }
 
 export function calculateFinancialHealthScore(snapshot: FinancialSnapshot): number {
-  const emergencyScore = calculateEmergencyProgress(snapshot) * 40;
   const monthlyFreeCashFlow = calculateMonthlyFreeCashFlow(snapshot);
   const cashFlowRatio =
     snapshot.profile.monthlyIncome > 0
       ? clamp(monthlyFreeCashFlow / snapshot.profile.monthlyIncome, 0, 0.4) / 0.4
       : 0;
-  const cashFlowScore = cashFlowRatio * 30;
-  const debtPressure = calculateDebtPressure(snapshot);
-  const debtScore = (1 - clamp(debtPressure / 0.45, 0, 1)) * 20;
-  const savingsScore = snapshot.profile.currentSavings > 0 ? 10 : 0;
 
-  return Math.round(clamp(emergencyScore + cashFlowScore + debtScore + savingsScore, 0, 100));
+  return calculateHealthScore({
+    emergencyFundProgress: calculateEmergencyFundProgress(snapshot.profile),
+    debtPressureScore: calculateDebtPressureScore({
+      monthlyIncome: snapshot.profile.monthlyIncome,
+      minimumDebtPayments: minimumDebtPayments(snapshot),
+    }),
+    cashFlowScore: cashFlowRatio * 100,
+    goalProgressScore: calculateGoalProgressScore(snapshot.goals),
+    purchaseDisciplineScore: 100,
+  });
 }
 
 export function calculateGoalDelayMonths(
   snapshot: FinancialSnapshot,
   purchase: PurchaseInput
 ): number {
-  const monthlyGoalFunding = sum(snapshot.goals.map((goal) => goal.monthlyContribution));
-
-  if (monthlyGoalFunding <= 0) {
-    return 0;
-  }
-
-  return Math.ceil(purchase.amount / monthlyGoalFunding);
+  return calculateGoalDelayMonthsFromGoals({
+    goals: snapshot.goals,
+    purchaseAmount: purchase.amount,
+  });
 }
 
-export function calculateCooldownDays({
-  amount,
-  safeToSpend,
-  urgency,
-}: {
-  amount: number;
-  safeToSpend: number;
-  urgency: PurchaseUrgency;
-}): number {
-  if (urgency === "need_now") {
-    return 0;
+export { calculateCooldownDays };
+
+export function evaluatePurchase(input: PurchaseEvaluationInput): PurchaseEvaluationResult {
+  const reasons: string[] = [];
+  const savingsAfterPurchase =
+    input.paymentMethod === "cash"
+      ? input.currentSavings - input.price
+      : input.currentSavings - (input.downPayment ?? 0);
+
+  let riskScore = 0;
+
+  if (input.price > input.safeToSpend) {
+    riskScore += 30;
+    reasons.push("The purchase is higher than your safe-to-spend amount.");
   }
 
-  if (urgency === "need_this_month" && amount <= safeToSpend) {
-    return 0;
+  if (savingsAfterPurchase < input.emergencyBuffer) {
+    riskScore += 30;
+    reasons.push("The purchase would break your emergency buffer.");
   }
 
-  if (urgency === "can_wait") {
-    return amount <= safeToSpend ? 7 : 21;
+  if (input.upcomingDebt30Days > 0) {
+    riskScore += 20;
+    reasons.push("You have debt due within the next 30 days.");
   }
 
-  const ratio = safeToSpend > 0 ? amount / safeToSpend : Number.POSITIVE_INFINITY;
-
-  if (ratio <= 1) {
-    return 3;
+  if (input.paymentMethod !== "cash") {
+    riskScore += 15;
+    reasons.push("This purchase adds future payment pressure.");
   }
 
-  if (ratio <= 2) {
-    return 14;
+  if (input.installmentMonthlyAmount && input.installmentMonthlyAmount > 0) {
+    if (input.monthlyFreeCashFlow <= 0) {
+      riskScore += 40;
+      reasons.push("There is no monthly free cash flow available for a new payment.");
+    }
+
+    const installmentPressure =
+      input.installmentMonthlyAmount / Math.max(1, input.monthlyFreeCashFlow);
+
+    if (installmentPressure >= 0.3) {
+      riskScore += 20;
+      reasons.push("The monthly installment takes a large part of your free cash flow.");
+    } else if (installmentPressure >= 0.15) {
+      riskScore += 10;
+      reasons.push("The monthly installment will reduce your saving capacity.");
+    }
   }
 
-  return 30;
-}
-
-function decide(snapshot: FinancialSnapshot, purchase: PurchaseInput): PurchaseDecision {
-  const safeToSpend = calculateSafeToSpend(snapshot);
-  const monthlyFreeCashFlow = calculateMonthlyFreeCashFlow(snapshot);
-  const debtPressure = calculateDebtPressure(snapshot);
-  const emergencyProgress = calculateEmergencyProgress(snapshot);
-  const monthlyPayment = purchase.monthlyPayment ?? 0;
-
-  if (monthlyPayment > monthlyFreeCashFlow) {
-    return "NOT_RECOMMENDED";
+  if (input.urgency === "want") {
+    riskScore += 10;
+    reasons.push("This appears to be a want, not an urgent need.");
   }
 
-  if (debtPressure >= 0.45 && purchase.urgency === "want") {
-    return "NOT_RECOMMENDED";
+  if (input.currentAlternativeStillWorks) {
+    riskScore += 10;
+    reasons.push("Your current alternative still works.");
   }
 
-  if (purchase.amount > safeToSpend && purchase.urgency === "want") {
-    return "WAIT";
+  if (input.isIncomeGenerating) {
+    riskScore -= 15;
+    reasons.push("This may support your work or income.");
   }
 
-  if (purchase.amount > safeToSpend && purchase.urgency === "can_wait") {
-    return "WAIT";
+  riskScore = clamp(riskScore, 0, 100);
+
+  let decision: PurchaseDecision;
+
+  if (riskScore >= 75) {
+    decision = "NOT_RECOMMENDED";
+  } else if (riskScore >= 50) {
+    decision = "WAIT";
+  } else if (riskScore >= 30) {
+    decision = "BUY_WITH_CAUTION";
+  } else {
+    decision = "SAFE_TO_BUY";
   }
 
-  if (purchase.amount <= safeToSpend * 0.35 && emergencyProgress >= 0.75 && debtPressure < 0.35) {
-    return "SAFE_TO_BUY";
-  }
-
-  if (purchase.amount <= safeToSpend && monthlyFreeCashFlow > 0) {
-    return "BUY_WITH_CAUTION";
-  }
-
-  return purchase.urgency === "need_now" ? "BUY_WITH_CAUTION" : "WAIT";
+  return {
+    decision,
+    riskScore,
+    reasons,
+    savingsAfterPurchase,
+  };
 }
 
 export function calculatePurchaseDecision(
@@ -176,47 +219,48 @@ export function calculatePurchaseDecision(
   const monthlyFreeCashFlow = calculateMonthlyFreeCashFlow(snapshot);
   const emergencyProgress = calculateEmergencyProgress(snapshot);
   const debtPressure = calculateDebtPressure(snapshot);
-  const decision = decide(snapshot, purchase);
+  const emergencyBuffer = calculateEmergencyBuffer(snapshot.profile);
+  const upcomingDebt30Days = minimumDebtPayments(snapshot);
+  const evaluation = evaluatePurchase({
+    price: purchase.amount,
+    currentSavings: snapshot.profile.currentSavings,
+    safeToSpend,
+    emergencyBuffer,
+    upcomingDebt30Days,
+    monthlyFreeCashFlow,
+    paymentMethod: purchase.paymentMethod,
+    urgency: purchase.urgency,
+    isIncomeGenerating: purchase.isIncomeGenerating ?? false,
+    currentAlternativeStillWorks: purchase.currentAlternativeStillWorks ?? false,
+    downPayment: purchase.downPayment,
+    installmentMonthlyAmount: purchase.monthlyPayment,
+    installmentTermMonths: purchase.installmentMonths,
+  });
   const cooldownDays = calculateCooldownDays({
     amount: purchase.amount,
     safeToSpend,
     urgency: purchase.urgency,
   });
   const goalDelayMonths = calculateGoalDelayMonths(snapshot, purchase);
-  const reasons: string[] = [];
-
-  if (purchase.amount <= safeToSpend) {
-    reasons.push("The purchase fits inside today's safe-to-spend amount.");
-  } else {
-    reasons.push("This would exceed today's safe-to-spend amount.");
-  }
-
-  if ((purchase.monthlyPayment ?? 0) > monthlyFreeCashFlow) {
-    reasons.push("The monthly payment is higher than available monthly free cash flow.");
-  } else if (purchase.monthlyPayment) {
-    reasons.push("The monthly payment fits inside current monthly free cash flow.");
-  }
-
-  if (emergencyProgress < 1) {
-    reasons.push("Your emergency fund is still below target.");
-  }
-
-  if (debtPressure >= 0.35) {
-    reasons.push("Debt payments are taking a large share of monthly income.");
-  }
+  const reasons =
+    evaluation.reasons.length > 0
+      ? [...evaluation.reasons]
+      : ["No major risk triggers were found in the current plan."];
 
   if (goalDelayMonths > 0 && purchase.urgency !== "need_now") {
     reasons.push(`Buying now could delay current goals by about ${goalDelayMonths} months.`);
   }
 
   return {
-    decision,
+    decision: evaluation.decision,
+    riskScore: evaluation.riskScore,
     safeToSpend,
     monthlyFreeCashFlow,
     emergencyProgress,
     debtPressure,
     goalDelayMonths,
     cooldownDays,
+    savingsAfterPurchase: evaluation.savingsAfterPurchase,
     healthScore: calculateFinancialHealthScore(snapshot),
     reasons,
   };

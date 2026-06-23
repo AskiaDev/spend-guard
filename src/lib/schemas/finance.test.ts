@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { financialProfileSchema } from "./finance";
+import { financialProfileSchema, purchaseInputSchema } from "./finance";
 
 describe("financialProfileSchema", () => {
   it("parses profile completeness fields and applies safe defaults", () => {
@@ -59,5 +59,30 @@ describe("financialProfileSchema", () => {
         estimatedVariableExpenses: -1,
       })
     ).toThrow();
+  });
+});
+
+describe("purchaseInputSchema", () => {
+  it("accepts PRD purchase decision fields", () => {
+    const parsed = purchaseInputSchema.parse({
+      itemName: "Phone",
+      amount: "25000",
+      urgency: "can_wait",
+      paymentMethod: "installment",
+      downPayment: "5000",
+      installmentMonths: "12",
+      monthlyPayment: "2500",
+      isIncomeGenerating: "true",
+      currentAlternativeStillWorks: "false",
+    });
+
+    expect(parsed).toMatchObject({
+      amount: 25_000,
+      downPayment: 5_000,
+      installmentMonths: 12,
+      monthlyPayment: 2_500,
+      isIncomeGenerating: true,
+      currentAlternativeStillWorks: false,
+    });
   });
 });

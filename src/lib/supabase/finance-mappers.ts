@@ -101,17 +101,23 @@ export function mapFinancialWorkspaceRows(rows: FinancialWorkspaceRows): Financi
           ["cash", "installment", "credit_card", "loan", "bnpl"],
           "cash"
         ),
+        downPayment: check.down_payment === null ? undefined : Number(check.down_payment),
         installmentMonths: check.installment_months ?? undefined,
         monthlyPayment: check.monthly_payment === null ? undefined : Number(check.monthly_payment),
+        isIncomeGenerating: check.is_income_generating,
+        currentAlternativeStillWorks: check.current_alternative_still_works,
         createdAt: check.created_at,
         decision: enumValue<PurchaseDecision>(
           check.decision,
           ["SAFE_TO_BUY", "BUY_WITH_CAUTION", "WAIT", "NOT_RECOMMENDED"],
           "WAIT"
         ),
+        riskScore: check.risk_score,
         safeToSpend,
         monthlyFreeCashFlow: Number(check.monthly_free_cash_flow),
-        cooldownDays: calculateCooldownDays({ amount, safeToSpend, urgency }),
+        savingsAfterPurchase: Number(check.savings_after_purchase),
+        cooldownDays:
+          check.cooldown_days ?? calculateCooldownDays({ amount, safeToSpend, urgency }),
         advisorText: check.advisor_text,
         reasons: stringReasons(check.reasons),
       };

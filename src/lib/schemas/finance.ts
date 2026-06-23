@@ -10,6 +10,21 @@ const optionalInstallmentMonths = z.preprocess(
   z.coerce.number().int().min(1).max(60).optional()
 );
 const optionalMoney = z.preprocess(emptyToUndefined, money.optional());
+const optionalBoolean = z.preprocess((value) => {
+  if (value === "" || value === null || value === undefined) {
+    return undefined;
+  }
+
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
+  return value;
+}, z.boolean().optional());
 
 export const payFrequencySchema = z
   .enum(PAY_FREQUENCIES)
@@ -61,8 +76,11 @@ export const purchaseInputSchema = z
     amount: money.refine((value) => value > 0, "Enter a purchase amount."),
     urgency: z.enum(["need_now", "need_this_month", "can_wait", "want"]),
     paymentMethod: z.enum(["cash", "installment", "credit_card", "loan", "bnpl"]),
+    downPayment: optionalMoney,
     installmentMonths: optionalInstallmentMonths,
     monthlyPayment: optionalMoney,
+    isIncomeGenerating: optionalBoolean,
+    currentAlternativeStillWorks: optionalBoolean,
   })
   .superRefine((value, context) => {
     if (

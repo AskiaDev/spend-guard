@@ -199,9 +199,7 @@ describe("VoicePurchaseChecker", () => {
     expect(screen.getByLabelText(/monthly payment/i)).toHaveValue(6000);
     expect(screen.getByLabelText(/term.*months/i)).toHaveValue(24);
     expect(
-      screen.getByText(
-        /down payment is reference-only and is not included in spendguard analysis until the finance model supports it/i
-      )
+      screen.getByText(/down payment is included in the savings-after-purchase check/i)
     ).toBeVisible();
 
     await user.clear(screen.getByLabelText(/product name/i));
@@ -235,7 +233,7 @@ describe("VoicePurchaseChecker", () => {
     expect(within(review).queryByText("₱0")).not.toBeInTheDocument();
   });
 
-  it("maps only PurchaseInput fields, awaits analysis, and then navigates to the result", async () => {
+  it("maps reviewed PurchaseInput fields, awaits analysis, and then navigates to the result", async () => {
     const user = userEvent.setup();
     let resolveAnalysis: (value: unknown) => void = () => {};
     const analysis = new Promise((resolve) => {
@@ -262,10 +260,10 @@ describe("VoicePurchaseChecker", () => {
       amount: 170000,
       urgency: "can_wait",
       paymentMethod: "installment",
+      downPayment: 50000,
       installmentMonths: 24,
       monthlyPayment: 6000,
     });
-    expect(onRunCheck.mock.calls[0][0]).not.toHaveProperty("downPayment");
     expect(pushSpy).not.toHaveBeenCalled();
 
     resolveAnalysis({});

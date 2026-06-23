@@ -96,8 +96,10 @@ export function useFinancialState() {
       const checkWithoutIdentity: Omit<PurchaseCheck, "id" | "createdAt"> = {
         ...purchase,
         decision: result.decision,
+        riskScore: result.riskScore,
         safeToSpend: result.safeToSpend,
         monthlyFreeCashFlow: result.monthlyFreeCashFlow,
+        savingsAfterPurchase: result.savingsAfterPurchase,
         cooldownDays: result.cooldownDays,
         advisorText,
         reasons: result.reasons,

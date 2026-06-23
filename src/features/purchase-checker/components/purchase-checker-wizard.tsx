@@ -17,6 +17,7 @@ interface PurchaseCheckerWizardProps {
 }
 
 type IncomeGenerationChoice = "yes" | "no" | "";
+type AlternativeWorksChoice = "yes" | "no" | "";
 
 interface PurchaseWizardValues {
   itemName: string;
@@ -25,6 +26,7 @@ interface PurchaseWizardValues {
   reason: string;
   urgency: PurchaseUrgency;
   alternative: string;
+  currentAlternativeWorks: AlternativeWorksChoice;
   incomeGeneration: IncomeGenerationChoice;
   paymentMethod: PaymentMethod;
   downPayment?: number;
@@ -45,6 +47,7 @@ const errorIds: Record<keyof PurchaseWizardValues, string> = {
   reason: "purchase-reason-error",
   urgency: "purchase-urgency-error",
   alternative: "purchase-alternative-error",
+  currentAlternativeWorks: "purchase-current-alternative-error",
   incomeGeneration: "purchase-income-generation-error",
   paymentMethod: "purchase-payment-method-error",
   downPayment: "purchase-down-payment-error",
@@ -105,11 +108,18 @@ function buildPurchaseInput(values: PurchaseWizardValues): PurchaseInput {
     amount: values.amount,
     urgency: values.urgency,
     paymentMethod: values.paymentMethod,
+    currentAlternativeStillWorks: values.currentAlternativeWorks === "yes",
+    isIncomeGenerating: values.incomeGeneration === "yes",
   };
 
   if (isFinancedPaymentMethod(values.paymentMethod)) {
+    const downPayment = positiveNumberOrUndefined(values.downPayment);
     const installmentMonths = positiveNumberOrUndefined(values.installmentMonths);
     const monthlyPayment = positiveNumberOrUndefined(values.monthlyPayment);
+
+    if (downPayment) {
+      purchase.downPayment = downPayment;
+    }
 
     if (installmentMonths) {
       purchase.installmentMonths = installmentMonths;
@@ -144,6 +154,7 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
       reason: "",
       urgency: "want",
       alternative: "",
+      currentAlternativeWorks: "",
       incomeGeneration: "",
       paymentMethod: "cash",
       downPayment: undefined,
@@ -186,6 +197,10 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
 
     if (!values.alternative.trim()) {
       nextErrors.alternative = "Add the best alternative.";
+    }
+
+    if (!values.currentAlternativeWorks) {
+      nextErrors.currentAlternativeWorks = "Choose whether the current alternative still works.";
     }
 
     if (!values.incomeGeneration) {
@@ -386,6 +401,35 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
                   <FieldErrorText id={errorIds.alternative}>{errors.alternative}</FieldErrorText>
                 </div>
               </div>
+
+              <fieldset
+                aria-describedby={
+                  errors.currentAlternativeWorks ? errorIds.currentAlternativeWorks : undefined
+                }
+                aria-invalid={errors.currentAlternativeWorks ? "true" : undefined}
+                className="grid gap-3"
+              >
+                <legend className="text-xs font-semibold uppercase tracking-normal text-slate-600">
+                  Current alternative
+                </legend>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <RadioCard
+                    description="The current option can still cover the need."
+                    label="Yes, it still works"
+                    value="yes"
+                    {...register("currentAlternativeWorks")}
+                  />
+                  <RadioCard
+                    description="The current option no longer covers the need."
+                    label="No, it does not work"
+                    value="no"
+                    {...register("currentAlternativeWorks")}
+                  />
+                </div>
+                <FieldErrorText id={errorIds.currentAlternativeWorks}>
+                  {errors.currentAlternativeWorks}
+                </FieldErrorText>
+              </fieldset>
 
               <fieldset
                 aria-describedby={

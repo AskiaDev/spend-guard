@@ -3,12 +3,14 @@ import { createLiteRtAdvice } from "./litert-lm";
 
 const result = {
   decision: "WAIT" as const,
+  riskScore: 60,
   safeToSpend: 10_000,
   monthlyFreeCashFlow: 20_000,
   emergencyProgress: 0.5,
   debtPressure: 0.1,
   goalDelayMonths: 2,
   cooldownDays: 14,
+  savingsAfterPurchase: 5_000,
   healthScore: 60,
   reasons: ["The purchase exceeds safe-to-spend."],
 };

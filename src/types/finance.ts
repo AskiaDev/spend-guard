@@ -65,16 +65,21 @@ export interface PurchaseInput {
   amount: number;
   urgency: PurchaseUrgency;
   paymentMethod: PaymentMethod;
+  downPayment?: number;
   installmentMonths?: number;
   monthlyPayment?: number;
+  isIncomeGenerating?: boolean;
+  currentAlternativeStillWorks?: boolean;
 }
 
 export interface PurchaseCheck extends PurchaseInput {
   id: string;
   createdAt: string;
   decision: PurchaseDecision;
+  riskScore: number;
   safeToSpend: number;
   monthlyFreeCashFlow: number;
+  savingsAfterPurchase: number;
   cooldownDays: number;
   advisorText: string;
   reasons: string[];
@@ -116,12 +121,14 @@ export interface FinancialWorkspace {
 
 export interface PurchaseDecisionResult {
   decision: PurchaseDecision;
+  riskScore: number;
   safeToSpend: number;
   monthlyFreeCashFlow: number;
   emergencyProgress: number;
   debtPressure: number;
   goalDelayMonths: number;
   cooldownDays: number;
+  savingsAfterPurchase: number;
   healthScore: number;
   reasons: string[];
 }

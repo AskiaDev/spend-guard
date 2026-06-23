@@ -35,6 +35,7 @@ async function completeStepTwo(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/reason for purchase/i), "work and family photos");
   await user.selectOptions(screen.getByLabelText(/urgency/i), "can_wait");
   await user.type(screen.getByLabelText(/best alternative/i), "keep current phone");
+  await user.click(screen.getByRole("radio", { name: /yes, it still works/i }));
   await user.click(screen.getByRole("radio", { name: /no, this is personal use/i }));
   await user.click(screen.getByRole("button", { name: /continue/i }));
 }
@@ -125,7 +126,7 @@ describe("PurchaseCheckerWizard", () => {
     expect(screen.queryByRole("heading", { name: /payment/i })).not.toBeInTheDocument();
   });
 
-  it("preserves reason, urgency, alternative, and income-generation choices across steps", async () => {
+  it("preserves reason, urgency, alternative, current-alternative, and income-generation choices across steps", async () => {
     const user = userEvent.setup();
 
     render(<PurchaseCheckerWizard onRunCheck={vi.fn()} />);
@@ -134,6 +135,7 @@ describe("PurchaseCheckerWizard", () => {
     await user.type(screen.getByLabelText(/reason for purchase/i), "work and family photos");
     await user.selectOptions(screen.getByLabelText(/urgency/i), "can_wait");
     await user.type(screen.getByLabelText(/best alternative/i), "keep current phone");
+    await user.click(screen.getByRole("radio", { name: /yes, it still works/i }));
     await user.click(screen.getByRole("radio", { name: /no, this is personal use/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
@@ -144,6 +146,7 @@ describe("PurchaseCheckerWizard", () => {
     expect(screen.getByLabelText(/reason for purchase/i)).toHaveValue("work and family photos");
     expect(screen.getByLabelText(/urgency/i)).toHaveValue("can_wait");
     expect(screen.getByLabelText(/best alternative/i)).toHaveValue("keep current phone");
+    expect(screen.getByRole("radio", { name: /yes, it still works/i })).toBeChecked();
     expect(screen.getByRole("radio", { name: /no, this is personal use/i })).toBeChecked();
   });
 
@@ -155,6 +158,7 @@ describe("PurchaseCheckerWizard", () => {
     await completeStepOne(user);
     await user.type(screen.getByLabelText(/reason for purchase/i), "work and family photos");
     await user.type(screen.getByLabelText(/best alternative/i), "keep current phone");
+    await user.click(screen.getByRole("radio", { name: /yes, it still works/i }));
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
     const incomeGroup = screen.getByRole("group", { name: /income generation/i });
@@ -162,6 +166,28 @@ describe("PurchaseCheckerWizard", () => {
     const describedBy = incomeGroup.getAttribute("aria-describedby");
 
     expect(incomeGroup).toHaveAttribute("aria-invalid", "true");
+    expect(error).toBeVisible();
+    expect(error).toHaveAttribute("id");
+    expect(error.id).not.toBe("");
+    expect(describedBy?.split(/\s+/)).toContain(error.id);
+  });
+
+  it("links current-alternative validation to the radio group", async () => {
+    const user = userEvent.setup();
+
+    render(<PurchaseCheckerWizard onRunCheck={vi.fn()} />);
+
+    await completeStepOne(user);
+    await user.type(screen.getByLabelText(/reason for purchase/i), "work and family photos");
+    await user.type(screen.getByLabelText(/best alternative/i), "keep current phone");
+    await user.click(screen.getByRole("radio", { name: /no, this is personal use/i }));
+    await user.click(screen.getByRole("button", { name: /continue/i }));
+
+    const alternativeGroup = screen.getByRole("group", { name: /current alternative/i });
+    const error = screen.getByText(/choose whether the current alternative still works/i);
+    const describedBy = alternativeGroup.getAttribute("aria-describedby");
+
+    expect(alternativeGroup).toHaveAttribute("aria-invalid", "true");
     expect(error).toBeVisible();
     expect(error).toHaveAttribute("id");
     expect(error.id).not.toBe("");
@@ -226,6 +252,8 @@ describe("PurchaseCheckerWizard", () => {
       urgency: "can_wait",
       paymentMethod: "loan",
       monthlyPayment: 4500,
+      currentAlternativeStillWorks: true,
+      isIncomeGenerating: false,
     });
     expect(pushSpy).not.toHaveBeenCalled();
 
@@ -253,6 +281,8 @@ describe("PurchaseCheckerWizard", () => {
       amount: 170000,
       urgency: "can_wait",
       paymentMethod: "cash",
+      currentAlternativeStillWorks: true,
+      isIncomeGenerating: false,
     });
   });
 
@@ -279,8 +309,11 @@ describe("PurchaseCheckerWizard", () => {
       amount: 170000,
       urgency: "can_wait",
       paymentMethod: "installment",
+      downPayment: 26000,
       installmentMonths: 24,
       monthlyPayment: 6000,
+      currentAlternativeStillWorks: true,
+      isIncomeGenerating: false,
     });
     expect(pushSpy).not.toHaveBeenCalled();
 

@@ -17,14 +17,19 @@ describe("savePurchaseCheck", () => {
       itemName: "Phone",
       amount: 25_000,
       urgency: "can_wait" as const,
-      paymentMethod: "cash" as const,
+      paymentMethod: "installment" as const,
+      downPayment: 5_000,
+      isIncomeGenerating: true,
+      currentAlternativeStillWorks: false,
     };
     const check = {
       ...purchase,
       decision: "WAIT" as const,
+      riskScore: 50,
       safeToSpend: 20_000,
       monthlyFreeCashFlow: 30_000,
-      cooldownDays: 21,
+      savingsAfterPurchase: 15_000,
+      cooldownDays: 7,
       advisorText: "Wait before buying.",
       reasons: ["This would exceed today's safe-to-spend amount."],
     };
@@ -40,6 +45,12 @@ describe("savePurchaseCheck", () => {
       expect.objectContaining({
         user_id: "user-1",
         item_name: "Phone",
+        down_payment: 5_000,
+        is_income_generating: true,
+        current_alternative_still_works: false,
+        risk_score: 50,
+        savings_after_purchase: 15_000,
+        cooldown_days: 7,
       })
     );
   });

@@ -120,7 +120,7 @@ describe("useFinancialState Supabase mode", () => {
     expect(savedCheck?.check.id).toBe("4fd8e28f-798a-4d71-b279-3ea9473c9ba3");
     expect(actions.saveCheck).toHaveBeenCalledWith(
       expect.objectContaining({ itemName: "Phone" }),
-      expect.objectContaining({ decision: "WAIT", cooldownDays: 21 })
+      expect.objectContaining({ decision: "WAIT", cooldownDays: 7 })
     );
 
     await act(async () => {
@@ -183,8 +183,10 @@ describe("useFinancialState Supabase mode", () => {
       paymentMethod: "cash" as const,
       createdAt: "2026-06-20T02:00:00.000Z",
       decision: "WAIT" as const,
+      riskScore: 50,
       safeToSpend: 0,
       monthlyFreeCashFlow: 0,
+      savingsAfterPurchase: 0,
       cooldownDays: 30,
       advisorText: "Wait.",
       reasons: ["This would exceed today's safe-to-spend amount."],
