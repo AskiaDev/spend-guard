@@ -37,7 +37,8 @@ export async function createCooldownItemAction(
     });
 
     if (error) {
-      return { ok: false, error: error.message };
+      console.error("Unable to create Supabase cooldown item", error);
+      return { ok: false, error: "Unable to add this cooldown item." };
     }
 
     return { ok: true, data: null };
@@ -45,6 +46,33 @@ export async function createCooldownItemAction(
     return {
       ok: false,
       error: error instanceof Error ? error.message : "Unable to create cooldown item.",
+    };
+  }
+}
+
+export async function deleteCooldownItemAction(id: string): Promise<ActionResult<null>> {
+  if (!id) {
+    return { ok: false, error: "Cooldown item ID is required." };
+  }
+
+  try {
+    const { supabase, userId } = await requireUserId();
+    const { error } = await supabase
+      .from("cooldown_items")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", userId);
+
+    if (error) {
+      console.error("Unable to delete Supabase cooldown item", error);
+      return { ok: false, error: "Unable to remove this cooldown item." };
+    }
+
+    return { ok: true, data: null };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Unable to remove cooldown item.",
     };
   }
 }

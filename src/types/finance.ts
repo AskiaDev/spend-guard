@@ -93,6 +93,13 @@ export interface FinancialSnapshot {
   goals: Goal[];
 }
 
+export interface FinancialWorkspace {
+  snapshot: FinancialSnapshot;
+  checks: PurchaseCheck[];
+  cooldownItems: CooldownItem[];
+  weeklyReports: WeeklyReport[];
+}
+
 export interface PurchaseDecisionResult {
   decision: PurchaseDecision;
   safeToSpend: number;

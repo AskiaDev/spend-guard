@@ -1,6 +1,6 @@
 # SpendGuard
 
-SpendGuard is a local-first Next.js MVP for answering one question: “Can I buy this?”
+SpendGuard is a Supabase-backed Next.js MVP for answering one question: “Can I buy this?”
 
 The product uses deterministic finance calculations for affordability. Advisory text is generated from a rule-based fallback, with an optional LiteRT-LM browser adapter that never changes the decision.
 
@@ -9,7 +9,6 @@ The product uses deterministic finance calculations for affordability. Advisory 
 - Next.js App Router with TypeScript
 - Tailwind CSS and shadcn-style local UI components
 - React Hook Form and Zod
-- Dexie for local browser persistence
 - Supabase Auth/Postgres schema and RLS migrations
 - Vitest, Testing Library, and Playwright
 
@@ -22,7 +21,7 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-Supabase is optional for local MVP usage. Without Supabase env vars, the app runs in local mode with Dexie persistence.
+Supabase is required. Without Supabase environment variables, the app shows an auth configuration notice and does not run a local persistence fallback. All app data is loaded from and saved to the authenticated user's Supabase rows.
 
 ```bash
 cp .env.example .env.local
@@ -47,6 +46,16 @@ supabase db reset
 
 The migration enables RLS on all user-owned tables. Server actions derive `user.id` from Supabase Auth and do not accept client-supplied `user_id` values.
 
+### Authentication setup
+
+In Supabase **Authentication > URL Configuration**, set:
+
+- Site URL: `http://localhost:3000`
+- Redirect URL: `http://localhost:3000/auth/confirm`
+- Add the equivalent production `/auth/confirm` URL before deployment.
+
+Keep the Email provider enabled. With email confirmation enabled, signup displays a check-email message; the confirmation link establishes the cookie session and redirects to the dashboard. Login and signup errors are displayed in the form.
+
 ## Scripts
 
 ```bash
@@ -65,9 +74,16 @@ Install Playwright browsers if needed:
 npx playwright install chromium
 ```
 
+`npm run e2e` uses real Supabase auth and data. Set these for a disposable confirmed test account before running it:
+
+```bash
+E2E_SUPABASE_EMAIL=
+E2E_SUPABASE_PASSWORD=
+```
+
 ## Notes
 
 - Default currency is PHP and can be changed in the profile.
 - Voice analysis is blocked until extracted fields are confirmed.
 - LiteRT-LM is optional and only used when a compatible browser runtime is present.
-- Remote Supabase persistence is available through server actions; the MVP UI currently remains local-first unless those actions are wired into the screens.
+- Accounts load and save profiles, expenses, debts, goals, purchase checks, cooldown items, weekly reports, and confirmed voice sessions through authenticated server actions.

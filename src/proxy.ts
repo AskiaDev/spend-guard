@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { env } from "@/config/env";
+import { getAuthRedirect } from "@/features/auth/api/auth-routing";
 import type { Database } from "@/types/database";
 
 export async function proxy(request: NextRequest) {
@@ -29,7 +30,16 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const redirectPath = getAuthRedirect(request.nextUrl.pathname, Boolean(user));
+
+  if (redirectPath) {
+    const redirectResponse = NextResponse.redirect(new URL(redirectPath, request.url));
+    response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
+    return redirectResponse;
+  }
 
   return response;
 }

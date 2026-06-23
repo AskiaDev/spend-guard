@@ -29,7 +29,8 @@ export async function createGoalAction(input: unknown): Promise<ActionResult<nul
     });
 
     if (error) {
-      return { ok: false, error: error.message };
+      console.error("Unable to create Supabase goal", error);
+      return { ok: false, error: "Unable to create this goal." };
     }
 
     return { ok: true, data: null };
@@ -37,6 +38,29 @@ export async function createGoalAction(input: unknown): Promise<ActionResult<nul
     return {
       ok: false,
       error: error instanceof Error ? error.message : "Unable to create goal.",
+    };
+  }
+}
+
+export async function deleteGoalAction(id: string): Promise<ActionResult<null>> {
+  if (!id) {
+    return { ok: false, error: "Goal ID is required." };
+  }
+
+  try {
+    const { supabase, userId } = await requireUserId();
+    const { error } = await supabase.from("goals").delete().eq("id", id).eq("user_id", userId);
+
+    if (error) {
+      console.error("Unable to delete Supabase goal", error);
+      return { ok: false, error: "Unable to delete this goal." };
+    }
+
+    return { ok: true, data: null };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Unable to delete goal.",
     };
   }
 }

@@ -3,14 +3,23 @@
 import { addDays, addMonths, startOfWeek } from "date-fns";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  createCooldownItemAction,
+  deleteCooldownItemAction,
+} from "@/features/cooldown/api/create-cooldown-item";
+import { loadFinancialWorkspaceAction } from "@/features/financial-profile/api/load-financial-workspace";
+import { saveFinancialProfileAction } from "@/features/financial-profile/api/save-financial-profile";
+import { createGoalAction, deleteGoalAction } from "@/features/goals/api/create-goal";
+import { savePurchaseCheckAction } from "@/features/purchase-checker/api/save-purchase-check";
+import { saveVoiceSessionAction } from "@/features/purchase-checker/api/save-voice-session";
+import { createWeeklyReportAction } from "@/features/reports/api/create-weekly-report";
+import {
   calculateFinancialHealthScore,
   calculateMonthlyFreeCashFlow,
   calculatePurchaseDecision,
   calculateSafeToSpend,
 } from "@/lib/calculations/purchase-decision";
 import { createAdvisorText } from "@/lib/advisor";
-import { defaultSnapshot } from "@/lib/storage/default-data";
-import { getLocalDatabase } from "@/lib/storage/local-database";
+import { emptySnapshot } from "@/lib/storage/default-data";
 import { createId, toIsoDate } from "@/lib/utils";
 import type {
   CooldownItem,
@@ -21,6 +30,7 @@ import type {
   Goal,
   PurchaseCheck,
   PurchaseInput,
+  VoicePurchaseDraft,
   WeeklyReport,
 } from "@/types/finance";
 
@@ -32,57 +42,28 @@ interface OnboardingPayload {
 }
 
 export function useFinancialState() {
-  const [snapshot, setSnapshot] = useState<FinancialSnapshot>(defaultSnapshot);
+  const [snapshot, setSnapshot] = useState<FinancialSnapshot>(() => emptySnapshot);
   const [checks, setChecks] = useState<PurchaseCheck[]>([]);
   const [cooldownItems, setCooldownItems] = useState<CooldownItem[]>([]);
   const [weeklyReports, setWeeklyReports] = useState<WeeklyReport[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    const db = getLocalDatabase();
-    const [profile, expenses, debts, goals, savedChecks, savedCooldown, savedReports] =
-      await Promise.all([
-        db.profiles.get("local"),
-        db.expenses.toArray(),
-        db.debts.toArray(),
-        db.goals.toArray(),
-        db.purchaseChecks.orderBy("createdAt").reverse().toArray(),
-        db.cooldownItems.orderBy("recheckAt").toArray(),
-        db.weeklyReports.orderBy("createdAt").reverse().toArray(),
-      ]);
+    setError(null);
 
-    if (!profile) {
-      await db.transaction(
-        "rw",
-        db.profiles,
-        db.expenses,
-        db.debts,
-        db.goals,
-        async () => {
-          await db.profiles.put({ id: "local", ...defaultSnapshot.profile });
-          await db.expenses.bulkPut(defaultSnapshot.expenses);
-          await db.debts.bulkPut(defaultSnapshot.debts);
-          await db.goals.bulkPut(defaultSnapshot.goals);
-        }
-      );
-      setSnapshot(defaultSnapshot);
-    } else {
-      setSnapshot({
-        profile: {
-          currency: profile.currency,
-          monthlyIncome: profile.monthlyIncome,
-          currentSavings: profile.currentSavings,
-          emergencyFundTarget: profile.emergencyFundTarget,
-        },
-        expenses,
-        debts,
-        goals,
-      });
+    const result = await loadFinancialWorkspaceAction();
+
+    if (!result.ok) {
+      setError(result.error);
+      setIsHydrated(true);
+      return;
     }
 
-    setChecks(savedChecks);
-    setCooldownItems(savedCooldown);
-    setWeeklyReports(savedReports);
+    setSnapshot(result.data.snapshot);
+    setChecks(result.data.checks);
+    setCooldownItems(result.data.cooldownItems);
+    setWeeklyReports(result.data.weeklyReports);
     setIsHydrated(true);
   }, []);
 
@@ -96,23 +77,13 @@ export function useFinancialState() {
 
   const replaceFinancialSetup = useCallback(
     async ({ profile, expenses, debts, goals }: OnboardingPayload) => {
-      const db = getLocalDatabase();
-      await db.transaction(
-        "rw",
-        db.profiles,
-        db.expenses,
-        db.debts,
-        db.goals,
-        async () => {
-          await db.profiles.put({ id: "local", ...profile });
-          await db.expenses.clear();
-          await db.debts.clear();
-          await db.goals.clear();
-          await db.expenses.bulkPut(expenses);
-          await db.debts.bulkPut(debts);
-          await db.goals.bulkPut(goals);
-        }
-      );
+      const result = await saveFinancialProfileAction({ profile, expenses, debts, goals });
+
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+
       await refresh();
     },
     [refresh]
@@ -122,9 +93,7 @@ export function useFinancialState() {
     async (purchase: PurchaseInput) => {
       const result = calculatePurchaseDecision(snapshot, purchase);
       const advisorText = await createAdvisorText(result, purchase);
-      const check: PurchaseCheck = {
-        id: createId("check"),
-        createdAt: new Date().toISOString(),
+      const checkWithoutIdentity: Omit<PurchaseCheck, "id" | "createdAt"> = {
         ...purchase,
         decision: result.decision,
         safeToSpend: result.safeToSpend,
@@ -134,7 +103,19 @@ export function useFinancialState() {
         reasons: result.reasons,
       };
 
-      await getLocalDatabase().purchaseChecks.put(check);
+      const saved = await savePurchaseCheckAction(purchase, checkWithoutIdentity);
+
+      if (!saved.ok) {
+        setError(saved.error);
+        throw new Error(saved.error);
+      }
+
+      const check: PurchaseCheck = {
+        ...checkWithoutIdentity,
+        id: saved.data.id,
+        createdAt: saved.data.createdAt,
+      };
+
       await refresh();
       return { check, result };
     },
@@ -153,7 +134,13 @@ export function useFinancialState() {
         priority: check.urgency === "need_now" ? "high" : "medium",
       };
 
-      await getLocalDatabase().goals.put(goal);
+      const result = await createGoalAction(goal);
+
+      if (!result.ok) {
+        setError(result.error);
+        return undefined;
+      }
+
       await refresh();
       return goal;
     },
@@ -174,7 +161,20 @@ export function useFinancialState() {
         recheckAt: addDays(new Date(), days).toISOString(),
       };
 
-      await getLocalDatabase().cooldownItems.put(item);
+      const result = await createCooldownItemAction({
+        itemName: item.itemName,
+        amount: item.amount,
+        urgency: item.urgency,
+        paymentMethod: item.paymentMethod,
+        sourceCheckId: item.sourceCheckId,
+        recheckAt: item.recheckAt,
+      });
+
+      if (!result.ok) {
+        setError(result.error);
+        return undefined;
+      }
+
       await refresh();
       return item;
     },
@@ -183,7 +183,13 @@ export function useFinancialState() {
 
   const removeCooldownItem = useCallback(
     async (id: string) => {
-      await getLocalDatabase().cooldownItems.delete(id);
+      const result = await deleteCooldownItemAction(id);
+
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+
       await refresh();
     },
     [refresh]
@@ -191,7 +197,13 @@ export function useFinancialState() {
 
   const deleteGoal = useCallback(
     async (id: string) => {
-      await getLocalDatabase().goals.delete(id);
+      const result = await deleteGoalAction(id);
+
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+
       await refresh();
     },
     [refresh]
@@ -209,10 +221,33 @@ export function useFinancialState() {
       summary: `Health score is ${healthScore}/100. Safe-to-spend is ${snapshot.profile.currency} ${safeToSpend.toLocaleString()}. You ran ${checks.length} purchase checks so far.`,
     };
 
-    await getLocalDatabase().weeklyReports.put(report);
+    const result = await createWeeklyReportAction({
+      weekStart: report.weekStart,
+      summary: report.summary,
+      healthScore: report.healthScore,
+      safeToSpend: report.safeToSpend,
+    });
+
+    if (!result.ok) {
+      setError(result.error);
+      return report;
+    }
+
     await refresh();
     return report;
   }, [checks.length, refresh, snapshot]);
+
+  const confirmVoiceDraft = useCallback(
+    async (draft: VoicePurchaseDraft) => {
+      const { transcript, ...extractedFields } = draft;
+      const result = await saveVoiceSessionAction({ transcript, extractedFields });
+
+      if (!result.ok) {
+        setError(result.error);
+      }
+    },
+    []
+  );
 
   const metrics = useMemo(
     () => ({
@@ -229,6 +264,7 @@ export function useFinancialState() {
     cooldownItems,
     weeklyReports,
     isHydrated,
+    error,
     metrics,
     replaceFinancialSetup,
     runPurchaseCheck,
@@ -237,5 +273,7 @@ export function useFinancialState() {
     removeCooldownItem,
     deleteGoal,
     generateWeeklyReport,
+    confirmVoiceDraft,
+    refresh,
   };
 }

@@ -30,6 +30,7 @@ interface PurchaseCheckerPanelProps {
   }>;
   onAddGoal: (check: PurchaseCheck) => Promise<unknown>;
   onAddCooldown: (check: PurchaseCheck) => Promise<unknown>;
+  onConfirmVoiceDraft: (draft: VoicePurchaseDraft) => Promise<void>;
 }
 
 const decisionTone = {
@@ -48,6 +49,7 @@ export function PurchaseCheckerPanel({
   onRunCheck,
   onAddGoal,
   onAddCooldown,
+  onConfirmVoiceDraft,
 }: PurchaseCheckerPanelProps) {
   const [activeCheck, setActiveCheck] = useState<PurchaseCheck | undefined>(latestCheck);
   const [voiceTranscript, setVoiceTranscript] = useState("");
@@ -93,7 +95,7 @@ export function PurchaseCheckerPanel({
     setVoiceMessage("Review the extracted fields before analysis.");
   }
 
-  function confirmVoiceDraft() {
+  async function confirmVoiceDraft() {
     if (!voiceDraft) {
       return;
     }
@@ -107,6 +109,7 @@ export function PurchaseCheckerPanel({
     }
     if (voiceDraft.installmentMonths) setValue("installmentMonths", voiceDraft.installmentMonths);
     if (voiceDraft.monthlyPayment) setValue("monthlyPayment", voiceDraft.monthlyPayment);
+    await onConfirmVoiceDraft(voiceDraft);
     setVoiceMessage("Fields copied to the purchase form.");
   }
 
@@ -154,7 +157,7 @@ export function PurchaseCheckerPanel({
                 Deterministic affordability check with optional advisory wording.
               </p>
             </div>
-            <Badge tone="zinc">local analysis</Badge>
+            <Badge tone="zinc">deterministic</Badge>
           </div>
         </CardHeader>
         <CardContent>
@@ -267,7 +270,11 @@ export function PurchaseCheckerPanel({
                   <span className="font-medium text-zinc-950">{voiceDraft.paymentMethod}</span>
                 </div>
               </div>
-              <Button type="button" className="mt-4 w-full" onClick={confirmVoiceDraft}>
+              <Button
+                type="button"
+                className="mt-4 w-full"
+                onClick={() => void confirmVoiceDraft()}
+              >
                 Confirm fields
               </Button>
             </div>

@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { defaultSnapshot } from "@/lib/storage/default-data";
+import { financialSnapshotFixture } from "@/test/fixtures/financial-snapshot";
 import { OnboardingSetup } from "./onboarding-setup";
 
 describe("OnboardingSetup", () => {
@@ -10,7 +10,7 @@ describe("OnboardingSetup", () => {
     const onSave = vi.fn();
 
     render(
-      <OnboardingSetup snapshot={defaultSnapshot} isHydrated={true} onSave={onSave} />
+      <OnboardingSetup snapshot={financialSnapshotFixture} isHydrated={true} onSave={onSave} />
     );
 
     const income = screen.getByLabelText(/monthly income/i);
@@ -27,7 +27,7 @@ describe("OnboardingSetup", () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
 
     render(
-      <OnboardingSetup snapshot={defaultSnapshot} isHydrated={true} onSave={onSave} />
+      <OnboardingSetup snapshot={financialSnapshotFixture} isHydrated={true} onSave={onSave} />
     );
 
     await user.click(screen.getByRole("button", { name: /save profile/i }));

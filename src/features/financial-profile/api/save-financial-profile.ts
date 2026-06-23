@@ -34,23 +34,35 @@ export async function saveFinancialProfileAction(
     const { supabase, userId } = await requireUserId();
     const { profile, expenses, debts, goals } = parsed.data;
 
-    const profileResult = await supabase.from("profiles").upsert({
-      user_id: userId,
-      currency: profile.currency,
-      monthly_income: profile.monthlyIncome,
-      current_savings: profile.currentSavings,
-      emergency_fund_target: profile.emergencyFundTarget,
-    });
+    const profileResult = await supabase
+      .from("profiles")
+      .upsert(
+        {
+          user_id: userId,
+          currency: profile.currency,
+          monthly_income: profile.monthlyIncome,
+          current_savings: profile.currentSavings,
+          emergency_fund_target: profile.emergencyFundTarget,
+        },
+        { onConflict: "user_id" }
+      );
 
     if (profileResult.error) {
-      return { ok: false, error: profileResult.error.message };
+      console.error("Unable to save Supabase profile", profileResult.error);
+      return { ok: false, error: "Unable to save your financial profile." };
     }
 
-    await Promise.all([
+    const deletions = await Promise.all([
       supabase.from("expenses").delete().eq("user_id", userId),
       supabase.from("debts").delete().eq("user_id", userId),
       supabase.from("goals").delete().eq("user_id", userId),
     ]);
+    const deletionError = deletions.find((result) => result.error)?.error;
+
+    if (deletionError) {
+      console.error("Unable to replace Supabase financial setup", deletionError);
+      return { ok: false, error: "Unable to replace your financial setup." };
+    }
 
     const inserts = await Promise.all([
       expenses.length
@@ -93,7 +105,8 @@ export async function saveFinancialProfileAction(
 
     const error = inserts.find((result) => result.error)?.error;
     if (error) {
-      return { ok: false, error: error.message };
+      console.error("Unable to create Supabase financial setup rows", error);
+      return { ok: false, error: "Unable to save your financial setup." };
     }
 
     return { ok: true, data: null };

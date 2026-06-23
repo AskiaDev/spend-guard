@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { AuthStatus } from "@/features/auth";
+import { signOutAction } from "@/features/auth/api/actions";
 import { CooldownPanel } from "@/features/cooldown";
 import { DashboardOverview } from "@/features/dashboard";
 import { GoalsPanel } from "@/features/goals";
@@ -31,7 +32,7 @@ const tabs: Array<{ id: TabId; label: string; icon: React.ReactNode }> = [
   { id: "reports", label: "Reports", icon: <FileText className="size-4" /> },
 ];
 
-export function SpendGuardClient() {
+export function SpendGuardClient({ userEmail }: { userEmail: string }) {
   const [activeTab, setActiveTab] = useState<TabId>("dashboard");
   const state = useFinancialState();
   const latestCheck = state.checks[0];
@@ -53,7 +54,7 @@ export function SpendGuardClient() {
               </div>
             </div>
             <div className="hidden lg:mt-8 lg:block">
-              <AuthStatus />
+              <AuthStatus email={userEmail} signOutAction={signOutAction} />
             </div>
           </div>
           <nav className="mt-4 grid grid-flow-col gap-2 overflow-x-auto lg:mt-8 lg:grid-flow-row lg:overflow-visible">
@@ -85,13 +86,13 @@ export function SpendGuardClient() {
               </h1>
             </div>
             <div className="lg:hidden">
-              <AuthStatus />
+              <AuthStatus email={userEmail} signOutAction={signOutAction} />
             </div>
           </header>
 
           {!state.isHydrated ? (
             <div className="rounded-lg border border-zinc-200 bg-white p-8 text-sm text-zinc-600">
-              Loading local financial workspace...
+              Loading financial workspace...
             </div>
           ) : null}
 
@@ -101,6 +102,15 @@ export function SpendGuardClient() {
               checks={state.checks}
               metrics={state.metrics}
             />
+          ) : null}
+
+          {state.error ? (
+            <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+              <span>{state.error}</span>
+              <button type="button" className="font-semibold underline" onClick={() => void state.refresh()}>
+                Retry
+              </button>
+            </div>
           ) : null}
 
           {state.isHydrated && activeTab === "profile" ? (
@@ -118,6 +128,7 @@ export function SpendGuardClient() {
               onRunCheck={state.runPurchaseCheck}
               onAddGoal={state.addGoalFromCheck}
               onAddCooldown={state.addCooldownFromCheck}
+              onConfirmVoiceDraft={state.confirmVoiceDraft}
             />
           ) : null}
 

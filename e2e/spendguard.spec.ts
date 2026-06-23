@@ -1,9 +1,24 @@
 import { expect, test } from "@playwright/test";
 
-test("manual purchase check can become a goal, cooldown item, and report", async ({ page }) => {
-  await page.goto("/");
+const e2eEmail = process.env.E2E_SUPABASE_EMAIL;
+const e2ePassword = process.env.E2E_SUPABASE_PASSWORD;
 
+test.beforeEach(async ({ page }) => {
+  test.skip(
+    !e2eEmail || !e2ePassword,
+    "Set E2E_SUPABASE_EMAIL and E2E_SUPABASE_PASSWORD for a disposable confirmed Supabase test account."
+  );
+
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(e2eEmail!);
+  await page.getByLabel("Password").fill(e2ePassword!);
+  await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+});
+
+test("manual purchase check can become a goal, cooldown item, and report", async ({ page }) => {
+  const itemName = `Replacement keyboard ${Date.now()}`;
+
 
   await page.getByRole("button", { name: "Profile" }).click();
   await page.getByLabel("Monthly income").fill("90000");
@@ -15,7 +30,7 @@ test("manual purchase check can become a goal, cooldown item, and report", async
   await page.getByRole("button", { name: "Save profile" }).click();
 
   await page.getByRole("button", { name: "Can I Buy This?" }).click();
-  await page.getByLabel("Purchase").fill("Replacement keyboard");
+  await page.getByLabel("Purchase").fill(itemName);
   await page.getByLabel("Amount").fill("4500");
   await page.getByLabel("Urgency").selectOption("need_this_month");
   await page.getByRole("button", { name: "Check purchase" }).click();
@@ -29,10 +44,10 @@ test("manual purchase check can become a goal, cooldown item, and report", async
   await page.getByRole("button", { name: "Add cooldown" }).click();
 
   await page.getByRole("button", { name: "Goals" }).click();
-  await expect(page.getByText("Replacement keyboard")).toBeVisible();
+  await expect(page.getByText(itemName)).toBeVisible();
 
   await page.getByRole("button", { name: "Cooldown" }).click();
-  await expect(page.getByText("Replacement keyboard")).toBeVisible();
+  await expect(page.getByText(itemName)).toBeVisible();
 
   await page.getByRole("button", { name: "Reports" }).click();
   await page.getByRole("button", { name: "Generate report" }).click();
@@ -40,7 +55,6 @@ test("manual purchase check can become a goal, cooldown item, and report", async
 });
 
 test("voice transcript parsing requires explicit confirmation", async ({ page }) => {
-  await page.goto("/");
   await page.getByRole("button", { name: "Can I Buy This?" }).click();
 
   await page

@@ -1,15 +1,16 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { defaultSnapshot } from "@/lib/storage/default-data";
+import { financialSnapshotFixture } from "@/test/fixtures/financial-snapshot";
 import { PurchaseCheckerPanel } from "./purchase-checker-panel";
 import type { PurchaseCheck } from "@/types/finance";
 
 const props = {
-  snapshot: defaultSnapshot,
+  snapshot: financialSnapshotFixture,
   onRunCheck: vi.fn(),
   onAddGoal: vi.fn(),
   onAddCooldown: vi.fn(),
+  onConfirmVoiceDraft: vi.fn(),
 };
 
 describe("PurchaseCheckerPanel", () => {
@@ -33,8 +34,9 @@ describe("PurchaseCheckerPanel", () => {
 
   it("copies confirmed voice draft fields into the purchase form before analysis", async () => {
     const user = userEvent.setup();
+    const onConfirmVoiceDraft = vi.fn().mockResolvedValue(undefined);
 
-    render(<PurchaseCheckerPanel {...props} />);
+    render(<PurchaseCheckerPanel {...props} onConfirmVoiceDraft={onConfirmVoiceDraft} />);
 
     await user.type(
       screen.getByLabelText(/voice transcript/i),
@@ -49,6 +51,9 @@ describe("PurchaseCheckerPanel", () => {
     await waitFor(() => expect(screen.getByLabelText(/purchase/i)).toHaveValue("phone"));
     expect(screen.getByLabelText(/^amount$/i)).toHaveValue(25000);
     expect(screen.getByLabelText(/^payment$/i)).toHaveValue("installment");
+    expect(onConfirmVoiceDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ transcript: expect.stringContaining("phone for 25k") })
+    );
   });
 
   it("shows voice fallback when speech capture is unavailable", async () => {

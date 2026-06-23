@@ -36,7 +36,8 @@ export async function createWeeklyReportAction(
     });
 
     if (error) {
-      return { ok: false, error: error.message };
+      console.error("Unable to create Supabase weekly report", error);
+      return { ok: false, error: "Unable to create this weekly report." };
     }
 
     return { ok: true, data: null };

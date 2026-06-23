@@ -1,45 +1,102 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { ActionResult } from "@/types/action-result";
+import {
+  initialAuthActionState,
+  resolveSignUpResult,
+  type AuthActionState,
+} from "./auth-result";
 
-export async function signInAction(formData: FormData): Promise<ActionResult<null>> {
-  const email = String(formData.get("email") ?? "");
-  const password = String(formData.get("password") ?? "");
+const credentialsSchema = z.object({
+  email: z.email("Enter a valid email address."),
+  password: z.string().min(8, "Password must be at least 8 characters."),
+});
+
+function readCredentials(formData: FormData):
+  | { success: true; data: z.infer<typeof credentialsSchema> }
+  | { success: false; state: AuthActionState } {
+  const parsed = credentialsSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      state: {
+        status: "error",
+        message: parsed.error.issues[0]?.message ?? "Check your email and password.",
+      },
+    };
+  }
+
+  return { success: true, data: parsed.data };
+}
+
+export async function signInAction(
+  previousState: AuthActionState = initialAuthActionState,
+  formData: FormData
+): Promise<AuthActionState> {
+  void previousState;
+  const credentials = readCredentials(formData);
+
+  if (!credentials.success) {
+    return credentials.state;
+  }
 
   try {
     const supabase = await createServerSupabaseClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword(credentials.data);
 
     if (error) {
-      return { ok: false, error: error.message };
+      return { status: "error", message: error.message };
     }
   } catch (error) {
     return {
-      ok: false,
-      error: error instanceof Error ? error.message : "Unable to sign in.",
+      status: "error",
+      message: error instanceof Error ? error.message : "Unable to sign in.",
     };
   }
 
   redirect("/");
 }
 
-export async function signUpAction(formData: FormData): Promise<ActionResult<null>> {
-  const email = String(formData.get("email") ?? "");
-  const password = String(formData.get("password") ?? "");
+export async function signUpAction(
+  previousState: AuthActionState = initialAuthActionState,
+  formData: FormData
+): Promise<AuthActionState> {
+  void previousState;
+  const credentials = readCredentials(formData);
+
+  if (!credentials.success) {
+    return credentials.state;
+  }
 
   try {
+    const requestHeaders = await headers();
+    const origin = requestHeaders.get("origin") ?? "http://localhost:3000";
     const supabase = await createServerSupabaseClient();
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      ...credentials.data,
+      options: {
+        emailRedirectTo: new URL("/auth/confirm", origin).toString(),
+      },
+    });
+    const result = resolveSignUpResult({
+      errorMessage: error?.message ?? null,
+      hasSession: Boolean(data.session),
+    });
 
-    if (error) {
-      return { ok: false, error: error.message };
+    if (result.status !== "authenticated") {
+      return result;
     }
   } catch (error) {
     return {
-      ok: false,
-      error: error instanceof Error ? error.message : "Unable to sign up.",
+      status: "error",
+      message: error instanceof Error ? error.message : "Unable to sign up.",
     };
   }
 
