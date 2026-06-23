@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 export function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) {
   return (
     <label
-      className={cn("text-xs font-semibold uppercase tracking-normal text-zinc-600", className)}
+      className={cn("text-xs font-semibold uppercase tracking-normal text-slate-600", className)}
       {...props}
     />
   );
@@ -15,7 +15,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
     <input
       ref={ref}
       className={cn(
-        "h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-950 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 disabled:bg-zinc-100",
+        "h-11 w-full rounded-control border border-border bg-surface px-3 text-sm text-foreground shadow-sm outline-none transition placeholder:text-muted/70 focus:border-primary focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-muted",
         className
       )}
       {...props}
@@ -32,7 +32,7 @@ export const Textarea = React.forwardRef<
   <textarea
     ref={ref}
     className={cn(
-      "min-h-24 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-950 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100",
+      "min-h-24 w-full rounded-control border border-border bg-surface px-3 py-2.5 text-sm text-foreground shadow-sm outline-none transition placeholder:text-muted/70 focus:border-primary focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-muted",
       className
     )}
     {...props}
@@ -48,7 +48,7 @@ export const Select = React.forwardRef<
   <select
     ref={ref}
     className={cn(
-      "h-10 w-full rounded-md border border-zinc-200 bg-white px-3 text-sm text-zinc-950 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100",
+      "h-11 w-full rounded-control border border-border bg-surface px-3 text-sm text-foreground shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-muted",
       className
     )}
     {...props}
@@ -62,5 +62,5 @@ export function FieldError({ children }: { children?: React.ReactNode }) {
     return null;
   }
 
-  return <p className="text-xs font-medium text-rose-700">{children}</p>;
+  return <p className="text-xs font-medium text-risk">{children}</p>;
 }

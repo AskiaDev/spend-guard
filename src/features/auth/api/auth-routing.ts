@@ -1,5 +1,11 @@
+const PUBLIC_PATHS = new Set(["/login", "/signup"]);
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.has(pathname) || pathname.startsWith("/auth/");
+}
+
 export function getAuthRedirect(pathname: string, isAuthenticated: boolean): string | null {
-  if (!isAuthenticated && pathname === "/") {
+  if (!isAuthenticated && !isPublicPath(pathname)) {
     return "/login";
   }
 

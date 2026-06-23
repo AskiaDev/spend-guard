@@ -1,10 +1,10 @@
 import { cn } from "@/lib/utils";
 
 const tones = {
-  green: "bg-emerald-100 text-emerald-900 ring-emerald-200",
-  amber: "bg-amber-100 text-amber-900 ring-amber-200",
-  red: "bg-rose-100 text-rose-900 ring-rose-200",
-  zinc: "bg-zinc-100 text-zinc-800 ring-zinc-200",
+  green: "bg-safe/10 text-safe ring-safe/20",
+  amber: "bg-caution/10 text-caution ring-caution/20",
+  red: "bg-risk/10 text-risk ring-risk/20",
+  zinc: "bg-slate-100 text-slate-700 ring-border",
 };
 
 export function Badge({
@@ -19,7 +19,7 @@ export function Badge({
   return (
     <span
       className={cn(
-        "inline-flex h-7 items-center whitespace-nowrap rounded-md px-2.5 text-xs font-semibold ring-1",
+        "inline-flex h-7 items-center whitespace-nowrap rounded-full px-2.5 text-xs font-semibold ring-1",
         tones[tone],
         className
       )}

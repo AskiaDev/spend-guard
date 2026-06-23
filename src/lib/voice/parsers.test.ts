@@ -40,6 +40,16 @@ describe("voice and money parsers", () => {
     });
   });
 
+  it("removes the full indefinite article from a supplied-style product name", () => {
+    expect(
+      extractPurchaseFromTranscript(
+        "Can I buy an iPhone Pro Max 1TB for ₱170,000 on installment with a ₱50,000 down payment, 24 months at ₱6,000 per month? I can wait."
+      )
+    ).toMatchObject({
+      itemName: "iPhone Pro Max 1TB",
+    });
+  });
+
   it("infers non-cash payment methods and urgency phrases", () => {
     expect(extractPurchaseFromTranscript("Need now: buy a camera for 12k on credit card")).toMatchObject({
       paymentMethod: "credit_card",

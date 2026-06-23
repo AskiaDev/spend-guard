@@ -1,10 +1,16 @@
 "use client";
 
-import { FileText } from "lucide-react";
+import { ArrowUpRight, Download, FileText, Lightbulb, Sparkles } from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { useState } from "react";
+
+import { InlineNotice } from "@/components/feedback/inline-notice";
+import { ProgressRing } from "@/components/finance/progress-ring";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/utils";
-import type { FinancialSnapshot, WeeklyReport } from "@/types/finance";
+import { cn, formatCurrency } from "@/lib/utils";
+import type { CurrencyCode, FinancialSnapshot, WeeklyReport } from "@/types/finance";
 
 export function ReportsPanel({
   reports,
@@ -15,42 +21,285 @@ export function ReportsPanel({
   currency: FinancialSnapshot["profile"]["currency"];
   onGenerateReport: () => Promise<WeeklyReport>;
 }) {
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-md bg-zinc-100 text-zinc-700">
-              <FileText className="size-5" aria-hidden="true" />
-            </div>
-            <CardTitle>Weekly Reports</CardTitle>
+  const latestReport = getLatestReport(reports);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+
+  async function generateReport() {
+    setIsGenerating(true);
+    setGenerationError(null);
+
+    try {
+      await onGenerateReport();
+    } catch {
+      setGenerationError(
+        "We couldn’t generate this report. Your saved data is unchanged—please try again."
+      );
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  if (!latestReport) {
+    return (
+      <Card aria-labelledby="no-report-heading">
+        <CardContent className="grid gap-5 p-6">
+          <div className="grid max-w-2xl gap-3">
+            <p className="text-xs font-semibold uppercase tracking-normal text-primary">
+              Weekly advisor report
+            </p>
+            <h2 id="no-report-heading" className="text-2xl font-semibold text-foreground">
+              No weekly report yet
+            </h2>
+            <p className="text-sm leading-6 text-muted">
+              Generate a local weekly report from saved purchase checks and the rule-based
+              financial snapshot. Nothing leaves this browser.
+            </p>
           </div>
-          <Button type="button" variant="secondary" onClick={() => void onGenerateReport()}>
-            Generate report
+          {generationError ? (
+            <InlineNotice tone="error">{generationError}</InlineNotice>
+          ) : null}
+          <Button
+            type="button"
+            className="w-fit"
+            isLoading={isGenerating}
+            loadingText="Generating..."
+            onClick={() => void generateReport()}
+          >
+            Generate Report
           </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="grid gap-4">
-        {reports.map((report) => (
-          <article key={report.id} className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="font-semibold text-zinc-950">Week of {report.weekStart}</h3>
-              <p className="text-sm font-medium text-zinc-600">
-                {formatCurrency(report.safeToSpend, currency)} safe
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const weekRange = formatWeekRange(latestReport.weekStart);
+  const insights = buildReferenceInsights(latestReport, currency);
+
+  return (
+    <div className="grid gap-5 pb-24 lg:pb-0">
+      <Card aria-labelledby="weekly-report-heading">
+        <CardContent className="grid gap-5 p-6 lg:grid-cols-[auto_minmax(0,1fr)_10rem_auto] lg:items-center">
+          <div className="rounded-full bg-advisor p-3 text-primary">
+            <FileText aria-hidden="true" className="size-6" />
+          </div>
+          <div className="grid gap-2">
+            <p className="text-xs font-semibold uppercase tracking-normal text-primary">
+              Weekly advisor report
+            </p>
+            <h2 id="weekly-report-heading" className="text-2xl font-semibold text-foreground">
+              {weekRange}
+            </h2>
+            <p className="max-w-3xl text-sm leading-6 text-muted">{latestReport.summary}</p>
+          </div>
+          <Image
+            src="/illustrations/progress-overview.svg"
+            alt="Person reviewing a weekly progress overview"
+            width={220}
+            height={180}
+            className="hidden h-auto w-36 lg:block"
+          />
+          <Button type="button" variant="secondary" onClick={() => downloadReport(latestReport, currency)}>
+            <Download aria-hidden="true" className="size-4" />
+            Download Report
+          </Button>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card aria-labelledby="health-score-heading">
+          <CardContent className="grid min-h-64 place-items-center gap-3 text-center">
+            <div>
+              <p id="health-score-heading" className="text-xs font-semibold uppercase tracking-normal text-muted">
+                Weekly health
+              </p>
+              <p className="mt-2 text-3xl font-bold text-foreground">
+                {latestReport.healthScore}/100
               </p>
             </div>
-            <p className="mt-3 text-sm leading-6 text-zinc-700">{report.summary}</p>
-            <p className="mt-3 text-xs font-semibold uppercase tracking-normal text-zinc-500">
-              health score {report.healthScore}/100
+            <ProgressRing
+              value={latestReport.healthScore}
+              label="Weekly health score"
+              size={116}
+              strokeWidth={10}
+            />
+          </CardContent>
+        </Card>
+        <MetricCard
+          label="Good Decisions"
+          value="3"
+          detail="Checks that stayed inside current guardrails."
+        />
+        <MetricCard
+          label="Purchases Avoided"
+          value={formatCurrency(latestReport.safeToSpend, currency)}
+          detail="Safe-to-spend preserved for higher-priority needs."
+        />
+      </div>
+
+      <Card aria-labelledby="reference-insights-heading">
+        <CardHeader>
+          <CardTitle id="reference-insights-heading">Reference insights</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 lg:grid-cols-3">
+          {insights.map((insight) => (
+            <InsightCard key={insight.label} {...insight} />
+          ))}
+        </CardContent>
+      </Card>
+
+      <Card aria-labelledby="coach-tip-heading">
+        <CardContent className="grid gap-4 md:grid-cols-[auto_1fr] md:items-start">
+          <div className="grid size-11 place-items-center rounded-control bg-advisor text-primary">
+            <Lightbulb aria-hidden="true" className="size-5" />
+          </div>
+          <div className="grid gap-2">
+            <p id="coach-tip-heading" className="text-xs font-semibold uppercase tracking-normal text-primary">
+              Coach Tip
             </p>
-          </article>
-        ))}
-        {reports.length === 0 ? (
-          <p className="rounded-md border border-dashed border-zinc-300 p-5 text-sm text-zinc-600">
-            Reports use the rule-based fallback and saved purchase history.
-          </p>
-        ) : null}
+            <p className="text-sm leading-6 text-muted">
+              Keep using purchase checks before credit-card or installment decisions. The safest
+              habit is checking the monthly payment against free cash flow before you commit.
+            </p>
+            <p className="text-xs font-semibold uppercase tracking-normal text-muted">
+              Educational Tip
+            </p>
+            <p className="text-sm leading-6 text-muted">
+              A safe-to-spend number is not spare cash. It is the amount left after protecting bills,
+              debt payments, emergency savings, and active goals.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div
+        data-testid="mobile-report-cta"
+        className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 rounded-card border border-border bg-surface/95 p-3 shadow-elevated backdrop-blur lg:static lg:p-0 lg:shadow-none lg:border-0 lg:bg-transparent"
+      >
+        <Link
+          href="/checker"
+          className={cn(
+            "inline-flex h-11 w-full items-center justify-center gap-2 rounded-control bg-primary px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background lg:w-fit"
+          )}
+        >
+          Take Action
+          <ArrowUpRight aria-hidden="true" className="size-4" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <Card aria-label={`${label} card`}>
+      <CardContent className="grid min-h-64 content-between gap-5">
+        <div className="grid size-11 place-items-center rounded-control bg-advisor text-primary">
+          <Sparkles aria-hidden="true" className="size-5" />
+        </div>
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-normal text-muted">{label}</h3>
+          <p className="mt-2 text-3xl font-bold text-foreground">{value}</p>
+          <p className="mt-3 text-sm leading-6 text-muted">{detail}</p>
+        </div>
       </CardContent>
     </Card>
   );
+}
+
+function InsightCard({ label, detail }: { label: string; detail: string }) {
+  return (
+    <article className="rounded-control border border-border bg-muted/30 p-4">
+      <h3 className="text-sm font-semibold text-foreground">{label}</h3>
+      <p className="mt-2 text-sm leading-6 text-muted">{detail}</p>
+    </article>
+  );
+}
+
+function buildReferenceInsights(report: WeeklyReport, currency: CurrencyCode) {
+  return [
+    {
+      label: "Improved Items",
+      detail: "More wants are being paused before becoming payment commitments.",
+    },
+    {
+      label: "Current Risks",
+      detail: "Installment purchases still need a monthly-payment check before approval.",
+    },
+    {
+      label: "Goal Progress",
+      detail: `${formatCurrency(report.safeToSpend, currency)} remains available as a guardrail while goals continue funding.`,
+    },
+    {
+      label: "Next Best Action",
+      detail: "Run a purchase check before the next flexible purchase over your weekly threshold.",
+    },
+  ];
+}
+
+function getLatestReport(reports: WeeklyReport[]) {
+  return [...reports].sort(
+    (first, second) =>
+      new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()
+  )[0];
+}
+
+const dateComponentPattern = /^(\d{4})-(\d{2})-(\d{2})/;
+
+function parseDisplayDate(value: string) {
+  const match = dateComponentPattern.exec(value);
+
+  if (match) {
+    const [, year, month, day] = match;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  return new Date(value);
+}
+
+function formatDate(date: Date) {
+  return new Intl.DateTimeFormat("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatWeekRange(weekStart: string) {
+  const start = parseDisplayDate(weekStart);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  return `${formatDate(start)} – ${formatDate(end)}`;
+}
+
+function buildDownloadText(report: WeeklyReport, currency: CurrencyCode) {
+  return [
+    "SpendGuard Weekly Advisor Report",
+    formatWeekRange(report.weekStart),
+    "",
+    `Health score: ${report.healthScore}/100`,
+    `Safe to spend: ${formatCurrency(report.safeToSpend, currency)}`,
+    "",
+    report.summary,
+  ].join("\n");
+}
+
+function downloadReport(report: WeeklyReport, currency: CurrencyCode) {
+  if (typeof URL.createObjectURL !== "function") {
+    return;
+  }
+
+  const blob = new Blob([buildDownloadText(report, currency)], {
+    type: "text/plain;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = `spendguard-weekly-report-${report.weekStart}.txt`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
