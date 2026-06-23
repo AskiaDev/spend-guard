@@ -5,6 +5,7 @@ import type {
   CurrencyCode,
   FinancialWorkspace,
   GoalPriority,
+  PayFrequency,
   PaymentMethod,
   PurchaseDecision,
   PurchaseUrgency,
@@ -43,6 +44,13 @@ export function mapFinancialWorkspaceRows(rows: FinancialWorkspaceRows): Financi
         monthlyIncome: Number(rows.profile.monthly_income),
         currentSavings: Number(rows.profile.current_savings),
         emergencyFundTarget: Number(rows.profile.emergency_fund_target),
+        fullName: rows.profile.full_name ?? undefined,
+        payFrequency: enumValue<PayFrequency>(
+          rows.profile.pay_frequency ?? "monthly",
+          ["monthly", "semi_monthly", "biweekly", "weekly"],
+          "monthly"
+        ),
+        estimatedVariableExpenses: Number(rows.profile.estimated_variable_expenses ?? 0),
       }
     : { ...emptySnapshot.profile };
 

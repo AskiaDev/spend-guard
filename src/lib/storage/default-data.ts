@@ -6,6 +6,8 @@ export const emptySnapshot: FinancialSnapshot = {
     monthlyIncome: 0,
     currentSavings: 0,
     emergencyFundTarget: 0,
+    payFrequency: "monthly",
+    estimatedVariableExpenses: 0,
   },
   expenses: [],
   debts: [],

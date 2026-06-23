@@ -11,7 +11,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FieldError, Input, Label, Select } from "@/components/ui/form-fields";
 import { createId, formatCurrency } from "@/lib/utils";
-import type { CurrencyCode, FinancialSnapshot, GoalPriority } from "@/types/finance";
+import {
+  PAY_FREQUENCIES,
+  PAY_FREQUENCY_LABELS,
+  type CurrencyCode,
+  type FinancialSnapshot,
+  type GoalPriority,
+  type PayFrequency,
+} from "@/types/finance";
 
 interface OnboardingSetupProps {
   snapshot: FinancialSnapshot;
@@ -23,7 +30,10 @@ type StepId = "income" | "savings" | "expenses" | "debt" | "goals" | "review";
 
 interface OnboardingFormValues {
   currency: CurrencyCode;
+  fullName: string;
+  payFrequency: PayFrequency;
   monthlyIncome: number;
+  estimatedVariableExpenses: number;
   currentSavings: number;
   emergencyFundTarget: number;
   housingExpense: number;
@@ -48,10 +58,14 @@ const steps: Array<{ id: StepId; label: string; title: string }> = [
 ];
 
 const currencySchema = z.enum(["PHP", "USD", "EUR", "JPY", "SGD"]);
+const payFrequencySchema = z.enum(PAY_FREQUENCIES);
 const money = z.coerce.number().min(0, "Enter a positive amount.");
 const incomeSchema = z.object({
   currency: currencySchema,
+  fullName: z.string().trim().max(120, "Keep the name under 120 characters.").optional(),
+  payFrequency: payFrequencySchema,
   monthlyIncome: money,
+  estimatedVariableExpenses: money,
 });
 const savingsSchema = z.object({
   currentSavings: money,
@@ -83,7 +97,7 @@ const stepSchemas = [
 ] as const;
 
 const stepFieldNames: Array<Array<keyof OnboardingFormValues>> = [
-  ["currency", "monthlyIncome"],
+  ["currency", "fullName", "payFrequency", "monthlyIncome", "estimatedVariableExpenses"],
   ["currentSavings", "emergencyFundTarget"],
   ["housingExpense", "utilitiesExpense", "foodTransportExpense"],
   ["debtLabel", "debtBalance", "debtMinimumPayment"],
@@ -317,6 +331,11 @@ function IncomeStep({
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="grid gap-2">
+        <Label htmlFor="full-name">Full name</Label>
+        <Input id="full-name" autoComplete="name" {...register("fullName")} />
+        <FieldError>{errors.fullName?.message}</FieldError>
+      </div>
+      <div className="grid gap-2">
         <Label htmlFor="currency">Currency</Label>
         <Select id="currency" {...register("currency")}>
           <option value="PHP">PHP</option>
@@ -326,11 +345,27 @@ function IncomeStep({
           <option value="SGD">SGD</option>
         </Select>
       </div>
+      <div className="grid gap-2">
+        <Label htmlFor="pay-frequency">Pay frequency</Label>
+        <Select id="pay-frequency" {...register("payFrequency")}>
+          {PAY_FREQUENCIES.map((frequency) => (
+            <option key={frequency} value={frequency}>
+              {PAY_FREQUENCY_LABELS[frequency]}
+            </option>
+          ))}
+        </Select>
+      </div>
       <NumberField
         id="monthly-income"
         label="Monthly income"
         registration={register("monthlyIncome")}
         error={errors.monthlyIncome?.message}
+      />
+      <NumberField
+        id="estimated-variable-expenses"
+        label="Estimated variable expenses"
+        registration={register("estimatedVariableExpenses")}
+        error={errors.estimatedVariableExpenses?.message}
       />
     </div>
   );
@@ -486,7 +521,13 @@ function ReviewStep({
 }) {
   return (
     <div className="grid gap-4 text-sm">
+      <ReviewRow label="Full name" value={values.fullName.trim() || "Not provided"} />
+      <ReviewRow label="Pay frequency" value={formatPayFrequency(values.payFrequency)} />
       <ReviewRow label="Monthly income" value={formatCurrency(toNumber(values.monthlyIncome), currency)} />
+      <ReviewRow
+        label="Estimated variable expenses"
+        value={formatCurrency(toNumber(values.estimatedVariableExpenses), currency)}
+      />
       <ReviewRow label="Current savings" value={formatCurrency(toNumber(values.currentSavings), currency)} />
       <ReviewRow label="Emergency target" value={formatCurrency(toNumber(values.emergencyFundTarget), currency)} />
       <ReviewRow label="Expense category sum" value={formatCurrency(expenseTotal, currency)} />
@@ -530,7 +571,10 @@ function buildDefaultValues(snapshot: FinancialSnapshot): OnboardingFormValues {
 
   return {
     currency: snapshot.profile.currency,
+    fullName: snapshot.profile.fullName ?? "",
+    payFrequency: snapshot.profile.payFrequency ?? "monthly",
     monthlyIncome: snapshot.profile.monthlyIncome,
+    estimatedVariableExpenses: snapshot.profile.estimatedVariableExpenses ?? 0,
     currentSavings: snapshot.profile.currentSavings,
     emergencyFundTarget: snapshot.profile.emergencyFundTarget,
     housingExpense: fixedExpenses,
@@ -549,7 +593,10 @@ function buildDefaultValues(snapshot: FinancialSnapshot): OnboardingFormValues {
 function buildSnapshotPayload(values: OnboardingFormValues): FinancialSnapshot {
   const profile = {
     currency: values.currency,
+    fullName: values.fullName.trim() || undefined,
+    payFrequency: values.payFrequency,
     monthlyIncome: toNumber(values.monthlyIncome),
+    estimatedVariableExpenses: toNumber(values.estimatedVariableExpenses),
     currentSavings: toNumber(values.currentSavings),
     emergencyFundTarget: toNumber(values.emergencyFundTarget),
   };
@@ -659,4 +706,8 @@ function toNumber(value: unknown) {
   const numberValue = Number(value);
 
   return Number.isFinite(numberValue) ? numberValue : 0;
+}
+
+function formatPayFrequency(value: PayFrequency) {
+  return PAY_FREQUENCY_LABELS[value];
 }

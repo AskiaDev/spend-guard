@@ -43,6 +43,9 @@ export async function saveFinancialProfileAction(
           monthly_income: profile.monthlyIncome,
           current_savings: profile.currentSavings,
           emergency_fund_target: profile.emergencyFundTarget,
+          full_name: profile.fullName?.trim() || null,
+          pay_frequency: profile.payFrequency,
+          estimated_variable_expenses: profile.estimatedVariableExpenses,
         },
         { onConflict: "user_id" }
       );
@@ -107,6 +110,16 @@ export async function saveFinancialProfileAction(
     if (error) {
       console.error("Unable to create Supabase financial setup rows", error);
       return { ok: false, error: "Unable to save your financial setup." };
+    }
+
+    const completionResult = await supabase
+      .from("profiles")
+      .update({ onboarding_completed: true })
+      .eq("user_id", userId);
+
+    if (completionResult.error) {
+      console.error("Unable to mark onboarding complete", completionResult.error);
+      return { ok: false, error: "Unable to finish your financial profile." };
     }
 
     return { ok: true, data: null };

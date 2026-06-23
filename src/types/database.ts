@@ -11,6 +11,10 @@ export interface Database {
           monthly_income: number;
           current_savings: number;
           emergency_fund_target: number;
+          full_name: string | null;
+          pay_frequency: string;
+          estimated_variable_expenses: number;
+          onboarding_completed: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -20,6 +24,10 @@ export interface Database {
           monthly_income: number;
           current_savings: number;
           emergency_fund_target: number;
+          full_name?: string | null;
+          pay_frequency?: string;
+          estimated_variable_expenses?: number;
+          onboarding_completed?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
         Relationships: [];

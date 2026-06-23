@@ -37,6 +37,12 @@ describe("OnboardingSetup", () => {
       <OnboardingSetup snapshot={financialSnapshotFixture} isHydrated={true} onSave={vi.fn()} />
     );
 
+    await user.clear(screen.getByLabelText("Full name"));
+    await user.type(screen.getByLabelText("Full name"), "Askia");
+    await user.selectOptions(screen.getByLabelText("Pay frequency"), "biweekly");
+    await user.clear(screen.getByLabelText("Estimated variable expenses"));
+    await user.type(screen.getByLabelText("Estimated variable expenses"), "12000");
+
     const income = screen.getByLabelText("Monthly income");
     await user.clear(income);
     await user.type(income, "-1");
@@ -51,6 +57,9 @@ describe("OnboardingSetup", () => {
     await user.click(screen.getByRole("button", { name: "Back" }));
 
     expect(screen.getByLabelText("Monthly income")).toHaveValue(90000);
+    expect(screen.getByLabelText("Full name")).toHaveValue("Askia");
+    expect(screen.getByLabelText("Pay frequency")).toHaveValue("biweekly");
+    expect(screen.getByLabelText("Estimated variable expenses")).toHaveValue(12000);
   });
 
   it("shows savings helpers, expense category sum, debt fields, and four goal options", async () => {
@@ -101,6 +110,11 @@ describe("OnboardingSetup", () => {
       <OnboardingSetup snapshot={financialSnapshotFixture} isHydrated={true} onSave={onSave} />
     );
 
+    await user.clear(screen.getByLabelText("Full name"));
+    await user.type(screen.getByLabelText("Full name"), "Askia Manjares");
+    await user.selectOptions(screen.getByLabelText("Pay frequency"), "weekly");
+    await user.clear(screen.getByLabelText("Estimated variable expenses"));
+    await user.type(screen.getByLabelText("Estimated variable expenses"), "15000");
     await user.clear(screen.getByLabelText("Monthly income"));
     await user.type(screen.getByLabelText("Monthly income"), "90000");
     await user.click(screen.getByRole("button", { name: "Continue" }));
@@ -132,6 +146,9 @@ describe("OnboardingSetup", () => {
     await user.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(screen.getByRole("heading", { name: "Review your setup" })).toBeVisible();
+    expect(screen.getByText("Askia Manjares")).toBeVisible();
+    expect(screen.getByText("Weekly")).toBeVisible();
+    expect(screen.getByText("₱15,000")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Finish Setup" }));
 
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
@@ -142,6 +159,9 @@ describe("OnboardingSetup", () => {
       monthlyIncome: 90000,
       currentSavings: 130000,
       emergencyFundTarget: 240000,
+      fullName: "Askia Manjares",
+      payFrequency: "weekly",
+      estimatedVariableExpenses: 15000,
     });
     expect(payload.expenses).toEqual(
       expect.arrayContaining([

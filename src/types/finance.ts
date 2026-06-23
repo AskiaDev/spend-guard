@@ -12,11 +12,25 @@ export type PurchaseUrgency = "need_now" | "need_this_month" | "can_wait" | "wan
 
 export type GoalPriority = "high" | "medium" | "low";
 
+export const PAY_FREQUENCIES = ["monthly", "semi_monthly", "biweekly", "weekly"] as const;
+
+export type PayFrequency = (typeof PAY_FREQUENCIES)[number];
+
+export const PAY_FREQUENCY_LABELS: Record<PayFrequency, string> = {
+  monthly: "Monthly",
+  semi_monthly: "Twice a month",
+  biweekly: "Every 2 weeks",
+  weekly: "Weekly",
+};
+
 export interface FinancialProfile {
   currency: CurrencyCode;
   monthlyIncome: number;
   currentSavings: number;
   emergencyFundTarget: number;
+  fullName?: string;
+  payFrequency?: PayFrequency;
+  estimatedVariableExpenses?: number;
 }
 
 export interface Expense {

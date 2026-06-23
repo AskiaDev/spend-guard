@@ -32,6 +32,10 @@ describe("mapFinancialWorkspaceRows", () => {
         monthly_income: 90_000,
         current_savings: 180_000,
         emergency_fund_target: 150_000,
+        full_name: "Askia Manjares",
+        pay_frequency: "biweekly",
+        estimated_variable_expenses: 12_500,
+        onboarding_completed: true,
         created_at: "2026-06-20T00:00:00.000Z",
         updated_at: "2026-06-20T00:00:00.000Z",
       },
@@ -106,7 +110,12 @@ describe("mapFinancialWorkspaceRows", () => {
       ],
     });
 
-    expect(workspace.snapshot.profile.monthlyIncome).toBe(90_000);
+    expect(workspace.snapshot.profile).toMatchObject({
+      monthlyIncome: 90_000,
+      fullName: "Askia Manjares",
+      payFrequency: "biweekly",
+      estimatedVariableExpenses: 12_500,
+    });
     expect(workspace.snapshot.expenses[0]).toMatchObject({
       id: "expense-1",
       amount: 28_000,
@@ -133,6 +142,10 @@ describe("mapFinancialWorkspaceRows", () => {
         monthly_income: 0,
         current_savings: 0,
         emergency_fund_target: 0,
+        full_name: null,
+        pay_frequency: "unexpected",
+        estimated_variable_expenses: 0,
+        onboarding_completed: false,
         created_at: "2026-06-20T00:00:00.000Z",
         updated_at: "2026-06-20T00:00:00.000Z",
       },
@@ -197,6 +210,9 @@ describe("mapFinancialWorkspaceRows", () => {
     });
 
     expect(workspace.snapshot.profile.currency).toBe("PHP");
+    expect(workspace.snapshot.profile.fullName).toBeUndefined();
+    expect(workspace.snapshot.profile.payFrequency).toBe("monthly");
+    expect(workspace.snapshot.profile.estimatedVariableExpenses).toBe(0);
     expect(workspace.snapshot.debts[0].interestRate).toBeUndefined();
     expect(workspace.snapshot.goals[0]).toMatchObject({ priority: "medium", targetDate: undefined });
     expect(workspace.checks[0]).toMatchObject({

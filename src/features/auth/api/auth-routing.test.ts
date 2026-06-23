@@ -20,19 +20,37 @@ describe("getAuthRedirect", () => {
     }
   });
 
-  it("allows authenticated users to reach protected app routes", () => {
+  it("allows onboarded authenticated users to reach protected app routes", () => {
     for (const path of ["/", "/checker", "/goals", "/voice"]) {
-      expect(getAuthRedirect(path, true)).toBeNull();
+      expect(getAuthRedirect(path, true, true)).toBeNull();
     }
   });
 
-  it("sends authenticated users away from login and signup", () => {
-    expect(getAuthRedirect("/login", true)).toBe("/");
-    expect(getAuthRedirect("/signup", true)).toBe("/");
+  it("sends onboarded authenticated users away from login and signup", () => {
+    expect(getAuthRedirect("/login", true, true)).toBe("/");
+    expect(getAuthRedirect("/signup", true, true)).toBe("/");
   });
 
-  it("allows confirmation and valid destination requests", () => {
+  it("redirects onboarded users away from onboarding to the dashboard", () => {
+    expect(getAuthRedirect("/onboarding", true, true)).toBe("/");
+  });
+
+  it("routes authenticated users who have not completed onboarding to onboarding", () => {
+    for (const path of ["/", "/checker", "/goals", "/reports", "/login", "/signup"]) {
+      expect(getAuthRedirect(path, true, false)).toBe("/onboarding");
+    }
+  });
+
+  it("lets a not-yet-onboarded user stay on the onboarding page", () => {
+    expect(getAuthRedirect("/onboarding", true, false)).toBeNull();
+  });
+
+  it("never forces auth callback routes into onboarding", () => {
+    expect(getAuthRedirect("/auth/confirm", true, false)).toBeNull();
+  });
+
+  it("allows confirmation requests and onboarded dashboard requests", () => {
     expect(getAuthRedirect("/auth/confirm", false)).toBeNull();
-    expect(getAuthRedirect("/", true)).toBeNull();
+    expect(getAuthRedirect("/", true, true)).toBeNull();
   });
 });

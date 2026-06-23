@@ -6,6 +6,9 @@ export const financialSnapshotFixture: FinancialSnapshot = {
     monthlyIncome: 85000,
     currentSavings: 120000,
     emergencyFundTarget: 180000,
+    fullName: "Askia",
+    payFrequency: "monthly",
+    estimatedVariableExpenses: 12000,
   },
   expenses: [
     { id: "expense_rent", label: "Rent", amount: 22000, dueDay: 1, isRecurring: true },

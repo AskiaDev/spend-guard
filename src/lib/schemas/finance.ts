@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PAY_FREQUENCIES } from "@/types/finance";
 
 const money = z.coerce.number().min(0, "Enter a positive amount.");
 const dueDay = z.coerce.number().int().min(1).max(31);
@@ -10,11 +11,21 @@ const optionalInstallmentMonths = z.preprocess(
 );
 const optionalMoney = z.preprocess(emptyToUndefined, money.optional());
 
+export const payFrequencySchema = z
+  .enum(PAY_FREQUENCIES)
+  .default("monthly");
+
 export const financialProfileSchema = z.object({
   currency: z.enum(["PHP", "USD", "EUR", "JPY", "SGD"]).default("PHP"),
   monthlyIncome: money,
   currentSavings: money,
   emergencyFundTarget: money,
+  fullName: z.preprocess(
+    emptyToUndefined,
+    z.string().trim().max(120, "Keep the name under 120 characters.").optional()
+  ),
+  payFrequency: payFrequencySchema,
+  estimatedVariableExpenses: money.default(0),
 });
 
 export const expenseSchema = z.object({

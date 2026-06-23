@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   upsert: vi.fn(),
+  profileUpdateEq: vi.fn(),
   deleteEq: vi.fn(),
   insert: vi.fn(),
   requireUserId: vi.fn(),
@@ -15,12 +16,13 @@ describe("saveFinancialProfileAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.upsert.mockResolvedValue({ error: null });
+    mocks.profileUpdateEq.mockResolvedValue({ error: null });
     mocks.deleteEq.mockResolvedValue({ error: null });
     mocks.insert.mockResolvedValue({ error: null });
     const supabase = {
       from: vi.fn((table: string) =>
         table === "profiles"
-          ? { upsert: mocks.upsert }
+          ? { upsert: mocks.upsert, update: () => ({ eq: mocks.profileUpdateEq }) }
           : { delete: () => ({ eq: mocks.deleteEq }), insert: mocks.insert }
       ),
     };
@@ -43,9 +45,45 @@ describe("saveFinancialProfileAction", () => {
     ).resolves.toEqual({ ok: true, data: null });
 
     expect(mocks.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ user_id: "user-1", monthly_income: 90_000 }),
+      expect.objectContaining({
+        user_id: "user-1",
+        monthly_income: 90_000,
+        full_name: null,
+        pay_frequency: "monthly",
+        estimated_variable_expenses: 0,
+      }),
       { onConflict: "user_id" }
     );
+    expect(mocks.profileUpdateEq).toHaveBeenCalledWith("user_id", "user-1");
+  });
+
+  it("persists profile completeness fields and marks onboarding complete", async () => {
+    await expect(
+      saveFinancialProfileAction({
+        profile: {
+          currency: "PHP",
+          monthlyIncome: 90_000,
+          currentSavings: 180_000,
+          emergencyFundTarget: 150_000,
+          fullName: "  Askia  ",
+          payFrequency: "weekly",
+          estimatedVariableExpenses: 12_000,
+        },
+        expenses: [],
+        debts: [],
+        goals: [],
+      })
+    ).resolves.toEqual({ ok: true, data: null });
+
+    expect(mocks.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        full_name: "Askia",
+        pay_frequency: "weekly",
+        estimated_variable_expenses: 12_000,
+      }),
+      { onConflict: "user_id" }
+    );
+    expect(mocks.profileUpdateEq).toHaveBeenCalledWith("user_id", "user-1");
   });
 
   it("rejects invalid setup before accessing Supabase", async () => {
@@ -147,5 +185,25 @@ describe("saveFinancialProfileAction", () => {
         goals: [],
       })
     ).resolves.toEqual({ ok: false, error: "Unable to save your financial setup." });
+
+    expect(mocks.profileUpdateEq).not.toHaveBeenCalled();
+  });
+
+  it("reports a completion flag failure after setup rows are saved", async () => {
+    mocks.profileUpdateEq.mockResolvedValueOnce({ error: { message: "update failed" } });
+
+    await expect(
+      saveFinancialProfileAction({
+        profile: {
+          currency: "PHP",
+          monthlyIncome: 1,
+          currentSavings: 1,
+          emergencyFundTarget: 1,
+        },
+        expenses: [],
+        debts: [],
+        goals: [],
+      })
+    ).resolves.toEqual({ ok: false, error: "Unable to finish your financial profile." });
   });
 });

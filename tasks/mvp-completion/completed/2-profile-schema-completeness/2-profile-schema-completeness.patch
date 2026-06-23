@@ -1,0 +1,833 @@
+diff --git a/src/features/auth/api/auth-routing.test.ts b/src/features/auth/api/auth-routing.test.ts
+index f67badf..df30783 100644
+--- a/src/features/auth/api/auth-routing.test.ts
++++ b/src/features/auth/api/auth-routing.test.ts
+@@ -20,19 +20,37 @@ describe("getAuthRedirect", () => {
+     }
+   });
+ 
+-  it("allows authenticated users to reach protected app routes", () => {
++  it("allows onboarded authenticated users to reach protected app routes", () => {
+     for (const path of ["/", "/checker", "/goals", "/voice"]) {
+-      expect(getAuthRedirect(path, true)).toBeNull();
++      expect(getAuthRedirect(path, true, true)).toBeNull();
+     }
+   });
+ 
+-  it("sends authenticated users away from login and signup", () => {
+-    expect(getAuthRedirect("/login", true)).toBe("/");
+-    expect(getAuthRedirect("/signup", true)).toBe("/");
++  it("sends onboarded authenticated users away from login and signup", () => {
++    expect(getAuthRedirect("/login", true, true)).toBe("/");
++    expect(getAuthRedirect("/signup", true, true)).toBe("/");
+   });
+ 
+-  it("allows confirmation and valid destination requests", () => {
++  it("redirects onboarded users away from onboarding to the dashboard", () => {
++    expect(getAuthRedirect("/onboarding", true, true)).toBe("/");
++  });
++
++  it("routes authenticated users who have not completed onboarding to onboarding", () => {
++    for (const path of ["/", "/checker", "/goals", "/reports", "/login", "/signup"]) {
++      expect(getAuthRedirect(path, true, false)).toBe("/onboarding");
++    }
++  });
++
++  it("lets a not-yet-onboarded user stay on the onboarding page", () => {
++    expect(getAuthRedirect("/onboarding", true, false)).toBeNull();
++  });
++
++  it("never forces auth callback routes into onboarding", () => {
++    expect(getAuthRedirect("/auth/confirm", true, false)).toBeNull();
++  });
++
++  it("allows confirmation requests and onboarded dashboard requests", () => {
+     expect(getAuthRedirect("/auth/confirm", false)).toBeNull();
+-    expect(getAuthRedirect("/", true)).toBeNull();
++    expect(getAuthRedirect("/", true, true)).toBeNull();
+   });
+ });
+diff --git a/src/features/auth/api/auth-routing.ts b/src/features/auth/api/auth-routing.ts
+index da205b4..9bda5f2 100644
+--- a/src/features/auth/api/auth-routing.ts
++++ b/src/features/auth/api/auth-routing.ts
+@@ -1,15 +1,32 @@
+ const PUBLIC_PATHS = new Set(["/login", "/signup"]);
++const ONBOARDING_PATH = "/onboarding";
++const AWAY_FROM_WHEN_ONBOARDED = new Set(["/login", "/signup", ONBOARDING_PATH]);
+ 
+ function isPublicPath(pathname: string): boolean {
+   return PUBLIC_PATHS.has(pathname) || pathname.startsWith("/auth/");
+ }
+ 
+-export function getAuthRedirect(pathname: string, isAuthenticated: boolean): string | null {
+-  if (!isAuthenticated && !isPublicPath(pathname)) {
+-    return "/login";
++export function getAuthRedirect(
++  pathname: string,
++  isAuthenticated: boolean,
++  onboardingCompleted = false
++): string | null {
++  if (!isAuthenticated) {
++    return isPublicPath(pathname) ? null : "/login";
+   }
+ 
+-  if (isAuthenticated && (pathname === "/login" || pathname === "/signup")) {
++  if (!onboardingCompleted) {
++    // Authenticated but setup incomplete: funnel everything to onboarding,
++    // except the onboarding page itself and auth callbacks (avoid loops).
++    if (pathname === ONBOARDING_PATH || pathname.startsWith("/auth/")) {
++      return null;
++    }
++
++    return ONBOARDING_PATH;
++  }
++
++  // Authenticated and onboarded: keep them out of the setup/auth entry pages.
++  if (AWAY_FROM_WHEN_ONBOARDED.has(pathname)) {
+     return "/";
+   }
+ 
+diff --git a/src/features/financial-profile/api/save-financial-profile.test.ts b/src/features/financial-profile/api/save-financial-profile.test.ts
+index ae6e9bd..c7b3765 100644
+--- a/src/features/financial-profile/api/save-financial-profile.test.ts
++++ b/src/features/financial-profile/api/save-financial-profile.test.ts
+@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
+ 
+ const mocks = vi.hoisted(() => ({
+   upsert: vi.fn(),
++  profileUpdateEq: vi.fn(),
+   deleteEq: vi.fn(),
+   insert: vi.fn(),
+   requireUserId: vi.fn(),
+@@ -15,12 +16,13 @@ describe("saveFinancialProfileAction", () => {
+   beforeEach(() => {
+     vi.clearAllMocks();
+     mocks.upsert.mockResolvedValue({ error: null });
++    mocks.profileUpdateEq.mockResolvedValue({ error: null });
+     mocks.deleteEq.mockResolvedValue({ error: null });
+     mocks.insert.mockResolvedValue({ error: null });
+     const supabase = {
+       from: vi.fn((table: string) =>
+         table === "profiles"
+-          ? { upsert: mocks.upsert }
++          ? { upsert: mocks.upsert, update: () => ({ eq: mocks.profileUpdateEq }) }
+           : { delete: () => ({ eq: mocks.deleteEq }), insert: mocks.insert }
+       ),
+     };
+@@ -43,9 +45,45 @@ describe("saveFinancialProfileAction", () => {
+     ).resolves.toEqual({ ok: true, data: null });
+ 
+     expect(mocks.upsert).toHaveBeenCalledWith(
+-      expect.objectContaining({ user_id: "user-1", monthly_income: 90_000 }),
++      expect.objectContaining({
++        user_id: "user-1",
++        monthly_income: 90_000,
++        full_name: null,
++        pay_frequency: "monthly",
++        estimated_variable_expenses: 0,
++      }),
+       { onConflict: "user_id" }
+     );
++    expect(mocks.profileUpdateEq).toHaveBeenCalledWith("user_id", "user-1");
++  });
++
++  it("persists profile completeness fields and marks onboarding complete", async () => {
++    await expect(
++      saveFinancialProfileAction({
++        profile: {
++          currency: "PHP",
++          monthlyIncome: 90_000,
++          currentSavings: 180_000,
++          emergencyFundTarget: 150_000,
++          fullName: "  Askia  ",
++          payFrequency: "weekly",
++          estimatedVariableExpenses: 12_000,
++        },
++        expenses: [],
++        debts: [],
++        goals: [],
++      })
++    ).resolves.toEqual({ ok: true, data: null });
++
++    expect(mocks.upsert).toHaveBeenCalledWith(
++      expect.objectContaining({
++        full_name: "Askia",
++        pay_frequency: "weekly",
++        estimated_variable_expenses: 12_000,
++      }),
++      { onConflict: "user_id" }
++    );
++    expect(mocks.profileUpdateEq).toHaveBeenCalledWith("user_id", "user-1");
+   });
+ 
+   it("rejects invalid setup before accessing Supabase", async () => {
+@@ -147,5 +185,25 @@ describe("saveFinancialProfileAction", () => {
+         goals: [],
+       })
+     ).resolves.toEqual({ ok: false, error: "Unable to save your financial setup." });
++
++    expect(mocks.profileUpdateEq).not.toHaveBeenCalled();
++  });
++
++  it("reports a completion flag failure after setup rows are saved", async () => {
++    mocks.profileUpdateEq.mockResolvedValueOnce({ error: { message: "update failed" } });
++
++    await expect(
++      saveFinancialProfileAction({
++        profile: {
++          currency: "PHP",
++          monthlyIncome: 1,
++          currentSavings: 1,
++          emergencyFundTarget: 1,
++        },
++        expenses: [],
++        debts: [],
++        goals: [],
++      })
++    ).resolves.toEqual({ ok: false, error: "Unable to finish your financial profile." });
+   });
+ });
+diff --git a/src/features/financial-profile/api/save-financial-profile.ts b/src/features/financial-profile/api/save-financial-profile.ts
+index ed7f4d9..ec27c7c 100644
+--- a/src/features/financial-profile/api/save-financial-profile.ts
++++ b/src/features/financial-profile/api/save-financial-profile.ts
+@@ -43,6 +43,9 @@ export async function saveFinancialProfileAction(
+           monthly_income: profile.monthlyIncome,
+           current_savings: profile.currentSavings,
+           emergency_fund_target: profile.emergencyFundTarget,
++          full_name: profile.fullName?.trim() || null,
++          pay_frequency: profile.payFrequency,
++          estimated_variable_expenses: profile.estimatedVariableExpenses,
+         },
+         { onConflict: "user_id" }
+       );
+@@ -109,6 +112,16 @@ export async function saveFinancialProfileAction(
+       return { ok: false, error: "Unable to save your financial setup." };
+     }
+ 
++    const completionResult = await supabase
++      .from("profiles")
++      .update({ onboarding_completed: true })
++      .eq("user_id", userId);
++
++    if (completionResult.error) {
++      console.error("Unable to mark onboarding complete", completionResult.error);
++      return { ok: false, error: "Unable to finish your financial profile." };
++    }
++
+     return { ok: true, data: null };
+   } catch (error) {
+     return {
+diff --git a/src/features/onboarding/components/onboarding-setup.test.tsx b/src/features/onboarding/components/onboarding-setup.test.tsx
+index 3cebb88..2500254 100644
+--- a/src/features/onboarding/components/onboarding-setup.test.tsx
++++ b/src/features/onboarding/components/onboarding-setup.test.tsx
+@@ -37,6 +37,12 @@ describe("OnboardingSetup", () => {
+       <OnboardingSetup snapshot={financialSnapshotFixture} isHydrated={true} onSave={vi.fn()} />
+     );
+ 
++    await user.clear(screen.getByLabelText("Full name"));
++    await user.type(screen.getByLabelText("Full name"), "Askia");
++    await user.selectOptions(screen.getByLabelText("Pay frequency"), "biweekly");
++    await user.clear(screen.getByLabelText("Estimated variable expenses"));
++    await user.type(screen.getByLabelText("Estimated variable expenses"), "12000");
++
+     const income = screen.getByLabelText("Monthly income");
+     await user.clear(income);
+     await user.type(income, "-1");
+@@ -51,6 +57,9 @@ describe("OnboardingSetup", () => {
+     await user.click(screen.getByRole("button", { name: "Back" }));
+ 
+     expect(screen.getByLabelText("Monthly income")).toHaveValue(90000);
++    expect(screen.getByLabelText("Full name")).toHaveValue("Askia");
++    expect(screen.getByLabelText("Pay frequency")).toHaveValue("biweekly");
++    expect(screen.getByLabelText("Estimated variable expenses")).toHaveValue(12000);
+   });
+ 
+   it("shows savings helpers, expense category sum, debt fields, and four goal options", async () => {
+@@ -101,6 +110,11 @@ describe("OnboardingSetup", () => {
+       <OnboardingSetup snapshot={financialSnapshotFixture} isHydrated={true} onSave={onSave} />
+     );
+ 
++    await user.clear(screen.getByLabelText("Full name"));
++    await user.type(screen.getByLabelText("Full name"), "Askia Manjares");
++    await user.selectOptions(screen.getByLabelText("Pay frequency"), "weekly");
++    await user.clear(screen.getByLabelText("Estimated variable expenses"));
++    await user.type(screen.getByLabelText("Estimated variable expenses"), "15000");
+     await user.clear(screen.getByLabelText("Monthly income"));
+     await user.type(screen.getByLabelText("Monthly income"), "90000");
+     await user.click(screen.getByRole("button", { name: "Continue" }));
+@@ -132,6 +146,9 @@ describe("OnboardingSetup", () => {
+     await user.click(screen.getByRole("button", { name: "Continue" }));
+ 
+     expect(screen.getByRole("heading", { name: "Review your setup" })).toBeVisible();
++    expect(screen.getByText("Askia Manjares")).toBeVisible();
++    expect(screen.getByText("Weekly")).toBeVisible();
++    expect(screen.getByText("₱15,000")).toBeVisible();
+     await user.click(screen.getByRole("button", { name: "Finish Setup" }));
+ 
+     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
+@@ -142,6 +159,9 @@ describe("OnboardingSetup", () => {
+       monthlyIncome: 90000,
+       currentSavings: 130000,
+       emergencyFundTarget: 240000,
++      fullName: "Askia Manjares",
++      payFrequency: "weekly",
++      estimatedVariableExpenses: 15000,
+     });
+     expect(payload.expenses).toEqual(
+       expect.arrayContaining([
+diff --git a/src/features/onboarding/components/onboarding-setup.tsx b/src/features/onboarding/components/onboarding-setup.tsx
+index c44771a..d079e59 100644
+--- a/src/features/onboarding/components/onboarding-setup.tsx
++++ b/src/features/onboarding/components/onboarding-setup.tsx
+@@ -11,7 +11,14 @@ import { Button } from "@/components/ui/button";
+ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+ import { FieldError, Input, Label, Select } from "@/components/ui/form-fields";
+ import { createId, formatCurrency } from "@/lib/utils";
+-import type { CurrencyCode, FinancialSnapshot, GoalPriority } from "@/types/finance";
++import {
++  PAY_FREQUENCIES,
++  PAY_FREQUENCY_LABELS,
++  type CurrencyCode,
++  type FinancialSnapshot,
++  type GoalPriority,
++  type PayFrequency,
++} from "@/types/finance";
+ 
+ interface OnboardingSetupProps {
+   snapshot: FinancialSnapshot;
+@@ -23,7 +30,10 @@ type StepId = "income" | "savings" | "expenses" | "debt" | "goals" | "review";
+ 
+ interface OnboardingFormValues {
+   currency: CurrencyCode;
++  fullName: string;
++  payFrequency: PayFrequency;
+   monthlyIncome: number;
++  estimatedVariableExpenses: number;
+   currentSavings: number;
+   emergencyFundTarget: number;
+   housingExpense: number;
+@@ -48,10 +58,14 @@ const steps: Array<{ id: StepId; label: string; title: string }> = [
+ ];
+ 
+ const currencySchema = z.enum(["PHP", "USD", "EUR", "JPY", "SGD"]);
++const payFrequencySchema = z.enum(PAY_FREQUENCIES);
+ const money = z.coerce.number().min(0, "Enter a positive amount.");
+ const incomeSchema = z.object({
+   currency: currencySchema,
++  fullName: z.string().trim().max(120, "Keep the name under 120 characters.").optional(),
++  payFrequency: payFrequencySchema,
+   monthlyIncome: money,
++  estimatedVariableExpenses: money,
+ });
+ const savingsSchema = z.object({
+   currentSavings: money,
+@@ -83,7 +97,7 @@ const stepSchemas = [
+ ] as const;
+ 
+ const stepFieldNames: Array<Array<keyof OnboardingFormValues>> = [
+-  ["currency", "monthlyIncome"],
++  ["currency", "fullName", "payFrequency", "monthlyIncome", "estimatedVariableExpenses"],
+   ["currentSavings", "emergencyFundTarget"],
+   ["housingExpense", "utilitiesExpense", "foodTransportExpense"],
+   ["debtLabel", "debtBalance", "debtMinimumPayment"],
+@@ -316,6 +330,11 @@ function IncomeStep({
+ }) {
+   return (
+     <div className="grid gap-4 sm:grid-cols-2">
++      <div className="grid gap-2">
++        <Label htmlFor="full-name">Full name</Label>
++        <Input id="full-name" autoComplete="name" {...register("fullName")} />
++        <FieldError>{errors.fullName?.message}</FieldError>
++      </div>
+       <div className="grid gap-2">
+         <Label htmlFor="currency">Currency</Label>
+         <Select id="currency" {...register("currency")}>
+@@ -326,12 +345,28 @@ function IncomeStep({
+           <option value="SGD">SGD</option>
+         </Select>
+       </div>
++      <div className="grid gap-2">
++        <Label htmlFor="pay-frequency">Pay frequency</Label>
++        <Select id="pay-frequency" {...register("payFrequency")}>
++          {PAY_FREQUENCIES.map((frequency) => (
++            <option key={frequency} value={frequency}>
++              {PAY_FREQUENCY_LABELS[frequency]}
++            </option>
++          ))}
++        </Select>
++      </div>
+       <NumberField
+         id="monthly-income"
+         label="Monthly income"
+         registration={register("monthlyIncome")}
+         error={errors.monthlyIncome?.message}
+       />
++      <NumberField
++        id="estimated-variable-expenses"
++        label="Estimated variable expenses"
++        registration={register("estimatedVariableExpenses")}
++        error={errors.estimatedVariableExpenses?.message}
++      />
+     </div>
+   );
+ }
+@@ -486,7 +521,13 @@ function ReviewStep({
+ }) {
+   return (
+     <div className="grid gap-4 text-sm">
++      <ReviewRow label="Full name" value={values.fullName.trim() || "Not provided"} />
++      <ReviewRow label="Pay frequency" value={formatPayFrequency(values.payFrequency)} />
+       <ReviewRow label="Monthly income" value={formatCurrency(toNumber(values.monthlyIncome), currency)} />
++      <ReviewRow
++        label="Estimated variable expenses"
++        value={formatCurrency(toNumber(values.estimatedVariableExpenses), currency)}
++      />
+       <ReviewRow label="Current savings" value={formatCurrency(toNumber(values.currentSavings), currency)} />
+       <ReviewRow label="Emergency target" value={formatCurrency(toNumber(values.emergencyFundTarget), currency)} />
+       <ReviewRow label="Expense category sum" value={formatCurrency(expenseTotal, currency)} />
+@@ -530,7 +571,10 @@ function buildDefaultValues(snapshot: FinancialSnapshot): OnboardingFormValues {
+ 
+   return {
+     currency: snapshot.profile.currency,
++    fullName: snapshot.profile.fullName ?? "",
++    payFrequency: snapshot.profile.payFrequency ?? "monthly",
+     monthlyIncome: snapshot.profile.monthlyIncome,
++    estimatedVariableExpenses: snapshot.profile.estimatedVariableExpenses ?? 0,
+     currentSavings: snapshot.profile.currentSavings,
+     emergencyFundTarget: snapshot.profile.emergencyFundTarget,
+     housingExpense: fixedExpenses,
+@@ -549,7 +593,10 @@ function buildDefaultValues(snapshot: FinancialSnapshot): OnboardingFormValues {
+ function buildSnapshotPayload(values: OnboardingFormValues): FinancialSnapshot {
+   const profile = {
+     currency: values.currency,
++    fullName: values.fullName.trim() || undefined,
++    payFrequency: values.payFrequency,
+     monthlyIncome: toNumber(values.monthlyIncome),
++    estimatedVariableExpenses: toNumber(values.estimatedVariableExpenses),
+     currentSavings: toNumber(values.currentSavings),
+     emergencyFundTarget: toNumber(values.emergencyFundTarget),
+   };
+@@ -660,3 +707,7 @@ function toNumber(value: unknown) {
+ 
+   return Number.isFinite(numberValue) ? numberValue : 0;
+ }
++
++function formatPayFrequency(value: PayFrequency) {
++  return PAY_FREQUENCY_LABELS[value];
++}
+diff --git a/src/lib/schemas/finance.ts b/src/lib/schemas/finance.ts
+index 8cc2a1c..8a62847 100644
+--- a/src/lib/schemas/finance.ts
++++ b/src/lib/schemas/finance.ts
+@@ -1,4 +1,5 @@
+ import { z } from "zod";
++import { PAY_FREQUENCIES } from "@/types/finance";
+ 
+ const money = z.coerce.number().min(0, "Enter a positive amount.");
+ const dueDay = z.coerce.number().int().min(1).max(31);
+@@ -10,11 +11,21 @@ const optionalInstallmentMonths = z.preprocess(
+ );
+ const optionalMoney = z.preprocess(emptyToUndefined, money.optional());
+ 
++export const payFrequencySchema = z
++  .enum(PAY_FREQUENCIES)
++  .default("monthly");
++
+ export const financialProfileSchema = z.object({
+   currency: z.enum(["PHP", "USD", "EUR", "JPY", "SGD"]).default("PHP"),
+   monthlyIncome: money,
+   currentSavings: money,
+   emergencyFundTarget: money,
++  fullName: z.preprocess(
++    emptyToUndefined,
++    z.string().trim().max(120, "Keep the name under 120 characters.").optional()
++  ),
++  payFrequency: payFrequencySchema,
++  estimatedVariableExpenses: money.default(0),
+ });
+ 
+ export const expenseSchema = z.object({
+diff --git a/src/lib/storage/default-data.ts b/src/lib/storage/default-data.ts
+index 6a21179..80005f2 100644
+--- a/src/lib/storage/default-data.ts
++++ b/src/lib/storage/default-data.ts
+@@ -6,6 +6,8 @@ export const emptySnapshot: FinancialSnapshot = {
+     monthlyIncome: 0,
+     currentSavings: 0,
+     emergencyFundTarget: 0,
++    payFrequency: "monthly",
++    estimatedVariableExpenses: 0,
+   },
+   expenses: [],
+   debts: [],
+diff --git a/src/lib/supabase/finance-mappers.test.ts b/src/lib/supabase/finance-mappers.test.ts
+index c43a7c6..c046542 100644
+--- a/src/lib/supabase/finance-mappers.test.ts
++++ b/src/lib/supabase/finance-mappers.test.ts
+@@ -32,6 +32,10 @@ describe("mapFinancialWorkspaceRows", () => {
+         monthly_income: 90_000,
+         current_savings: 180_000,
+         emergency_fund_target: 150_000,
++        full_name: "Askia Manjares",
++        pay_frequency: "biweekly",
++        estimated_variable_expenses: 12_500,
++        onboarding_completed: true,
+         created_at: "2026-06-20T00:00:00.000Z",
+         updated_at: "2026-06-20T00:00:00.000Z",
+       },
+@@ -106,7 +110,12 @@ describe("mapFinancialWorkspaceRows", () => {
+       ],
+     });
+ 
+-    expect(workspace.snapshot.profile.monthlyIncome).toBe(90_000);
++    expect(workspace.snapshot.profile).toMatchObject({
++      monthlyIncome: 90_000,
++      fullName: "Askia Manjares",
++      payFrequency: "biweekly",
++      estimatedVariableExpenses: 12_500,
++    });
+     expect(workspace.snapshot.expenses[0]).toMatchObject({
+       id: "expense-1",
+       amount: 28_000,
+@@ -133,6 +142,10 @@ describe("mapFinancialWorkspaceRows", () => {
+         monthly_income: 0,
+         current_savings: 0,
+         emergency_fund_target: 0,
++        full_name: null,
++        pay_frequency: "unexpected",
++        estimated_variable_expenses: 0,
++        onboarding_completed: false,
+         created_at: "2026-06-20T00:00:00.000Z",
+         updated_at: "2026-06-20T00:00:00.000Z",
+       },
+@@ -197,6 +210,9 @@ describe("mapFinancialWorkspaceRows", () => {
+     });
+ 
+     expect(workspace.snapshot.profile.currency).toBe("PHP");
++    expect(workspace.snapshot.profile.fullName).toBeUndefined();
++    expect(workspace.snapshot.profile.payFrequency).toBe("monthly");
++    expect(workspace.snapshot.profile.estimatedVariableExpenses).toBe(0);
+     expect(workspace.snapshot.debts[0].interestRate).toBeUndefined();
+     expect(workspace.snapshot.goals[0]).toMatchObject({ priority: "medium", targetDate: undefined });
+     expect(workspace.checks[0]).toMatchObject({
+diff --git a/src/lib/supabase/finance-mappers.ts b/src/lib/supabase/finance-mappers.ts
+index 53a5b4f..45f9579 100644
+--- a/src/lib/supabase/finance-mappers.ts
++++ b/src/lib/supabase/finance-mappers.ts
+@@ -5,6 +5,7 @@ import type {
+   CurrencyCode,
+   FinancialWorkspace,
+   GoalPriority,
++  PayFrequency,
+   PaymentMethod,
+   PurchaseDecision,
+   PurchaseUrgency,
+@@ -43,6 +44,13 @@ export function mapFinancialWorkspaceRows(rows: FinancialWorkspaceRows): Financi
+         monthlyIncome: Number(rows.profile.monthly_income),
+         currentSavings: Number(rows.profile.current_savings),
+         emergencyFundTarget: Number(rows.profile.emergency_fund_target),
++        fullName: rows.profile.full_name ?? undefined,
++        payFrequency: enumValue<PayFrequency>(
++          rows.profile.pay_frequency ?? "monthly",
++          ["monthly", "semi_monthly", "biweekly", "weekly"],
++          "monthly"
++        ),
++        estimatedVariableExpenses: Number(rows.profile.estimated_variable_expenses ?? 0),
+       }
+     : { ...emptySnapshot.profile };
+ 
+diff --git a/src/proxy.ts b/src/proxy.ts
+index 0d1b0fe..d385c7b 100644
+--- a/src/proxy.ts
++++ b/src/proxy.ts
+@@ -4,6 +4,40 @@ import { env } from "@/config/env";
+ import { getAuthRedirect } from "@/features/auth/api/auth-routing";
+ import type { Database } from "@/types/database";
+ 
++interface OnboardingStatusClient {
++  from(table: "profiles"): {
++    select(columns: "onboarding_completed"): {
++      eq(
++        column: "user_id",
++        value: string
++      ): {
++        maybeSingle(): PromiseLike<{
++          data: { onboarding_completed: boolean } | null;
++          error: unknown;
++        }>;
++      };
++    };
++  };
++}
++
++export async function readOnboardingCompleted(
++  supabase: OnboardingStatusClient,
++  userId: string
++) {
++  const { data, error } = await supabase
++    .from("profiles")
++    .select("onboarding_completed")
++    .eq("user_id", userId)
++    .maybeSingle();
++
++  if (error) {
++    console.error("Unable to read onboarding status", error);
++    return true;
++  }
++
++  return data?.onboarding_completed ?? false;
++}
++
+ export async function proxy(request: NextRequest) {
+   let response = NextResponse.next({ request });
+ 
+@@ -33,7 +67,15 @@ export async function proxy(request: NextRequest) {
+   const {
+     data: { user },
+   } = await supabase.auth.getUser();
+-  const redirectPath = getAuthRedirect(request.nextUrl.pathname, Boolean(user));
++  const onboardingCompleted = user
++    ? await readOnboardingCompleted(supabase as unknown as OnboardingStatusClient, user.id)
++    : false;
++
++  const redirectPath = getAuthRedirect(
++    request.nextUrl.pathname,
++    Boolean(user),
++    onboardingCompleted
++  );
+ 
+   if (redirectPath) {
+     const redirectResponse = NextResponse.redirect(new URL(redirectPath, request.url));
+diff --git a/src/test/fixtures/financial-snapshot.ts b/src/test/fixtures/financial-snapshot.ts
+index 006abcf..407a423 100644
+--- a/src/test/fixtures/financial-snapshot.ts
++++ b/src/test/fixtures/financial-snapshot.ts
+@@ -6,6 +6,9 @@ export const financialSnapshotFixture: FinancialSnapshot = {
+     monthlyIncome: 85000,
+     currentSavings: 120000,
+     emergencyFundTarget: 180000,
++    fullName: "Askia",
++    payFrequency: "monthly",
++    estimatedVariableExpenses: 12000,
+   },
+   expenses: [
+     { id: "expense_rent", label: "Rent", amount: 22000, dueDay: 1, isRecurring: true },
+diff --git a/src/types/database.ts b/src/types/database.ts
+index 7a433ed..2b90c77 100644
+--- a/src/types/database.ts
++++ b/src/types/database.ts
+@@ -11,6 +11,10 @@ export interface Database {
+           monthly_income: number;
+           current_savings: number;
+           emergency_fund_target: number;
++          full_name: string | null;
++          pay_frequency: string;
++          estimated_variable_expenses: number;
++          onboarding_completed: boolean;
+           created_at: string;
+           updated_at: string;
+         };
+@@ -20,6 +24,10 @@ export interface Database {
+           monthly_income: number;
+           current_savings: number;
+           emergency_fund_target: number;
++          full_name?: string | null;
++          pay_frequency?: string;
++          estimated_variable_expenses?: number;
++          onboarding_completed?: boolean;
+         };
+         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
+         Relationships: [];
+diff --git a/src/types/finance.ts b/src/types/finance.ts
+index 16d253d..5123de7 100644
+--- a/src/types/finance.ts
++++ b/src/types/finance.ts
+@@ -12,11 +12,25 @@ export type PurchaseUrgency = "need_now" | "need_this_month" | "can_wait" | "wan
+ 
+ export type GoalPriority = "high" | "medium" | "low";
+ 
++export const PAY_FREQUENCIES = ["monthly", "semi_monthly", "biweekly", "weekly"] as const;
++
++export type PayFrequency = (typeof PAY_FREQUENCIES)[number];
++
++export const PAY_FREQUENCY_LABELS: Record<PayFrequency, string> = {
++  monthly: "Monthly",
++  semi_monthly: "Twice a month",
++  biweekly: "Every 2 weeks",
++  weekly: "Weekly",
++};
++
+ export interface FinancialProfile {
+   currency: CurrencyCode;
+   monthlyIncome: number;
+   currentSavings: number;
+   emergencyFundTarget: number;
++  fullName?: string;
++  payFrequency?: PayFrequency;
++  estimatedVariableExpenses?: number;
+ }
+ 
+ export interface Expense {
+diff --git a/src/lib/schemas/finance.test.ts b/src/lib/schemas/finance.test.ts
+new file mode 100644
+index 0000000..b99df02
+--- /dev/null
++++ b/src/lib/schemas/finance.test.ts
+@@ -0,0 +1,63 @@
++import { describe, expect, it } from "vitest";
++import { financialProfileSchema } from "./finance";
++
++describe("financialProfileSchema", () => {
++  it("parses profile completeness fields and applies safe defaults", () => {
++    expect(
++      financialProfileSchema.parse({
++        currency: "PHP",
++        monthlyIncome: 90_000,
++        currentSavings: 130_000,
++        emergencyFundTarget: 240_000,
++      })
++    ).toEqual({
++      currency: "PHP",
++      monthlyIncome: 90_000,
++      currentSavings: 130_000,
++      emergencyFundTarget: 240_000,
++      fullName: undefined,
++      payFrequency: "monthly",
++      estimatedVariableExpenses: 0,
++    });
++
++    expect(
++      financialProfileSchema.parse({
++        currency: "PHP",
++        monthlyIncome: 90_000,
++        currentSavings: 130_000,
++        emergencyFundTarget: 240_000,
++        fullName: "  Askia  ",
++        payFrequency: "biweekly",
++        estimatedVariableExpenses: 12_000,
++      })
++    ).toMatchObject({
++      fullName: "Askia",
++      payFrequency: "biweekly",
++      estimatedVariableExpenses: 12_000,
++    });
++  });
++
++  it("rejects unsupported pay frequency and negative variable expenses", () => {
++    expect(() =>
++      financialProfileSchema.parse({
++        currency: "PHP",
++        monthlyIncome: 90_000,
++        currentSavings: 130_000,
++        emergencyFundTarget: 240_000,
++        payFrequency: "quarterly",
++        estimatedVariableExpenses: 0,
++      })
++    ).toThrow();
++
++    expect(() =>
++      financialProfileSchema.parse({
++        currency: "PHP",
++        monthlyIncome: 90_000,
++        currentSavings: 130_000,
++        emergencyFundTarget: 240_000,
++        payFrequency: "monthly",
++        estimatedVariableExpenses: -1,
++      })
++    ).toThrow();
++  });
++});
+diff --git a/src/proxy.test.ts b/src/proxy.test.ts
+new file mode 100644
+index 0000000..82eab15
+--- /dev/null
++++ b/src/proxy.test.ts
+@@ -0,0 +1,52 @@
++import { afterEach, describe, expect, it, vi } from "vitest";
++import { readOnboardingCompleted } from "./proxy";
++
++function createStatusClient(result: {
++  data: { onboarding_completed: boolean } | null;
++  error: unknown;
++}) {
++  const maybeSingle = vi.fn().mockResolvedValue(result);
++  const eq = vi.fn(() => ({ maybeSingle }));
++  const select = vi.fn(() => ({ eq }));
++  const from = vi.fn(() => ({ select }));
++
++  return { client: { from }, from, select, eq, maybeSingle };
++}
++
++describe("readOnboardingCompleted", () => {
++  afterEach(() => {
++    vi.restoreAllMocks();
++  });
++
++  it("returns the persisted onboarding status", async () => {
++    const { client, from, select, eq } = createStatusClient({
++      data: { onboarding_completed: true },
++      error: null,
++    });
++
++    await expect(readOnboardingCompleted(client, "user-1")).resolves.toBe(true);
++    expect(from).toHaveBeenCalledWith("profiles");
++    expect(select).toHaveBeenCalledWith("onboarding_completed");
++    expect(eq).toHaveBeenCalledWith("user_id", "user-1");
++  });
++
++  it("treats a missing profile row as not onboarded", async () => {
++    const { client } = createStatusClient({ data: null, error: null });
++
++    await expect(readOnboardingCompleted(client, "user-1")).resolves.toBe(false);
++  });
++
++  it("fails open for authenticated users when the status lookup errors", async () => {
++    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
++    const { client } = createStatusClient({
++      data: null,
++      error: { message: "temporary outage" },
++    });
++
++    await expect(readOnboardingCompleted(client, "user-1")).resolves.toBe(true);
++    expect(consoleError).toHaveBeenCalledWith(
++      "Unable to read onboarding status",
++      { message: "temporary outage" }
++    );
++  });
++});
+diff --git a/supabase/migrations/20260623000000_profile_completeness.sql b/supabase/migrations/20260623000000_profile_completeness.sql
+new file mode 100644
+index 0000000..60d2f5a
+--- /dev/null
++++ b/supabase/migrations/20260623000000_profile_completeness.sql
+@@ -0,0 +1,27 @@
++alter table public.profiles
++  add column full_name text,
++  add column pay_frequency text not null default 'monthly',
++  add column estimated_variable_expenses numeric(12,2) not null default 0,
++  add column onboarding_completed boolean not null default false;
++
++alter table public.profiles
++  add constraint profiles_full_name_length
++    check (full_name is null or char_length(full_name) <= 120),
++  add constraint profiles_pay_frequency_check
++    check (pay_frequency in ('monthly', 'semi_monthly', 'biweekly', 'weekly')),
++  add constraint profiles_estimated_variable_expenses_check
++    check (estimated_variable_expenses >= 0);
++
++update public.profiles
++set onboarding_completed = true
++where onboarding_completed = false;
++
++-- Rollback:
++-- alter table public.profiles
++--   drop constraint if exists profiles_full_name_length,
++--   drop constraint if exists profiles_pay_frequency_check,
++--   drop constraint if exists profiles_estimated_variable_expenses_check,
++--   drop column if exists onboarding_completed,
++--   drop column if exists estimated_variable_expenses,
++--   drop column if exists pay_frequency,
++--   drop column if exists full_name;
