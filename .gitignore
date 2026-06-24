@@ -25,6 +25,9 @@
 .DS_Store
 *.pem
 
+# brainstorming visual companion (mockups, server state)
+.superpowers/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
