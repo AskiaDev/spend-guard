@@ -173,6 +173,8 @@ export function ReportsPageContent() {
   return (
     <ReportsPanel
       reports={state.weeklyReports}
+      checks={state.checks}
+      snapshot={state.snapshot}
       currency={state.snapshot.profile.currency}
       onGenerateReport={state.generateWeeklyReport}
     />

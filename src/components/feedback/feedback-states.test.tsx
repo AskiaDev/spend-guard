@@ -58,7 +58,15 @@ describe("feedback states", () => {
     });
     const onGenerateReport = vi.fn(() => reportPromise);
 
-    render(<ReportsPanel reports={[]} currency="PHP" onGenerateReport={onGenerateReport} />);
+    render(
+      <ReportsPanel
+        reports={[]}
+        checks={[]}
+        snapshot={defaultSnapshot}
+        currency="PHP"
+        onGenerateReport={onGenerateReport}
+      />
+    );
 
     await user.click(screen.getByRole("button", { name: "Generate Report" }));
 

@@ -25,6 +25,7 @@ import {
 } from "@/features/purchase-checker/api/save-purchase-check";
 import { saveVoiceSessionAction } from "@/features/purchase-checker/api/save-voice-session";
 import { createWeeklyReportAction } from "@/features/reports/api/create-weekly-report";
+import { generateWeeklyReportInsights } from "@/features/reports/lib/weekly-report";
 import {
   deleteFinancialDataAction,
   updateProfileSettingsAction,
@@ -408,13 +409,20 @@ export function useFinancialState() {
   const generateWeeklyReport = useCallback(async () => {
     const safeToSpend = calculateSafeToSpend(snapshot);
     const healthScore = calculateFinancialHealthScore(snapshot);
+    const weekStart = toIsoDate(startOfWeek(new Date(), { weekStartsOn: 1 }));
+    const insights = generateWeeklyReportInsights({
+      snapshot,
+      checks,
+      weekStart,
+      currency: snapshot.profile.currency,
+    });
     const report: WeeklyReport = {
       id: createId("report"),
       createdAt: new Date().toISOString(),
-      weekStart: toIsoDate(startOfWeek(new Date(), { weekStartsOn: 1 })),
+      weekStart,
       healthScore,
       safeToSpend,
-      summary: `Health score is ${healthScore}/100. Safe-to-spend is ${snapshot.profile.currency} ${safeToSpend.toLocaleString()}. You ran ${checks.length} purchase checks so far.`,
+      summary: insights.narrative,
     };
 
     const result = await createWeeklyReportAction({
@@ -431,7 +439,7 @@ export function useFinancialState() {
 
     await refresh();
     return report;
-  }, [checks.length, refresh, snapshot]);
+  }, [checks, refresh, snapshot]);
 
   const confirmVoiceDraft = useCallback(
     async (draft: VoicePurchaseDraft) => {

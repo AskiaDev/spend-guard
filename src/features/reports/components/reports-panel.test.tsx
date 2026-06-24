@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { WeeklyReport } from "@/types/finance";
+import { financialSnapshotFixture as snapshot } from "@/test/fixtures/financial-snapshot";
+import type { PurchaseCheck, WeeklyReport } from "@/types/finance";
 import { ReportsPanel } from "./reports-panel";
 
 const reports: WeeklyReport[] = [
@@ -24,13 +25,64 @@ const reports: WeeklyReport[] = [
   },
 ];
 
+// Checks inside the latest report's week (2026-06-15 .. 2026-06-21).
+const checks: PurchaseCheck[] = [
+  {
+    id: "wk_skip",
+    itemName: "Sneakers",
+    amount: 4000,
+    urgency: "want",
+    paymentMethod: "cash",
+    createdAt: "2026-06-16T10:00:00.000Z",
+    decision: "WAIT",
+    riskScore: 55,
+    safeToSpend: 24000,
+    monthlyFreeCashFlow: 10000,
+    savingsAfterPurchase: 20000,
+    cooldownDays: 7,
+    advisorText: "",
+    reasons: [],
+    status: "skipped",
+  },
+  {
+    id: "wk_safe",
+    itemName: "Groceries",
+    amount: 2000,
+    urgency: "need_now",
+    paymentMethod: "cash",
+    createdAt: "2026-06-17T10:00:00.000Z",
+    decision: "SAFE_TO_BUY",
+    riskScore: 10,
+    safeToSpend: 24000,
+    monthlyFreeCashFlow: 10000,
+    savingsAfterPurchase: 22000,
+    cooldownDays: 0,
+    advisorText: "",
+    reasons: [],
+    status: "bought",
+  },
+];
+
+function renderPanel(props: Partial<Parameters<typeof ReportsPanel>[0]> = {}) {
+  return render(
+    <ReportsPanel
+      reports={reports}
+      checks={checks}
+      snapshot={snapshot}
+      currency="PHP"
+      onGenerateReport={vi.fn()}
+      {...props}
+    />
+  );
+}
+
 describe("ReportsPanel", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
   it("renders the latest weekly advisor report composition", () => {
-    render(<ReportsPanel reports={reports} currency="PHP" onGenerateReport={vi.fn()} />);
+    renderPanel();
 
     expect(screen.getByText("Jun 15, 2026 – Jun 21, 2026")).toBeVisible();
     expect(screen.getByRole("button", { name: "Download Report" })).toBeVisible();
@@ -59,6 +111,25 @@ describe("ReportsPanel", () => {
     expect(screen.getByTestId("mobile-report-cta")).toHaveClass("sticky");
   });
 
+  it("renders data-driven good-decision and amount-preserved metrics from the week's checks", () => {
+    renderPanel();
+
+    const goodDecisions = screen.getByLabelText("Good Decisions card");
+    expect(within(goodDecisions).getByText("2")).toBeVisible();
+
+    const avoided = screen.getByLabelText("Purchases Avoided card");
+    expect(within(avoided).getByText("₱4,000")).toBeVisible();
+    expect(within(avoided).getByText(/1 want skipped/i)).toBeVisible();
+  });
+
+  it("lists earlier weekly reports in the history section", () => {
+    renderPanel();
+
+    expect(screen.getByRole("heading", { name: "Report history" })).toBeVisible();
+    expect(screen.getByText("Older weekly summary.")).toBeVisible();
+    expect(screen.getByText("Jun 8, 2026 – Jun 14, 2026")).toBeVisible();
+  });
+
   it("downloads a local text report and immediately revokes the Blob URL", async () => {
     const user = userEvent.setup();
     const createObjectURL = vi.fn((blob: Blob) => {
@@ -77,7 +148,7 @@ describe("ReportsPanel", () => {
       value: revokeObjectURL,
     });
 
-    render(<ReportsPanel reports={reports} currency="PHP" onGenerateReport={vi.fn()} />);
+    renderPanel();
 
     await user.click(screen.getByRole("button", { name: "Download Report" }));
 
@@ -93,7 +164,7 @@ describe("ReportsPanel", () => {
       id: "report_generated",
     });
 
-    render(<ReportsPanel reports={[]} currency="PHP" onGenerateReport={onGenerateReport} />);
+    renderPanel({ reports: [], onGenerateReport });
 
     expect(screen.getByText(/no weekly report yet/i)).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Generate Report" }));

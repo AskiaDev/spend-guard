@@ -10,18 +10,32 @@ import { ProgressRing } from "@/components/finance/progress-ring";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn, formatCurrency } from "@/lib/utils";
-import type { CurrencyCode, FinancialSnapshot, WeeklyReport } from "@/types/finance";
+import type {
+  CurrencyCode,
+  FinancialSnapshot,
+  PurchaseCheck,
+  WeeklyReport,
+} from "@/types/finance";
+
+import { generateWeeklyReportInsights } from "../lib/weekly-report";
 
 export function ReportsPanel({
   reports,
+  checks,
+  snapshot,
   currency,
   onGenerateReport,
 }: {
   reports: WeeklyReport[];
+  checks: PurchaseCheck[];
+  snapshot: FinancialSnapshot;
   currency: FinancialSnapshot["profile"]["currency"];
   onGenerateReport: () => Promise<WeeklyReport>;
 }) {
-  const latestReport = getLatestReport(reports);
+  const sortedReports = [...reports].sort(
+    (first, second) => new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()
+  );
+  const latestReport = sortedReports[0];
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
@@ -74,7 +88,19 @@ export function ReportsPanel({
   }
 
   const weekRange = formatWeekRange(latestReport.weekStart);
-  const insights = buildReferenceInsights(latestReport, currency);
+  const insights = generateWeeklyReportInsights({
+    snapshot,
+    checks,
+    weekStart: latestReport.weekStart,
+    currency,
+  });
+  const insightCards = [
+    { label: "Improved Items", detail: insights.improvedItems },
+    { label: "Current Risks", detail: insights.currentRisks },
+    { label: "Goal Progress", detail: insights.goalProgress },
+    { label: "Next Best Action", detail: insights.nextBestAction },
+  ];
+  const pastReports = sortedReports.slice(1);
 
   return (
     <div className="grid gap-5 pb-24 lg:pb-0">
@@ -127,13 +153,15 @@ export function ReportsPanel({
         </Card>
         <MetricCard
           label="Good Decisions"
-          value="3"
-          detail="Checks that stayed inside current guardrails."
+          value={String(insights.goodDecisions)}
+          detail="Checks that stayed inside your guardrails this week."
         />
         <MetricCard
           label="Purchases Avoided"
-          value={formatCurrency(latestReport.safeToSpend, currency)}
-          detail="Safe-to-spend preserved for higher-priority needs."
+          value={formatCurrency(insights.amountPreserved, currency)}
+          detail={`${insights.purchasesAvoided} ${
+            insights.purchasesAvoided === 1 ? "want" : "wants"
+          } skipped to protect your plan.`}
         />
       </div>
 
@@ -142,7 +170,7 @@ export function ReportsPanel({
           <CardTitle id="reference-insights-heading">Reference insights</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 lg:grid-cols-3">
-          {insights.map((insight) => (
+          {insightCards.map((insight) => (
             <InsightCard key={insight.label} {...insight} />
           ))}
         </CardContent>
@@ -171,6 +199,32 @@ export function ReportsPanel({
           </div>
         </CardContent>
       </Card>
+
+      {pastReports.length > 0 ? (
+        <Card aria-labelledby="report-history-heading">
+          <CardHeader>
+            <CardTitle id="report-history-heading">Report history</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {pastReports.map((report) => (
+              <article
+                key={report.id}
+                className="grid gap-1 rounded-control border border-border bg-muted/30 p-4 sm:grid-cols-[1fr_auto] sm:items-center"
+              >
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {formatWeekRange(report.weekStart)}
+                  </h3>
+                  <p className="mt-1 text-sm leading-6 text-muted">{report.summary}</p>
+                </div>
+                <p className="text-sm font-semibold text-foreground sm:text-right">
+                  {report.healthScore}/100
+                </p>
+              </article>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div
         data-testid="mobile-report-cta"
@@ -214,34 +268,6 @@ function InsightCard({ label, detail }: { label: string; detail: string }) {
       <p className="mt-2 text-sm leading-6 text-muted">{detail}</p>
     </article>
   );
-}
-
-function buildReferenceInsights(report: WeeklyReport, currency: CurrencyCode) {
-  return [
-    {
-      label: "Improved Items",
-      detail: "More wants are being paused before becoming payment commitments.",
-    },
-    {
-      label: "Current Risks",
-      detail: "Installment purchases still need a monthly-payment check before approval.",
-    },
-    {
-      label: "Goal Progress",
-      detail: `${formatCurrency(report.safeToSpend, currency)} remains available as a guardrail while goals continue funding.`,
-    },
-    {
-      label: "Next Best Action",
-      detail: "Run a purchase check before the next flexible purchase over your weekly threshold.",
-    },
-  ];
-}
-
-function getLatestReport(reports: WeeklyReport[]) {
-  return [...reports].sort(
-    (first, second) =>
-      new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime()
-  )[0];
 }
 
 const dateComponentPattern = /^(\d{4})-(\d{2})-(\d{2})/;
