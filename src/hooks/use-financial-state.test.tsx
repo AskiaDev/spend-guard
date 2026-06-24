@@ -9,6 +9,14 @@ const actions = vi.hoisted(() => ({
   markStatus: vi.fn(),
   createGoal: vi.fn(),
   deleteGoal: vi.fn(),
+  createExpense: vi.fn(),
+  updateExpense: vi.fn(),
+  deleteExpense: vi.fn(),
+  createDebt: vi.fn(),
+  updateDebt: vi.fn(),
+  deleteDebt: vi.fn(),
+  updateSettings: vi.fn(),
+  deleteData: vi.fn(),
   createCooldown: vi.fn(),
   deleteCooldown: vi.fn(),
   createReport: vi.fn(),
@@ -29,9 +37,23 @@ vi.mock("@/features/goals/api/create-goal", () => ({
   createGoalAction: actions.createGoal,
   deleteGoalAction: actions.deleteGoal,
 }));
+vi.mock("@/features/expenses/api/manage-expense", () => ({
+  createExpenseAction: actions.createExpense,
+  updateExpenseAction: actions.updateExpense,
+  deleteExpenseAction: actions.deleteExpense,
+}));
+vi.mock("@/features/debts/api/manage-debt", () => ({
+  createDebtAction: actions.createDebt,
+  updateDebtAction: actions.updateDebt,
+  deleteDebtAction: actions.deleteDebt,
+}));
 vi.mock("@/features/cooldown/api/create-cooldown-item", () => ({
   createCooldownItemAction: actions.createCooldown,
   deleteCooldownItemAction: actions.deleteCooldown,
+}));
+vi.mock("@/features/settings/api/manage-settings", () => ({
+  updateProfileSettingsAction: actions.updateSettings,
+  deleteFinancialDataAction: actions.deleteData,
 }));
 vi.mock("@/features/reports/api/create-weekly-report", () => ({
   createWeeklyReportAction: actions.createReport,
@@ -64,6 +86,14 @@ describe("useFinancialState Supabase mode", () => {
     actions.markStatus.mockResolvedValue({ ok: true, data: null });
     actions.createGoal.mockResolvedValue({ ok: true, data: null });
     actions.deleteGoal.mockResolvedValue({ ok: true, data: null });
+    actions.createExpense.mockResolvedValue({ ok: true, data: null });
+    actions.updateExpense.mockResolvedValue({ ok: true, data: null });
+    actions.deleteExpense.mockResolvedValue({ ok: true, data: null });
+    actions.createDebt.mockResolvedValue({ ok: true, data: null });
+    actions.updateDebt.mockResolvedValue({ ok: true, data: null });
+    actions.deleteDebt.mockResolvedValue({ ok: true, data: null });
+    actions.updateSettings.mockResolvedValue({ ok: true, data: null });
+    actions.deleteData.mockResolvedValue({ ok: true, data: null });
     actions.createCooldown.mockResolvedValue({ ok: true, data: null });
     actions.deleteCooldown.mockResolvedValue({ ok: true, data: null });
     actions.createReport.mockResolvedValue({ ok: true, data: null });
@@ -149,6 +179,43 @@ describe("useFinancialState Supabase mode", () => {
         addedAt: "2026-06-20T02:00:00.000Z",
         recheckAt: "2026-06-23T02:00:00.000Z",
       });
+      await result.current.createExpense({
+        label: "Utilities",
+        amount: 6_500,
+        dueDay: 15,
+        isRecurring: true,
+      });
+      await result.current.updateExpense("expense-1", {
+        label: "Rent",
+        amount: 28_000,
+        dueDay: 1,
+        isRecurring: true,
+      });
+      await result.current.deleteExpense("expense-1");
+      await result.current.createDebt({
+        label: "Credit card",
+        outstandingBalance: 35_000,
+        minimumPayment: 5_000,
+        dueDay: 20,
+        interestRate: 0.32,
+      });
+      await result.current.updateDebt("debt-1", {
+        label: "Card",
+        outstandingBalance: 30_000,
+        minimumPayment: 4_000,
+        dueDay: 18,
+      });
+      await result.current.deleteDebt("debt-1");
+      await result.current.updateProfileSettings({
+        currency: "PHP",
+        monthlyIncome: 100_000,
+        currentSavings: 180_000,
+        emergencyFundTarget: 150_000,
+        fullName: "Askia",
+        payFrequency: "weekly",
+        estimatedVariableExpenses: 12_000,
+      });
+      await result.current.deleteFinancialData();
       await result.current.addCooldownFromCheck(savedCheck!.check);
       await result.current.markPurchaseCheckStatus(savedCheck!.check, "bought");
       await result.current.deleteGoal("goal-1");
@@ -177,6 +244,26 @@ describe("useFinancialState Supabase mode", () => {
         priority: "high",
       })
     );
+    expect(actions.createExpense).toHaveBeenCalledWith(
+      expect.objectContaining({ label: "Utilities", dueDay: 15 })
+    );
+    expect(actions.updateExpense).toHaveBeenCalledWith(
+      "expense-1",
+      expect.objectContaining({ label: "Rent" })
+    );
+    expect(actions.deleteExpense).toHaveBeenCalledWith("expense-1");
+    expect(actions.createDebt).toHaveBeenCalledWith(
+      expect.objectContaining({ label: "Credit card", dueDay: 20 })
+    );
+    expect(actions.updateDebt).toHaveBeenCalledWith(
+      "debt-1",
+      expect.objectContaining({ label: "Card", dueDay: 18 })
+    );
+    expect(actions.deleteDebt).toHaveBeenCalledWith("debt-1");
+    expect(actions.updateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ monthlyIncome: 100_000, payFrequency: "weekly" })
+    );
+    expect(actions.deleteData).toHaveBeenCalledOnce();
     expect(actions.createCooldown).toHaveBeenCalledWith(
       expect.objectContaining({ sourceCheckId: savedCheck?.check.id })
     );
@@ -314,6 +401,69 @@ describe("useFinancialState Supabase mode", () => {
       );
     });
     expect(result.current.error).toBe("Status failed.");
+
+    const mutationFailures = [
+      [
+        actions.createExpense,
+        () =>
+          result.current.createExpense({
+            label: "Rent",
+            amount: 28_000,
+            dueDay: 1,
+            isRecurring: true,
+          }),
+        "Expense failed.",
+      ],
+      [
+        actions.updateExpense,
+        () =>
+          result.current.updateExpense("expense-1", {
+            label: "Rent",
+            amount: 28_000,
+            dueDay: 1,
+            isRecurring: true,
+          }),
+        "Update expense failed.",
+      ],
+      [actions.deleteExpense, () => result.current.deleteExpense("expense-1"), "Delete expense failed."],
+      [
+        actions.createDebt,
+        () =>
+          result.current.createDebt({
+            label: "Card",
+            outstandingBalance: 10_000,
+            minimumPayment: 1_000,
+            dueDay: 1,
+          }),
+        "Debt failed.",
+      ],
+      [
+        actions.updateDebt,
+        () =>
+          result.current.updateDebt("debt-1", {
+            label: "Card",
+            outstandingBalance: 10_000,
+            minimumPayment: 1_000,
+            dueDay: 1,
+          }),
+        "Update debt failed.",
+      ],
+      [actions.deleteDebt, () => result.current.deleteDebt("debt-1"), "Delete debt failed."],
+      [
+        actions.updateSettings,
+        () => result.current.updateProfileSettings(emptySnapshot.profile),
+        "Settings failed.",
+      ],
+      [actions.deleteData, () => result.current.deleteFinancialData(), "Delete data failed."],
+    ] as const;
+
+    for (const [mock, operation, message] of mutationFailures) {
+      mock.mockResolvedValueOnce({ ok: false, error: message });
+      await act(async () => {
+        await expect(operation()).rejects.toThrow(message);
+      });
+      expect(result.current.error).toBe(message);
+    }
 
     actions.saveVoice.mockResolvedValueOnce({ ok: false, error: "Voice failed." });
     await act(async () => {

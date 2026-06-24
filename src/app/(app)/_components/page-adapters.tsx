@@ -3,10 +3,13 @@
 import { PageSkeleton } from "@/components/feedback/page-skeleton";
 import { CooldownPanel } from "@/features/cooldown";
 import { DashboardOverview } from "@/features/dashboard";
+import { DebtsPanel } from "@/features/debts";
+import { ExpensesPanel } from "@/features/expenses";
 import { GoalsPanel } from "@/features/goals";
 import { OnboardingSetup } from "@/features/onboarding";
 import { PurchaseCheckerWizard, PurchaseResult } from "@/features/purchase-checker";
 import { ReportsPanel } from "@/features/reports";
+import { SettingsPanel } from "@/features/settings";
 import { VoicePurchaseChecker } from "@/features/voice";
 import { useFinancialStateContext } from "@/providers/financial-state-provider";
 
@@ -90,6 +93,42 @@ export function GoalsPageContent() {
   );
 }
 
+export function ExpensesPageContent() {
+  const state = useFinancialStateContext();
+
+  if (!state.isHydrated) {
+    return <HydrationNotice />;
+  }
+
+  return (
+    <ExpensesPanel
+      expenses={state.snapshot.expenses}
+      currency={state.snapshot.profile.currency}
+      onCreateExpense={state.createExpense}
+      onUpdateExpense={state.updateExpense}
+      onDeleteExpense={state.deleteExpense}
+    />
+  );
+}
+
+export function DebtsPageContent() {
+  const state = useFinancialStateContext();
+
+  if (!state.isHydrated) {
+    return <HydrationNotice />;
+  }
+
+  return (
+    <DebtsPanel
+      debts={state.snapshot.debts}
+      currency={state.snapshot.profile.currency}
+      onCreateDebt={state.createDebt}
+      onUpdateDebt={state.updateDebt}
+      onDeleteDebt={state.deleteDebt}
+    />
+  );
+}
+
 export function CooldownPageContent() {
   const state = useFinancialStateContext();
 
@@ -104,6 +143,22 @@ export function CooldownPageContent() {
       snapshot={state.snapshot}
       onRemove={state.removeCooldownItem}
       onConvertToGoal={state.addGoalFromCooldown}
+    />
+  );
+}
+
+export function SettingsPageContent() {
+  const state = useFinancialStateContext();
+
+  if (!state.isHydrated) {
+    return <HydrationNotice />;
+  }
+
+  return (
+    <SettingsPanel
+      profile={state.snapshot.profile}
+      onUpdateProfile={state.updateProfileSettings}
+      onDeleteFinancialData={state.deleteFinancialData}
     />
   );
 }

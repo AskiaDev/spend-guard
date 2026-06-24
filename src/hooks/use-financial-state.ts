@@ -6,6 +6,16 @@ import {
   createCooldownItemAction,
   deleteCooldownItemAction,
 } from "@/features/cooldown/api/create-cooldown-item";
+import {
+  createDebtAction,
+  deleteDebtAction,
+  updateDebtAction,
+} from "@/features/debts/api/manage-debt";
+import {
+  createExpenseAction,
+  deleteExpenseAction,
+  updateExpenseAction,
+} from "@/features/expenses/api/manage-expense";
 import { loadFinancialWorkspaceAction } from "@/features/financial-profile/api/load-financial-workspace";
 import { saveFinancialProfileAction } from "@/features/financial-profile/api/save-financial-profile";
 import { createGoalAction, deleteGoalAction } from "@/features/goals/api/create-goal";
@@ -15,6 +25,10 @@ import {
 } from "@/features/purchase-checker/api/save-purchase-check";
 import { saveVoiceSessionAction } from "@/features/purchase-checker/api/save-voice-session";
 import { createWeeklyReportAction } from "@/features/reports/api/create-weekly-report";
+import {
+  deleteFinancialDataAction,
+  updateProfileSettingsAction,
+} from "@/features/settings/api/manage-settings";
 import {
   calculateFinancialHealthScore,
   calculateMonthlyFreeCashFlow,
@@ -47,6 +61,8 @@ interface OnboardingPayload {
 }
 
 type GoalDraft = Omit<Goal, "id">;
+type ExpenseDraft = Omit<Expense, "id">;
+type DebtDraft = Omit<Debt, "id">;
 
 export function useFinancialState() {
   const [snapshot, setSnapshot] = useState<FinancialSnapshot>(() => emptySnapshot);
@@ -278,6 +294,117 @@ export function useFinancialState() {
     [refresh]
   );
 
+  const createExpense = useCallback(
+    async (expenseDraft: ExpenseDraft) => {
+      const result = await createExpenseAction(expenseDraft);
+
+      if (!result.ok) {
+        setError(result.error);
+        throw new Error(result.error);
+      }
+
+      await refresh();
+      return { id: createId("expense"), ...expenseDraft };
+    },
+    [refresh]
+  );
+
+  const updateExpense = useCallback(
+    async (id: string, expenseDraft: ExpenseDraft) => {
+      const result = await updateExpenseAction(id, expenseDraft);
+
+      if (!result.ok) {
+        setError(result.error);
+        throw new Error(result.error);
+      }
+
+      await refresh();
+    },
+    [refresh]
+  );
+
+  const deleteExpense = useCallback(
+    async (id: string) => {
+      const result = await deleteExpenseAction(id);
+
+      if (!result.ok) {
+        setError(result.error);
+        throw new Error(result.error);
+      }
+
+      await refresh();
+    },
+    [refresh]
+  );
+
+  const createDebt = useCallback(
+    async (debtDraft: DebtDraft) => {
+      const result = await createDebtAction(debtDraft);
+
+      if (!result.ok) {
+        setError(result.error);
+        throw new Error(result.error);
+      }
+
+      await refresh();
+      return { id: createId("debt"), ...debtDraft };
+    },
+    [refresh]
+  );
+
+  const updateDebt = useCallback(
+    async (id: string, debtDraft: DebtDraft) => {
+      const result = await updateDebtAction(id, debtDraft);
+
+      if (!result.ok) {
+        setError(result.error);
+        throw new Error(result.error);
+      }
+
+      await refresh();
+    },
+    [refresh]
+  );
+
+  const deleteDebt = useCallback(
+    async (id: string) => {
+      const result = await deleteDebtAction(id);
+
+      if (!result.ok) {
+        setError(result.error);
+        throw new Error(result.error);
+      }
+
+      await refresh();
+    },
+    [refresh]
+  );
+
+  const updateProfileSettings = useCallback(
+    async (profile: FinancialProfile) => {
+      const result = await updateProfileSettingsAction(profile);
+
+      if (!result.ok) {
+        setError(result.error);
+        throw new Error(result.error);
+      }
+
+      await refresh();
+    },
+    [refresh]
+  );
+
+  const deleteFinancialData = useCallback(async () => {
+    const result = await deleteFinancialDataAction();
+
+    if (!result.ok) {
+      setError(result.error);
+      throw new Error(result.error);
+    }
+
+    await refresh();
+  }, [refresh]);
+
   const generateWeeklyReport = useCallback(async () => {
     const safeToSpend = calculateSafeToSpend(snapshot);
     const healthScore = calculateFinancialHealthScore(snapshot);
@@ -344,6 +471,14 @@ export function useFinancialState() {
     markPurchaseCheckStatus,
     removeCooldownItem,
     deleteGoal,
+    createExpense,
+    updateExpense,
+    deleteExpense,
+    createDebt,
+    updateDebt,
+    deleteDebt,
+    updateProfileSettings,
+    deleteFinancialData,
     generateWeeklyReport,
     confirmVoiceDraft,
     refresh,

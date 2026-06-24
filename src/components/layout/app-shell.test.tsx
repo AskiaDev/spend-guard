@@ -26,6 +26,7 @@ describe("AppShell", () => {
     for (const link of currentLinks) {
       expect(link).toHaveAccessibleName("Goals");
     }
+    expect(screen.getByRole("link", { name: "Expenses" })).not.toHaveAttribute("aria-current");
     expect(screen.getByRole("link", { name: "Debts" })).not.toHaveAttribute("aria-current");
   });
 
@@ -46,9 +47,16 @@ describe("AppShell", () => {
     expect(screen.getAllByRole("link", { name: "Checker" })).toHaveLength(1);
     expect(screen.getAllByRole("link", { name: "Voice" })).toHaveLength(1);
     expect(screen.getAllByRole("link", { name: "More" })).toHaveLength(1);
-    expect(screen.getAllByRole("link", { name: "Debts" })).toHaveLength(1);
-    expect(screen.getAllByRole("link", { name: "Reports" })).toHaveLength(1);
-    expect(screen.getAllByRole("link", { name: "Settings" })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Expenses" })).toHaveAttribute(
+      "href",
+      "/expenses"
+    );
+    expect(screen.getByRole("link", { name: "Debts" })).toHaveAttribute("href", "/debts");
+    expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("href", "/reports");
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute(
+      "href",
+      "/settings"
+    );
     expect(screen.getAllByRole("heading", { name: "Goals content" })).toHaveLength(1);
   });
 });

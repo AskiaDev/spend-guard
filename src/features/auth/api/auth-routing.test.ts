@@ -11,9 +11,12 @@ describe("getAuthRedirect", () => {
       "/checker",
       "/checker/result",
       "/cooldown",
+      "/debts",
+      "/expenses",
       "/goals",
       "/onboarding",
       "/reports",
+      "/settings",
       "/voice",
     ]) {
       expect(getAuthRedirect(path, false)).toBe("/login");
@@ -21,7 +24,7 @@ describe("getAuthRedirect", () => {
   });
 
   it("allows onboarded authenticated users to reach protected app routes", () => {
-    for (const path of ["/", "/checker", "/goals", "/voice"]) {
+    for (const path of ["/", "/checker", "/debts", "/expenses", "/goals", "/settings", "/voice"]) {
       expect(getAuthRedirect(path, true, true)).toBeNull();
     }
   });
@@ -36,7 +39,17 @@ describe("getAuthRedirect", () => {
   });
 
   it("routes authenticated users who have not completed onboarding to onboarding", () => {
-    for (const path of ["/", "/checker", "/goals", "/reports", "/login", "/signup"]) {
+    for (const path of [
+      "/",
+      "/checker",
+      "/debts",
+      "/expenses",
+      "/goals",
+      "/reports",
+      "/settings",
+      "/login",
+      "/signup",
+    ]) {
       expect(getAuthRedirect(path, true, false)).toBe("/onboarding");
     }
   });

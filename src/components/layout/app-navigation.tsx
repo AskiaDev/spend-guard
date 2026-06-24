@@ -6,6 +6,7 @@ import {
   House,
   Menu,
   Mic,
+  ReceiptText,
   SearchCheck,
   Settings,
   Target,
@@ -24,9 +25,10 @@ export const primaryNavigation = [
 ] as const;
 
 const secondaryNavigation = [
-  { href: "/goals#debts", label: "Debts", icon: CircleDollarSign },
+  { href: "/expenses", label: "Expenses", icon: ReceiptText },
+  { href: "/debts", label: "Debts", icon: CircleDollarSign },
   { href: "/reports", label: "Reports", icon: FileText },
-  { href: "/onboarding", label: "Settings", icon: Settings },
+  { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 type NavigationItem = {

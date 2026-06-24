@@ -1,0 +1,3691 @@
+diff --git a/src/app/(app)/_components/page-adapters.test.tsx b/src/app/(app)/_components/page-adapters.test.tsx
+index 973073f..90e66d6 100644
+--- a/src/app/(app)/_components/page-adapters.test.tsx
++++ b/src/app/(app)/_components/page-adapters.test.tsx
+@@ -2,21 +2,27 @@ import { render, screen } from "@testing-library/react";
+ import { beforeEach, describe, expect, it, vi } from "vitest";
+ import { CooldownPanel } from "@/features/cooldown";
+ import { DashboardOverview } from "@/features/dashboard";
++import { DebtsPanel } from "@/features/debts";
++import { ExpensesPanel } from "@/features/expenses";
+ import { GoalsPanel } from "@/features/goals";
+ import { OnboardingSetup } from "@/features/onboarding";
+ import { PurchaseCheckerWizard, PurchaseResult } from "@/features/purchase-checker";
+ import { ReportsPanel } from "@/features/reports";
++import { SettingsPanel } from "@/features/settings";
+ import { VoicePurchaseChecker } from "@/features/voice";
+ import { financialSnapshotFixture as defaultSnapshot } from "@/test/fixtures/financial-snapshot";
+ import { useFinancialStateContext } from "@/providers/financial-state-provider";
+ import {
+   CooldownPageContent,
+   DashboardPageContent,
++  DebtsPageContent,
++  ExpensesPageContent,
+   GoalsPageContent,
+   OnboardingPageContent,
+   PurchaseCheckerPageContent,
+   PurchaseResultPageContent,
+   ReportsPageContent,
++  SettingsPageContent,
+   VoicePageContent,
+ } from "./page-adapters";
+ 
+@@ -28,6 +34,14 @@ vi.mock("@/features/dashboard", () => ({
+   DashboardOverview: vi.fn(() => <div data-testid="dashboard-overview" />),
+ }));
+ 
++vi.mock("@/features/debts", () => ({
++  DebtsPanel: vi.fn(() => <div data-testid="debts-panel" />),
++}));
++
++vi.mock("@/features/expenses", () => ({
++  ExpensesPanel: vi.fn(() => <div data-testid="expenses-panel" />),
++}));
++
+ vi.mock("@/features/goals", () => ({
+   GoalsPanel: vi.fn(() => <div data-testid="goals-panel" />),
+ }));
+@@ -47,6 +61,10 @@ vi.mock("@/features/reports", () => ({
+   ReportsPanel: vi.fn(() => <div data-testid="reports-panel" />),
+ }));
+ 
++vi.mock("@/features/settings", () => ({
++  SettingsPanel: vi.fn(() => <div data-testid="settings-panel" />),
++}));
++
+ vi.mock("@/features/voice", () => ({
+   VoicePurchaseChecker: vi.fn(() => <div data-testid="voice-purchase-checker" />),
+ }));
+@@ -116,6 +134,14 @@ describe("page adapters", () => {
+       addGoalFromCheck: vi.fn(),
+       addGoalFromCooldown: vi.fn(),
+       createGoal: vi.fn(),
++      createExpense: vi.fn(),
++      updateExpense: vi.fn(),
++      deleteExpense: vi.fn(),
++      createDebt: vi.fn(),
++      updateDebt: vi.fn(),
++      deleteDebt: vi.fn(),
++      updateProfileSettings: vi.fn(),
++      deleteFinancialData: vi.fn(),
+       addCooldownFromCheck: vi.fn(),
+       markPurchaseCheckStatus: vi.fn(),
+       removeCooldownItem: vi.fn(),
+@@ -224,6 +250,34 @@ describe("page adapters", () => {
+     expect(props.onDeleteGoal).toBe(financialState.deleteGoal);
+   });
+ 
++  it("passes expense state and callback identities", () => {
++    render(<ExpensesPageContent />);
++
++    expect(screen.getByTestId("expenses-panel")).toBeInTheDocument();
++    expect(ExpensesPanel).toHaveBeenCalledOnce();
++
++    const props = vi.mocked(ExpensesPanel).mock.calls[0][0];
++    expect(props.expenses).toBe(financialState.snapshot.expenses);
++    expect(props.currency).toBe(financialState.snapshot.profile.currency);
++    expect(props.onCreateExpense).toBe(financialState.createExpense);
++    expect(props.onUpdateExpense).toBe(financialState.updateExpense);
++    expect(props.onDeleteExpense).toBe(financialState.deleteExpense);
++  });
++
++  it("passes debt state and callback identities", () => {
++    render(<DebtsPageContent />);
++
++    expect(screen.getByTestId("debts-panel")).toBeInTheDocument();
++    expect(DebtsPanel).toHaveBeenCalledOnce();
++
++    const props = vi.mocked(DebtsPanel).mock.calls[0][0];
++    expect(props.debts).toBe(financialState.snapshot.debts);
++    expect(props.currency).toBe(financialState.snapshot.profile.currency);
++    expect(props.onCreateDebt).toBe(financialState.createDebt);
++    expect(props.onUpdateDebt).toBe(financialState.updateDebt);
++    expect(props.onDeleteDebt).toBe(financialState.deleteDebt);
++  });
++
+   it("passes cooldown state and callback identities", () => {
+     render(<CooldownPageContent />);
+ 
+@@ -250,6 +304,18 @@ describe("page adapters", () => {
+     expect(props.onGenerateReport).toBe(financialState.generateWeeklyReport);
+   });
+ 
++  it("passes settings state and callback identities", () => {
++    render(<SettingsPageContent />);
++
++    expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
++    expect(SettingsPanel).toHaveBeenCalledOnce();
++
++    const props = vi.mocked(SettingsPanel).mock.calls[0][0];
++    expect(props.profile).toBe(financialState.snapshot.profile);
++    expect(props.onUpdateProfile).toBe(financialState.updateProfileSettings);
++    expect(props.onDeleteFinancialData).toBe(financialState.deleteFinancialData);
++  });
++
+   it("shows the hydration notice before passing onboarding state and callback identities", () => {
+     vi.mocked(useFinancialStateContext).mockReturnValue({
+       ...financialState,
+diff --git a/src/app/(app)/_components/page-adapters.tsx b/src/app/(app)/_components/page-adapters.tsx
+index 0f94804..f4172c3 100644
+--- a/src/app/(app)/_components/page-adapters.tsx
++++ b/src/app/(app)/_components/page-adapters.tsx
+@@ -3,10 +3,13 @@
+ import { PageSkeleton } from "@/components/feedback/page-skeleton";
+ import { CooldownPanel } from "@/features/cooldown";
+ import { DashboardOverview } from "@/features/dashboard";
++import { DebtsPanel } from "@/features/debts";
++import { ExpensesPanel } from "@/features/expenses";
+ import { GoalsPanel } from "@/features/goals";
+ import { OnboardingSetup } from "@/features/onboarding";
+ import { PurchaseCheckerWizard, PurchaseResult } from "@/features/purchase-checker";
+ import { ReportsPanel } from "@/features/reports";
++import { SettingsPanel } from "@/features/settings";
+ import { VoicePurchaseChecker } from "@/features/voice";
+ import { useFinancialStateContext } from "@/providers/financial-state-provider";
+ 
+@@ -90,6 +93,42 @@ export function GoalsPageContent() {
+   );
+ }
+ 
++export function ExpensesPageContent() {
++  const state = useFinancialStateContext();
++
++  if (!state.isHydrated) {
++    return <HydrationNotice />;
++  }
++
++  return (
++    <ExpensesPanel
++      expenses={state.snapshot.expenses}
++      currency={state.snapshot.profile.currency}
++      onCreateExpense={state.createExpense}
++      onUpdateExpense={state.updateExpense}
++      onDeleteExpense={state.deleteExpense}
++    />
++  );
++}
++
++export function DebtsPageContent() {
++  const state = useFinancialStateContext();
++
++  if (!state.isHydrated) {
++    return <HydrationNotice />;
++  }
++
++  return (
++    <DebtsPanel
++      debts={state.snapshot.debts}
++      currency={state.snapshot.profile.currency}
++      onCreateDebt={state.createDebt}
++      onUpdateDebt={state.updateDebt}
++      onDeleteDebt={state.deleteDebt}
++    />
++  );
++}
++
+ export function CooldownPageContent() {
+   const state = useFinancialStateContext();
+ 
+@@ -108,6 +147,22 @@ export function CooldownPageContent() {
+   );
+ }
+ 
++export function SettingsPageContent() {
++  const state = useFinancialStateContext();
++
++  if (!state.isHydrated) {
++    return <HydrationNotice />;
++  }
++
++  return (
++    <SettingsPanel
++      profile={state.snapshot.profile}
++      onUpdateProfile={state.updateProfileSettings}
++      onDeleteFinancialData={state.deleteFinancialData}
++    />
++  );
++}
++
+ export function ReportsPageContent() {
+   const state = useFinancialStateContext();
+ 
+diff --git a/src/app/(app)/debts/page.tsx b/src/app/(app)/debts/page.tsx
+new file mode 100644
+index 0000000..6bc79cd
+--- /dev/null
++++ b/src/app/(app)/debts/page.tsx
+@@ -0,0 +1,19 @@
++import type { Metadata } from "next";
++import { DebtsPageContent } from "../_components/page-adapters";
++import { PageFrame } from "../_components/page-frame";
++
++export const metadata: Metadata = {
++  title: "Debts | SpendGuard",
++};
++
++export default function DebtsPage() {
++  return (
++    <PageFrame
++      eyebrow="Debt pressure"
++      title="Debts"
++      description="Keep balances, minimums, and due dates current for the 30-day debt window."
++    >
++      <DebtsPageContent />
++    </PageFrame>
++  );
++}
+diff --git a/src/app/(app)/expenses/page.tsx b/src/app/(app)/expenses/page.tsx
+new file mode 100644
+index 0000000..aaf937b
+--- /dev/null
++++ b/src/app/(app)/expenses/page.tsx
+@@ -0,0 +1,19 @@
++import type { Metadata } from "next";
++import { ExpensesPageContent } from "../_components/page-adapters";
++import { PageFrame } from "../_components/page-frame";
++
++export const metadata: Metadata = {
++  title: "Expenses | SpendGuard",
++};
++
++export default function ExpensesPage() {
++  return (
++    <PageFrame
++      eyebrow="Committed cash"
++      title="Expenses"
++      description="Edit bills and recurring costs so the checker protects money already assigned."
++    >
++      <ExpensesPageContent />
++    </PageFrame>
++  );
++}
+diff --git a/src/app/(app)/settings/page.tsx b/src/app/(app)/settings/page.tsx
+new file mode 100644
+index 0000000..19e1cd5
+--- /dev/null
++++ b/src/app/(app)/settings/page.tsx
+@@ -0,0 +1,19 @@
++import type { Metadata } from "next";
++import { SettingsPageContent } from "../_components/page-adapters";
++import { PageFrame } from "../_components/page-frame";
++
++export const metadata: Metadata = {
++  title: "Settings | SpendGuard",
++};
++
++export default function SettingsPage() {
++  return (
++    <PageFrame
++      eyebrow="Profile controls"
++      title="Settings"
++      description="Update your financial baseline and manage the data stored for your account."
++    >
++      <SettingsPageContent />
++    </PageFrame>
++  );
++}
+diff --git a/src/components/layout/app-navigation.tsx b/src/components/layout/app-navigation.tsx
+index d605894..86f094c 100644
+--- a/src/components/layout/app-navigation.tsx
++++ b/src/components/layout/app-navigation.tsx
+@@ -6,6 +6,7 @@ import {
+   House,
+   Menu,
+   Mic,
++  ReceiptText,
+   SearchCheck,
+   Settings,
+   Target,
+@@ -24,9 +25,10 @@ export const primaryNavigation = [
+ ] as const;
+ 
+ const secondaryNavigation = [
+-  { href: "/goals#debts", label: "Debts", icon: CircleDollarSign },
++  { href: "/expenses", label: "Expenses", icon: ReceiptText },
++  { href: "/debts", label: "Debts", icon: CircleDollarSign },
+   { href: "/reports", label: "Reports", icon: FileText },
+-  { href: "/onboarding", label: "Settings", icon: Settings },
++  { href: "/settings", label: "Settings", icon: Settings },
+ ] as const;
+ 
+ type NavigationItem = {
+diff --git a/src/components/layout/app-shell.test.tsx b/src/components/layout/app-shell.test.tsx
+index 29d485d..df69708 100644
+--- a/src/components/layout/app-shell.test.tsx
++++ b/src/components/layout/app-shell.test.tsx
+@@ -26,6 +26,7 @@ describe("AppShell", () => {
+     for (const link of currentLinks) {
+       expect(link).toHaveAccessibleName("Goals");
+     }
++    expect(screen.getByRole("link", { name: "Expenses" })).not.toHaveAttribute("aria-current");
+     expect(screen.getByRole("link", { name: "Debts" })).not.toHaveAttribute("aria-current");
+   });
+ 
+@@ -46,9 +47,16 @@ describe("AppShell", () => {
+     expect(screen.getAllByRole("link", { name: "Checker" })).toHaveLength(1);
+     expect(screen.getAllByRole("link", { name: "Voice" })).toHaveLength(1);
+     expect(screen.getAllByRole("link", { name: "More" })).toHaveLength(1);
+-    expect(screen.getAllByRole("link", { name: "Debts" })).toHaveLength(1);
+-    expect(screen.getAllByRole("link", { name: "Reports" })).toHaveLength(1);
+-    expect(screen.getAllByRole("link", { name: "Settings" })).toHaveLength(1);
++    expect(screen.getByRole("link", { name: "Expenses" })).toHaveAttribute(
++      "href",
++      "/expenses"
++    );
++    expect(screen.getByRole("link", { name: "Debts" })).toHaveAttribute("href", "/debts");
++    expect(screen.getByRole("link", { name: "Reports" })).toHaveAttribute("href", "/reports");
++    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute(
++      "href",
++      "/settings"
++    );
+     expect(screen.getAllByRole("heading", { name: "Goals content" })).toHaveLength(1);
+   });
+ });
+diff --git a/src/features/auth/api/auth-routing.test.ts b/src/features/auth/api/auth-routing.test.ts
+index df30783..c23b51c 100644
+--- a/src/features/auth/api/auth-routing.test.ts
++++ b/src/features/auth/api/auth-routing.test.ts
+@@ -11,9 +11,12 @@ describe("getAuthRedirect", () => {
+       "/checker",
+       "/checker/result",
+       "/cooldown",
++      "/debts",
++      "/expenses",
+       "/goals",
+       "/onboarding",
+       "/reports",
++      "/settings",
+       "/voice",
+     ]) {
+       expect(getAuthRedirect(path, false)).toBe("/login");
+@@ -21,7 +24,7 @@ describe("getAuthRedirect", () => {
+   });
+ 
+   it("allows onboarded authenticated users to reach protected app routes", () => {
+-    for (const path of ["/", "/checker", "/goals", "/voice"]) {
++    for (const path of ["/", "/checker", "/debts", "/expenses", "/goals", "/settings", "/voice"]) {
+       expect(getAuthRedirect(path, true, true)).toBeNull();
+     }
+   });
+@@ -36,7 +39,17 @@ describe("getAuthRedirect", () => {
+   });
+ 
+   it("routes authenticated users who have not completed onboarding to onboarding", () => {
+-    for (const path of ["/", "/checker", "/goals", "/reports", "/login", "/signup"]) {
++    for (const path of [
++      "/",
++      "/checker",
++      "/debts",
++      "/expenses",
++      "/goals",
++      "/reports",
++      "/settings",
++      "/login",
++      "/signup",
++    ]) {
+       expect(getAuthRedirect(path, true, false)).toBe("/onboarding");
+     }
+   });
+diff --git a/src/features/debts/api/manage-debt.test.ts b/src/features/debts/api/manage-debt.test.ts
+new file mode 100644
+index 0000000..4875e53
+--- /dev/null
++++ b/src/features/debts/api/manage-debt.test.ts
+@@ -0,0 +1,168 @@
++import { beforeEach, describe, expect, it, vi } from "vitest";
++import { createDebtAction, deleteDebtAction, updateDebtAction } from "./manage-debt";
++
++vi.mock("@/lib/supabase/server", () => ({ requireUserId: vi.fn() }));
++
++import { requireUserId } from "@/lib/supabase/server";
++
++const mockedRequireUserId = vi.mocked(requireUserId);
++
++describe("debt actions", () => {
++  beforeEach(() => {
++    vi.clearAllMocks();
++  });
++
++  it("inserts a validated debt for the authenticated user", async () => {
++    const insert = vi.fn(async () => ({ error: null }));
++    const supabase = { from: vi.fn(() => ({ insert })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await createDebtAction({
++      label: "Credit card",
++      outstandingBalance: 35_000,
++      minimumPayment: 5_000,
++      dueDay: 20,
++      interestRate: 0.32,
++    });
++
++    expect(result).toEqual({ ok: true, data: null });
++    expect(supabase.from).toHaveBeenCalledWith("debts");
++    expect(insert).toHaveBeenCalledWith({
++      user_id: "user-1",
++      label: "Credit card",
++      outstanding_balance: 35_000,
++      minimum_payment: 5_000,
++      due_day: 20,
++      interest_rate: 0.32,
++    });
++  });
++
++  it("persists blank interest as null", async () => {
++    const insert = vi.fn(async () => ({ error: null }));
++    const supabase = { from: vi.fn(() => ({ insert })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    await createDebtAction({
++      label: "Device loan",
++      outstandingBalance: 12_000,
++      minimumPayment: 2_000,
++      dueDay: 5,
++    });
++
++    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ interest_rate: null }));
++  });
++
++  it("updates debts only for the authenticated user", async () => {
++    const eqUser = vi.fn(async () => ({ error: null }));
++    const eqId = vi.fn(() => ({ eq: eqUser }));
++    const update = vi.fn(() => ({ eq: eqId }));
++    const supabase = { from: vi.fn(() => ({ update })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await updateDebtAction("debt-1", {
++      label: "Card",
++      outstandingBalance: 30_000,
++      minimumPayment: 4_000,
++      dueDay: 18,
++      interestRate: 0.25,
++    });
++
++    expect(result).toEqual({ ok: true, data: null });
++    expect(supabase.from).toHaveBeenCalledWith("debts");
++    expect(update).toHaveBeenCalledWith({
++      label: "Card",
++      outstanding_balance: 30_000,
++      minimum_payment: 4_000,
++      due_day: 18,
++      interest_rate: 0.25,
++    });
++    expect(eqId).toHaveBeenCalledWith("id", "debt-1");
++    expect(eqUser).toHaveBeenCalledWith("user_id", "user-1");
++  });
++
++  it("rejects invalid debt payloads before auth or database access", async () => {
++    const result = await createDebtAction({
++      label: "",
++      outstandingBalance: -1,
++      minimumPayment: -1,
++      dueDay: 0,
++      interestRate: 2,
++    });
++
++    expect(result.ok).toBe(false);
++    expect(result).toMatchObject({
++      error: "Check the debt fields.",
++      fieldErrors: {
++        label: ["Name this debt."],
++        outstandingBalance: ["Enter a positive amount."],
++        minimumPayment: ["Enter a positive amount."],
++        dueDay: ["Too small: expected number to be >=1"],
++        interestRate: ["Too big: expected number to be <=1"],
++      },
++    });
++    expect(mockedRequireUserId).not.toHaveBeenCalled();
++  });
++
++  it("requires a debt id before update or delete", async () => {
++    await expect(
++      updateDebtAction("", { label: "Card", outstandingBalance: 1, minimumPayment: 1, dueDay: 1 })
++    ).resolves.toEqual({ ok: false, error: "Debt ID is required." });
++    await expect(deleteDebtAction("")).resolves.toEqual({
++      ok: false,
++      error: "Debt ID is required.",
++    });
++    expect(mockedRequireUserId).not.toHaveBeenCalled();
++  });
++
++  it("returns friendly errors for database failures", async () => {
++    const insert = vi.fn(async () => ({ error: { message: "insert failed" } }));
++    const updateEqUser = vi.fn(async () => ({ error: { message: "update failed" } }));
++    const update = vi.fn(() => ({ eq: () => ({ eq: updateEqUser }) }));
++    const deleteEqUser = vi.fn(async () => ({ error: { message: "delete failed" } }));
++    const remove = vi.fn(() => ({ eq: () => ({ eq: deleteEqUser }) }));
++    const supabase = {
++      from: vi.fn(() => ({
++        insert,
++        update,
++        delete: remove,
++      })),
++    };
++    mockedRequireUserId.mockResolvedValue({ supabase, userId: "user-1" } as never);
++
++    await expect(
++      createDebtAction({
++        label: "Card",
++        outstandingBalance: 10_000,
++        minimumPayment: 1_000,
++        dueDay: 1,
++      })
++    ).resolves.toEqual({ ok: false, error: "Unable to create this debt." });
++    await expect(
++      updateDebtAction("debt-1", {
++        label: "Card",
++        outstandingBalance: 10_000,
++        minimumPayment: 1_000,
++        dueDay: 1,
++      })
++    ).resolves.toEqual({ ok: false, error: "Unable to update this debt." });
++    await expect(deleteDebtAction("debt-1")).resolves.toEqual({
++      ok: false,
++      error: "Unable to delete this debt.",
++    });
++  });
++
++  it("deletes debts only for the authenticated user", async () => {
++    const eqUser = vi.fn(async () => ({ error: null }));
++    const eqId = vi.fn(() => ({ eq: eqUser }));
++    const remove = vi.fn(() => ({ eq: eqId }));
++    const supabase = { from: vi.fn(() => ({ delete: remove })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await deleteDebtAction("debt-1");
++
++    expect(result).toEqual({ ok: true, data: null });
++    expect(supabase.from).toHaveBeenCalledWith("debts");
++    expect(eqId).toHaveBeenCalledWith("id", "debt-1");
++    expect(eqUser).toHaveBeenCalledWith("user_id", "user-1");
++  });
++});
+diff --git a/src/features/debts/api/manage-debt.ts b/src/features/debts/api/manage-debt.ts
+new file mode 100644
+index 0000000..aa30c2d
+--- /dev/null
++++ b/src/features/debts/api/manage-debt.ts
+@@ -0,0 +1,109 @@
++"use server";
++
++import { debtSchema } from "@/lib/schemas/finance";
++import { requireUserId } from "@/lib/supabase/server";
++import type { ActionResult } from "@/types/action-result";
++
++export async function createDebtAction(input: unknown): Promise<ActionResult<null>> {
++  const parsed = debtSchema.safeParse(input);
++
++  if (!parsed.success) {
++    return {
++      ok: false,
++      error: "Check the debt fields.",
++      fieldErrors: parsed.error.flatten().fieldErrors,
++    };
++  }
++
++  try {
++    const { supabase, userId } = await requireUserId();
++    const debt = parsed.data;
++    const { error } = await supabase.from("debts").insert({
++      user_id: userId,
++      label: debt.label,
++      outstanding_balance: debt.outstandingBalance,
++      minimum_payment: debt.minimumPayment,
++      due_day: debt.dueDay,
++      interest_rate: debt.interestRate ?? null,
++    });
++
++    if (error) {
++      console.error("Unable to create Supabase debt", error);
++      return { ok: false, error: "Unable to create this debt." };
++    }
++
++    return { ok: true, data: null };
++  } catch (error) {
++    return {
++      ok: false,
++      error: error instanceof Error ? error.message : "Unable to create debt.",
++    };
++  }
++}
++
++export async function updateDebtAction(id: string, input: unknown): Promise<ActionResult<null>> {
++  if (!id) {
++    return { ok: false, error: "Debt ID is required." };
++  }
++
++  const parsed = debtSchema.safeParse(input);
++
++  if (!parsed.success) {
++    return {
++      ok: false,
++      error: "Check the debt fields.",
++      fieldErrors: parsed.error.flatten().fieldErrors,
++    };
++  }
++
++  try {
++    const { supabase, userId } = await requireUserId();
++    const debt = parsed.data;
++    const { error } = await supabase
++      .from("debts")
++      .update({
++        label: debt.label,
++        outstanding_balance: debt.outstandingBalance,
++        minimum_payment: debt.minimumPayment,
++        due_day: debt.dueDay,
++        interest_rate: debt.interestRate ?? null,
++      })
++      .eq("id", id)
++      .eq("user_id", userId);
++
++    if (error) {
++      console.error("Unable to update Supabase debt", error);
++      return { ok: false, error: "Unable to update this debt." };
++    }
++
++    return { ok: true, data: null };
++  } catch (error) {
++    return {
++      ok: false,
++      error: error instanceof Error ? error.message : "Unable to update debt.",
++    };
++  }
++}
++
++export async function deleteDebtAction(id: string): Promise<ActionResult<null>> {
++  if (!id) {
++    return { ok: false, error: "Debt ID is required." };
++  }
++
++  try {
++    const { supabase, userId } = await requireUserId();
++    const { error } = await supabase.from("debts").delete().eq("id", id).eq("user_id", userId);
++
++    if (error) {
++      console.error("Unable to delete Supabase debt", error);
++      return { ok: false, error: "Unable to delete this debt." };
++    }
++
++    return { ok: true, data: null };
++  } catch (error) {
++    return {
++      ok: false,
++      error: error instanceof Error ? error.message : "Unable to delete debt.",
++    };
++  }
++}
+diff --git a/src/features/debts/components/debts-panel.test.tsx b/src/features/debts/components/debts-panel.test.tsx
+new file mode 100644
+index 0000000..e034520
+--- /dev/null
++++ b/src/features/debts/components/debts-panel.test.tsx
+@@ -0,0 +1,125 @@
++import { render, screen, within } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { describe, expect, it, vi } from "vitest";
++
++import { financialSnapshotFixture } from "@/test/fixtures/financial-snapshot";
++import type { Debt } from "@/types/finance";
++import { DebtsPanel } from "./debts-panel";
++
++const debts = financialSnapshotFixture.debts;
++
++function renderDebtsPanel({
++  items = debts,
++  onCreateDebt = vi.fn().mockResolvedValue(undefined),
++  onUpdateDebt = vi.fn().mockResolvedValue(undefined),
++  onDeleteDebt = vi.fn().mockResolvedValue(undefined),
++}: {
++  items?: Debt[];
++  onCreateDebt?: (debt: Omit<Debt, "id">) => Promise<Debt | undefined>;
++  onUpdateDebt?: (id: string, debt: Omit<Debt, "id">) => Promise<void>;
++  onDeleteDebt?: (id: string) => Promise<void>;
++} = {}) {
++  return render(
++    <DebtsPanel
++      debts={items}
++      currency="PHP"
++      onCreateDebt={onCreateDebt}
++      onUpdateDebt={onUpdateDebt}
++      onDeleteDebt={onDeleteDebt}
++    />
++  );
++}
++
++describe("DebtsPanel", () => {
++  it("renders debt summary and editable debt cards", () => {
++    renderDebtsPanel();
++
++    const summary = screen.getByTestId("debt-summary");
++    expect(within(summary).getByText("Tracked debts")).toBeVisible();
++    expect(within(summary).getByText("1")).toBeVisible();
++    expect(within(summary).getByText("Total balance")).toBeVisible();
++    expect(within(summary).getByText(/35,000/)).toBeVisible();
++    expect(within(summary).getByText("Day 20")).toBeVisible();
++
++    const card = screen.getByRole("article", { name: "Credit card debt" });
++    expect(within(card).getByText("Credit card")).toBeVisible();
++    expect(within(card).getByText("32% APR")).toBeVisible();
++    expect(within(card).getByText(/35,000/)).toBeVisible();
++    expect(within(card).getByText("Day 20")).toBeVisible();
++    expect(within(card).getByRole("button", { name: "Edit Credit card" })).toBeEnabled();
++    expect(within(card).getByRole("button", { name: "Delete Credit card" })).toBeEnabled();
++  });
++
++  it("creates a debt from the form", async () => {
++    const user = userEvent.setup();
++    const onCreateDebt = vi.fn().mockResolvedValue(undefined);
++    renderDebtsPanel({ onCreateDebt });
++
++    await user.click(screen.getByRole("button", { name: "New Debt" }));
++    await user.type(screen.getByLabelText("Debt name"), "Device loan");
++    await user.type(screen.getByLabelText("Balance"), "12000");
++    await user.type(screen.getByLabelText("Minimum payment"), "2000");
++    await user.clear(screen.getByLabelText("Due day"));
++    await user.type(screen.getByLabelText("Due day"), "5");
++    await user.type(screen.getByLabelText("Interest rate"), "0.18");
++    await user.click(screen.getByRole("button", { name: "Create Debt" }));
++
++    expect(onCreateDebt).toHaveBeenCalledWith({
++      label: "Device loan",
++      outstandingBalance: 12000,
++      minimumPayment: 2000,
++      dueDay: 5,
++      interestRate: 0.18,
++    });
++  });
++
++  it("updates an existing debt and allows blank optional interest", async () => {
++    const user = userEvent.setup();
++    const onUpdateDebt = vi.fn().mockResolvedValue(undefined);
++    renderDebtsPanel({ onUpdateDebt });
++
++    await user.click(screen.getByRole("button", { name: "Edit Credit card" }));
++    await user.clear(screen.getByLabelText("Balance"));
++    await user.type(screen.getByLabelText("Balance"), "30000");
++    await user.clear(screen.getByLabelText("Interest rate"));
++    await user.click(screen.getByRole("button", { name: "Save Debt" }));
++
++    expect(onUpdateDebt).toHaveBeenCalledWith("debt_card", {
++      label: "Credit card",
++      outstandingBalance: 30000,
++      minimumPayment: 5000,
++      dueDay: 20,
++      interestRate: undefined,
++    });
++  });
++
++  it("deletes a debt through its card action", async () => {
++    const user = userEvent.setup();
++    const onDeleteDebt = vi.fn().mockResolvedValue(undefined);
++    renderDebtsPanel({ onDeleteDebt });
++
++    await user.click(screen.getByRole("button", { name: "Delete Credit card" }));
++
++    expect(onDeleteDebt).toHaveBeenCalledWith("debt_card");
++  });
++
++  it("blocks invalid debt input with accessible errors", async () => {
++    const user = userEvent.setup();
++    const onCreateDebt = vi.fn().mockResolvedValue(undefined);
++    renderDebtsPanel({ onCreateDebt });
++
++    await user.click(screen.getByRole("button", { name: "New Debt" }));
++    await user.clear(screen.getByLabelText("Due day"));
++    await user.type(screen.getByLabelText("Due day"), "0");
++    await user.type(screen.getByLabelText("Interest rate"), "2");
++    await user.click(screen.getByRole("button", { name: "Create Debt" }));
++
++    const alert = await screen.findByRole("alert");
++    expect(alert).toHaveTextContent("Name this debt.");
++    expect(alert).toHaveTextContent("Enter a positive balance.");
++    expect(alert).toHaveTextContent("Enter a positive minimum payment.");
++    expect(alert).toHaveTextContent("Use a due day from 1 to 31.");
++    expect(alert).toHaveTextContent("Use a decimal rate from 0 to 1.");
++    expect(onCreateDebt).not.toHaveBeenCalled();
++  });
++});
+diff --git a/src/features/debts/components/debts-panel.tsx b/src/features/debts/components/debts-panel.tsx
+new file mode 100644
+index 0000000..bfdee8b
+--- /dev/null
++++ b/src/features/debts/components/debts-panel.tsx
+@@ -0,0 +1,466 @@
++"use client";
++
++import { CalendarDays, CreditCard, Pencil, Plus, Trash2, X } from "lucide-react";
++import { useState, type FormEvent } from "react";
++
++import { Badge } from "@/components/ui/badge";
++import { Button } from "@/components/ui/button";
++import { Card, CardContent } from "@/components/ui/card";
++import { FieldError, Input, Label } from "@/components/ui/form-fields";
++import { formatCurrency } from "@/lib/utils";
++import type { CurrencyCode, Debt } from "@/types/finance";
++
++type DebtDraft = Omit<Debt, "id">;
++
++type DebtFormValues = {
++  label: string;
++  outstandingBalance: string;
++  minimumPayment: string;
++  dueDay: string;
++  interestRate: string;
++};
++
++type DebtFormErrors = Partial<Record<keyof DebtFormValues, string>>;
++
++const emptyDebtForm: DebtFormValues = {
++  label: "",
++  outstandingBalance: "",
++  minimumPayment: "",
++  dueDay: "1",
++  interestRate: "",
++};
++
++export function DebtsPanel({
++  debts,
++  currency,
++  onCreateDebt,
++  onUpdateDebt,
++  onDeleteDebt,
++}: {
++  debts: Debt[];
++  currency: CurrencyCode;
++  onCreateDebt: (debt: DebtDraft) => Promise<Debt | undefined>;
++  onUpdateDebt: (id: string, debt: DebtDraft) => Promise<void>;
++  onDeleteDebt: (id: string) => Promise<void>;
++}) {
++  const [isFormOpen, setIsFormOpen] = useState(false);
++  const [editingId, setEditingId] = useState<string | null>(null);
++  const [formValues, setFormValues] = useState<DebtFormValues>(emptyDebtForm);
++  const [formErrors, setFormErrors] = useState<DebtFormErrors>({});
++  const [message, setMessage] = useState<string | null>(null);
++  const [pendingAction, setPendingAction] = useState<string | null>(null);
++  const totalBalance = debts.reduce((total, debt) => total + debt.outstandingBalance, 0);
++  const totalMinimum = debts.reduce((total, debt) => total + debt.minimumPayment, 0);
++  const formErrorMessages = Object.values(formErrors).filter(Boolean);
++
++  function updateField<K extends keyof DebtFormValues>(field: K, value: DebtFormValues[K]) {
++    setFormValues((current) => ({ ...current, [field]: value }));
++    setFormErrors((current) => {
++      const rest = { ...current };
++      delete rest[field];
++      return rest;
++    });
++    setMessage(null);
++  }
++
++  function openCreateForm() {
++    setEditingId(null);
++    setFormValues(emptyDebtForm);
++    setFormErrors({});
++    setMessage(null);
++    setIsFormOpen(true);
++  }
++
++  function openEditForm(debt: Debt) {
++    setEditingId(debt.id);
++    setFormValues({
++      label: debt.label,
++      outstandingBalance: String(debt.outstandingBalance),
++      minimumPayment: String(debt.minimumPayment),
++      dueDay: String(debt.dueDay),
++      interestRate: debt.interestRate === undefined ? "" : String(debt.interestRate),
++    });
++    setFormErrors({});
++    setMessage(null);
++    setIsFormOpen(true);
++  }
++
++  function closeForm() {
++    setIsFormOpen(false);
++    setEditingId(null);
++    setFormValues(emptyDebtForm);
++    setFormErrors({});
++  }
++
++  async function submitDebt(event: FormEvent<HTMLFormElement>) {
++    event.preventDefault();
++    setMessage(null);
++    const parsed = parseDebtForm(formValues);
++
++    if (!parsed.ok) {
++      setFormErrors(parsed.errors);
++      return;
++    }
++
++    setPendingAction("save");
++
++    try {
++      if (editingId) {
++        await onUpdateDebt(editingId, parsed.debt);
++        setMessage("Debt updated.");
++      } else {
++        await onCreateDebt(parsed.debt);
++        setMessage("Debt created.");
++      }
++
++      closeForm();
++    } catch {
++      setMessage("We couldn't save this debt. Please try again.");
++    } finally {
++      setPendingAction(null);
++    }
++  }
++
++  async function deleteDebt(debt: Debt) {
++    setMessage(null);
++    setPendingAction(`delete-${debt.id}`);
++
++    try {
++      await onDeleteDebt(debt.id);
++      setMessage("Debt deleted.");
++    } catch {
++      setMessage("We couldn't delete this debt. Please try again.");
++    } finally {
++      setPendingAction(null);
++    }
++  }
++
++  return (
++    <div className="grid gap-5">
++      <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-5 shadow-card sm:flex-row sm:items-center sm:justify-between">
++        <div className="flex items-start gap-3">
++          <div className="grid size-11 place-items-center rounded-control bg-caution/10 text-caution">
++            <CreditCard className="size-5" aria-hidden="true" />
++          </div>
++          <div>
++            <p className="text-xs font-semibold uppercase tracking-normal text-muted">
++              Payment pressure
++            </p>
++            <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">
++              Debts
++            </h2>
++            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
++              Track balances, minimum payments, and due dates that reduce safe-to-spend.
++            </p>
++          </div>
++        </div>
++        <Button type="button" className="sm:w-auto" onClick={openCreateForm}>
++          <Plus className="size-4" aria-hidden="true" />
++          New Debt
++        </Button>
++      </div>
++
++      {message ? (
++        <p
++          role={message.startsWith("We couldn't") ? "alert" : "status"}
++          className="rounded-control border border-border bg-slate-50 px-3 py-2 text-sm text-muted"
++        >
++          {message}
++        </p>
++      ) : null}
++
++      {isFormOpen ? (
++        <Card aria-labelledby="debt-form-heading">
++          <CardContent>
++            <form className="grid gap-4" onSubmit={submitDebt} noValidate>
++              <div className="flex items-start justify-between gap-4">
++                <div>
++                  <h3 id="debt-form-heading" className="text-lg font-semibold text-foreground">
++                    {editingId ? "Edit debt" : "New debt"}
++                  </h3>
++                  <p className="mt-1 text-sm leading-6 text-muted">
++                    Minimum payments and due days feed the 30-day debt window.
++                  </p>
++                </div>
++                <Button
++                  type="button"
++                  variant="ghost"
++                  size="icon"
++                  aria-label="Cancel debt form"
++                  onClick={closeForm}
++                >
++                  <X className="size-4" aria-hidden="true" />
++                </Button>
++              </div>
++
++              {formErrorMessages.length > 0 ? (
++                <div
++                  role="alert"
++                  className="rounded-control border border-risk/20 bg-red-50 px-3 py-2 text-sm text-risk"
++                >
++                  <p className="font-semibold">Check the debt fields.</p>
++                  <ul className="mt-1 list-disc space-y-1 pl-4">
++                    {formErrorMessages.map((error) => (
++                      <li key={error}>{error}</li>
++                    ))}
++                  </ul>
++                </div>
++              ) : null}
++
++              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
++                <div className="grid gap-2 md:col-span-2">
++                  <Label htmlFor="debt-label">Debt name</Label>
++                  <Input
++                    id="debt-label"
++                    value={formValues.label}
++                    onChange={(event) => updateField("label", event.target.value)}
++                    aria-invalid={formErrors.label ? "true" : undefined}
++                  />
++                  <FieldError>{formErrors.label}</FieldError>
++                </div>
++                <div className="grid gap-2">
++                  <Label htmlFor="debt-balance">Balance</Label>
++                  <Input
++                    id="debt-balance"
++                    inputMode="decimal"
++                    type="number"
++                    min="0"
++                    value={formValues.outstandingBalance}
++                    onChange={(event) => updateField("outstandingBalance", event.target.value)}
++                    aria-invalid={formErrors.outstandingBalance ? "true" : undefined}
++                  />
++                  <FieldError>{formErrors.outstandingBalance}</FieldError>
++                </div>
++                <div className="grid gap-2">
++                  <Label htmlFor="debt-minimum">Minimum payment</Label>
++                  <Input
++                    id="debt-minimum"
++                    inputMode="decimal"
++                    type="number"
++                    min="0"
++                    value={formValues.minimumPayment}
++                    onChange={(event) => updateField("minimumPayment", event.target.value)}
++                    aria-invalid={formErrors.minimumPayment ? "true" : undefined}
++                  />
++                  <FieldError>{formErrors.minimumPayment}</FieldError>
++                </div>
++                <div className="grid gap-2">
++                  <Label htmlFor="debt-due-day">Due day</Label>
++                  <Input
++                    id="debt-due-day"
++                    inputMode="numeric"
++                    type="number"
++                    min="1"
++                    max="31"
++                    value={formValues.dueDay}
++                    onChange={(event) => updateField("dueDay", event.target.value)}
++                    aria-invalid={formErrors.dueDay ? "true" : undefined}
++                  />
++                  <FieldError>{formErrors.dueDay}</FieldError>
++                </div>
++                <div className="grid gap-2 md:max-w-xs">
++                  <Label htmlFor="debt-interest">Interest rate</Label>
++                  <Input
++                    id="debt-interest"
++                    inputMode="decimal"
++                    type="number"
++                    min="0"
++                    max="1"
++                    step="0.01"
++                    value={formValues.interestRate}
++                    onChange={(event) => updateField("interestRate", event.target.value)}
++                    aria-invalid={formErrors.interestRate ? "true" : undefined}
++                  />
++                  <FieldError>{formErrors.interestRate}</FieldError>
++                </div>
++              </div>
++
++              <div className="flex flex-wrap justify-end gap-2">
++                <Button type="button" variant="secondary" onClick={closeForm}>
++                  Cancel
++                </Button>
++                <Button type="submit" disabled={pendingAction === "save"} isLoading={pendingAction === "save"}>
++                  {editingId ? "Save Debt" : "Create Debt"}
++                </Button>
++              </div>
++            </form>
++          </CardContent>
++        </Card>
++      ) : null}
++
++      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="debt-summary">
++        <SummaryMetric label="Tracked debts" value={String(debts.length)} helper="Active rows" />
++        <SummaryMetric
++          label="Total balance"
++          value={formatCurrency(totalBalance, currency)}
++          helper="Outstanding principal"
++        />
++        <SummaryMetric
++          label="Minimums"
++          value={formatCurrency(totalMinimum, currency)}
++          helper="Monthly floor"
++        />
++        <SummaryMetric label="Next due" value={getNextDueDay(debts)} helper="Earliest due day" />
++      </div>
++
++      {debts.length > 0 ? (
++        <div className="grid gap-4 lg:grid-cols-2">
++          {debts.map((debt) => (
++            <article
++              key={debt.id}
++              aria-label={`${debt.label} debt`}
++              className="grid gap-4 rounded-card border border-border bg-surface p-5 shadow-card"
++            >
++              <div className="flex items-start justify-between gap-4">
++                <div className="min-w-0">
++                  <div className="flex flex-wrap items-center gap-2">
++                    <h3 className="text-lg font-semibold tracking-tight text-foreground">
++                      {debt.label}
++                    </h3>
++                    {debt.interestRate !== undefined ? (
++                      <Badge tone="amber">{Math.round(debt.interestRate * 100)}% APR</Badge>
++                    ) : null}
++                  </div>
++                  <p className="mt-2 text-sm text-muted">
++                    {formatCurrency(debt.outstandingBalance, currency)} balance
++                  </p>
++                </div>
++                <div className="flex shrink-0 gap-1">
++                  <Button
++                    type="button"
++                    variant="ghost"
++                    size="icon"
++                    aria-label={`Edit ${debt.label}`}
++                    onClick={() => openEditForm(debt)}
++                  >
++                    <Pencil className="size-4" aria-hidden="true" />
++                  </Button>
++                  <Button
++                    type="button"
++                    variant="ghost"
++                    size="icon"
++                    aria-label={`Delete ${debt.label}`}
++                    disabled={pendingAction === `delete-${debt.id}`}
++                    isLoading={pendingAction === `delete-${debt.id}`}
++                    onClick={() => void deleteDebt(debt)}
++                  >
++                    <Trash2 className="size-4" aria-hidden="true" />
++                  </Button>
++                </div>
++              </div>
++              <dl className="grid gap-3 text-sm sm:grid-cols-2">
++                <DebtFact label="Minimum payment">
++                  {formatCurrency(debt.minimumPayment, currency)} minimum
++                </DebtFact>
++                <DebtFact label="Due date">
++                  <span className="flex items-center gap-2">
++                    <CalendarDays className="size-4" aria-hidden="true" />
++                    Day {debt.dueDay}
++                  </span>
++                </DebtFact>
++              </dl>
++            </article>
++          ))}
++        </div>
++      ) : (
++        <Card>
++          <CardContent>
++            <p className="rounded-control border border-dashed border-border bg-muted/40 p-5 text-sm leading-6 text-muted">
++              Add credit cards, loans, BNPL plans, and minimum payments so debt pressure is visible.
++            </p>
++          </CardContent>
++        </Card>
++      )}
++    </div>
++  );
++}
++
++function SummaryMetric({
++  label,
++  value,
++  helper,
++}: {
++  label: string;
++  value: string;
++  helper: string;
++}) {
++  return (
++    <Card aria-label={`${label} metric`} className="min-w-0">
++      <CardContent className="grid min-h-28 content-between gap-3">
++        <h3 className="text-xs font-semibold uppercase tracking-normal text-muted">{label}</h3>
++        <div>
++          <p className="truncate text-2xl font-semibold text-foreground">{value}</p>
++          <p className="mt-2 text-xs leading-5 text-muted">{helper}</p>
++        </div>
++      </CardContent>
++    </Card>
++  );
++}
++
++function DebtFact({ label, children }: { label: string; children: React.ReactNode }) {
++  return (
++    <div className="rounded-control border border-border bg-muted/30 p-3">
++      <dt className="text-xs font-semibold uppercase tracking-normal text-muted">{label}</dt>
++      <dd className="mt-1 font-medium text-foreground">{children}</dd>
++    </div>
++  );
++}
++
++function getNextDueDay(debts: Debt[]) {
++  if (debts.length === 0) {
++    return "None";
++  }
++
++  return `Day ${Math.min(...debts.map((debt) => debt.dueDay))}`;
++}
++
++function parseDebtForm(values: DebtFormValues):
++  | { ok: true; debt: DebtDraft }
++  | { ok: false; errors: DebtFormErrors } {
++  const errors: DebtFormErrors = {};
++  const label = values.label.trim();
++  const outstandingBalance = Number(values.outstandingBalance);
++  const minimumPayment = Number(values.minimumPayment);
++  const dueDay = Number(values.dueDay);
++  const interestRate =
++    values.interestRate.trim() === "" ? undefined : Number(values.interestRate);
++
++  if (!label) {
++    errors.label = "Name this debt.";
++  }
++
++  if (
++    values.outstandingBalance.trim() === "" ||
++    !Number.isFinite(outstandingBalance) ||
++    outstandingBalance < 0
++  ) {
++    errors.outstandingBalance = "Enter a positive balance.";
++  }
++
++  if (values.minimumPayment.trim() === "" || !Number.isFinite(minimumPayment) || minimumPayment < 0) {
++    errors.minimumPayment = "Enter a positive minimum payment.";
++  }
++
++  if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31) {
++    errors.dueDay = "Use a due day from 1 to 31.";
++  }
++
++  if (interestRate !== undefined && (!Number.isFinite(interestRate) || interestRate < 0 || interestRate > 1)) {
++    errors.interestRate = "Use a decimal rate from 0 to 1.";
++  }
++
++  if (Object.keys(errors).length > 0) {
++    return { ok: false, errors };
++  }
++
++  return {
++    ok: true,
++    debt: {
++      label,
++      outstandingBalance,
++      minimumPayment,
++      dueDay,
++      interestRate,
++    },
++  };
++}
+diff --git a/src/features/debts/index.ts b/src/features/debts/index.ts
+new file mode 100644
+index 0000000..1a93af1
+--- /dev/null
++++ b/src/features/debts/index.ts
+@@ -0,0 +1 @@
++export { DebtsPanel } from "./components/debts-panel";
+diff --git a/src/features/expenses/api/manage-expense.test.ts b/src/features/expenses/api/manage-expense.test.ts
+new file mode 100644
+index 0000000..e9bda55
+--- /dev/null
++++ b/src/features/expenses/api/manage-expense.test.ts
+@@ -0,0 +1,141 @@
++import { beforeEach, describe, expect, it, vi } from "vitest";
++import { createExpenseAction, deleteExpenseAction, updateExpenseAction } from "./manage-expense";
++
++vi.mock("@/lib/supabase/server", () => ({ requireUserId: vi.fn() }));
++
++import { requireUserId } from "@/lib/supabase/server";
++
++const mockedRequireUserId = vi.mocked(requireUserId);
++
++describe("expense actions", () => {
++  beforeEach(() => {
++    vi.clearAllMocks();
++  });
++
++  it("inserts a validated expense for the authenticated user", async () => {
++    const insert = vi.fn(async () => ({ error: null }));
++    const supabase = { from: vi.fn(() => ({ insert })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await createExpenseAction({
++      label: "Rent",
++      amount: 28_000,
++      dueDay: 1,
++      isRecurring: true,
++    });
++
++    expect(result).toEqual({ ok: true, data: null });
++    expect(supabase.from).toHaveBeenCalledWith("expenses");
++    expect(insert).toHaveBeenCalledWith({
++      user_id: "user-1",
++      label: "Rent",
++      amount: 28_000,
++      due_day: 1,
++      is_recurring: true,
++    });
++  });
++
++  it("updates expenses only for the authenticated user", async () => {
++    const eqUser = vi.fn(async () => ({ error: null }));
++    const eqId = vi.fn(() => ({ eq: eqUser }));
++    const update = vi.fn(() => ({ eq: eqId }));
++    const supabase = { from: vi.fn(() => ({ update })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await updateExpenseAction("expense-1", {
++      label: "Utilities",
++      amount: 6_500,
++      dueDay: 15,
++      isRecurring: false,
++    });
++
++    expect(result).toEqual({ ok: true, data: null });
++    expect(supabase.from).toHaveBeenCalledWith("expenses");
++    expect(update).toHaveBeenCalledWith({
++      label: "Utilities",
++      amount: 6_500,
++      due_day: 15,
++      is_recurring: false,
++    });
++    expect(eqId).toHaveBeenCalledWith("id", "expense-1");
++    expect(eqUser).toHaveBeenCalledWith("user_id", "user-1");
++  });
++
++  it("rejects invalid expense payloads before auth or database access", async () => {
++    const result = await createExpenseAction({
++      label: "",
++      amount: -1,
++      dueDay: 32,
++      isRecurring: true,
++    });
++
++    expect(result.ok).toBe(false);
++    expect(result).toMatchObject({
++      error: "Check the expense fields.",
++      fieldErrors: {
++        label: ["Name this expense."],
++        amount: ["Enter a positive amount."],
++        dueDay: ["Too big: expected number to be <=31"],
++      },
++    });
++    expect(mockedRequireUserId).not.toHaveBeenCalled();
++  });
++
++  it("requires an expense id before update or delete", async () => {
++    await expect(updateExpenseAction("", { label: "Rent", amount: 1, dueDay: 1 })).resolves.toEqual(
++      { ok: false, error: "Expense ID is required." }
++    );
++    await expect(deleteExpenseAction("")).resolves.toEqual({
++      ok: false,
++      error: "Expense ID is required.",
++    });
++    expect(mockedRequireUserId).not.toHaveBeenCalled();
++  });
++
++  it("returns friendly errors for database failures", async () => {
++    const insert = vi.fn(async () => ({ error: { message: "insert failed" } }));
++    const updateEqUser = vi.fn(async () => ({ error: { message: "update failed" } }));
++    const update = vi.fn(() => ({ eq: () => ({ eq: updateEqUser }) }));
++    const deleteEqUser = vi.fn(async () => ({ error: { message: "delete failed" } }));
++    const remove = vi.fn(() => ({ eq: () => ({ eq: deleteEqUser }) }));
++    const supabase = {
++      from: vi.fn(() => ({
++        insert,
++        update,
++        delete: remove,
++      })),
++    };
++    mockedRequireUserId.mockResolvedValue({ supabase, userId: "user-1" } as never);
++
++    await expect(
++      createExpenseAction({ label: "Rent", amount: 28_000, dueDay: 1, isRecurring: true })
++    ).resolves.toEqual({ ok: false, error: "Unable to create this expense." });
++    await expect(
++      updateExpenseAction("expense-1", {
++        label: "Rent",
++        amount: 28_000,
++        dueDay: 1,
++        isRecurring: true,
++      })
++    ).resolves.toEqual({ ok: false, error: "Unable to update this expense." });
++    await expect(deleteExpenseAction("expense-1")).resolves.toEqual({
++      ok: false,
++      error: "Unable to delete this expense.",
++    });
++  });
++
++  it("deletes expenses only for the authenticated user", async () => {
++    const eqUser = vi.fn(async () => ({ error: null }));
++    const eqId = vi.fn(() => ({ eq: eqUser }));
++    const remove = vi.fn(() => ({ eq: eqId }));
++    const supabase = { from: vi.fn(() => ({ delete: remove })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await deleteExpenseAction("expense-1");
++
++    expect(result).toEqual({ ok: true, data: null });
++    expect(supabase.from).toHaveBeenCalledWith("expenses");
++    expect(eqId).toHaveBeenCalledWith("id", "expense-1");
++    expect(eqUser).toHaveBeenCalledWith("user_id", "user-1");
++  });
++});
+diff --git a/src/features/expenses/api/manage-expense.ts b/src/features/expenses/api/manage-expense.ts
+new file mode 100644
+index 0000000..8fe4d45
+--- /dev/null
++++ b/src/features/expenses/api/manage-expense.ts
+@@ -0,0 +1,110 @@
++"use server";
++
++import { expenseSchema } from "@/lib/schemas/finance";
++import { requireUserId } from "@/lib/supabase/server";
++import type { ActionResult } from "@/types/action-result";
++
++export async function createExpenseAction(input: unknown): Promise<ActionResult<null>> {
++  const parsed = expenseSchema.safeParse(input);
++
++  if (!parsed.success) {
++    return {
++      ok: false,
++      error: "Check the expense fields.",
++      fieldErrors: parsed.error.flatten().fieldErrors,
++    };
++  }
++
++  try {
++    const { supabase, userId } = await requireUserId();
++    const expense = parsed.data;
++    const { error } = await supabase.from("expenses").insert({
++      user_id: userId,
++      label: expense.label,
++      amount: expense.amount,
++      due_day: expense.dueDay,
++      is_recurring: expense.isRecurring,
++    });
++
++    if (error) {
++      console.error("Unable to create Supabase expense", error);
++      return { ok: false, error: "Unable to create this expense." };
++    }
++
++    return { ok: true, data: null };
++  } catch (error) {
++    return {
++      ok: false,
++      error: error instanceof Error ? error.message : "Unable to create expense.",
++    };
++  }
++}
++
++export async function updateExpenseAction(
++  id: string,
++  input: unknown
++): Promise<ActionResult<null>> {
++  if (!id) {
++    return { ok: false, error: "Expense ID is required." };
++  }
++
++  const parsed = expenseSchema.safeParse(input);
++
++  if (!parsed.success) {
++    return {
++      ok: false,
++      error: "Check the expense fields.",
++      fieldErrors: parsed.error.flatten().fieldErrors,
++    };
++  }
++
++  try {
++    const { supabase, userId } = await requireUserId();
++    const expense = parsed.data;
++    const { error } = await supabase
++      .from("expenses")
++      .update({
++        label: expense.label,
++        amount: expense.amount,
++        due_day: expense.dueDay,
++        is_recurring: expense.isRecurring,
++      })
++      .eq("id", id)
++      .eq("user_id", userId);
++
++    if (error) {
++      console.error("Unable to update Supabase expense", error);
++      return { ok: false, error: "Unable to update this expense." };
++    }
++
++    return { ok: true, data: null };
++  } catch (error) {
++    return {
++      ok: false,
++      error: error instanceof Error ? error.message : "Unable to update expense.",
++    };
++  }
++}
++
++export async function deleteExpenseAction(id: string): Promise<ActionResult<null>> {
++  if (!id) {
++    return { ok: false, error: "Expense ID is required." };
++  }
++
++  try {
++    const { supabase, userId } = await requireUserId();
++    const { error } = await supabase.from("expenses").delete().eq("id", id).eq("user_id", userId);
++
++    if (error) {
++      console.error("Unable to delete Supabase expense", error);
++      return { ok: false, error: "Unable to delete this expense." };
++    }
++
++    return { ok: true, data: null };
++  } catch (error) {
++    return {
++      ok: false,
++      error: error instanceof Error ? error.message : "Unable to delete expense.",
++    };
++  }
++}
+diff --git a/src/features/expenses/components/expenses-panel.test.tsx b/src/features/expenses/components/expenses-panel.test.tsx
+new file mode 100644
+index 0000000..aa5b76d
+--- /dev/null
++++ b/src/features/expenses/components/expenses-panel.test.tsx
+@@ -0,0 +1,118 @@
++import { render, screen, within } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { describe, expect, it, vi } from "vitest";
++
++import { financialSnapshotFixture } from "@/test/fixtures/financial-snapshot";
++import type { Expense } from "@/types/finance";
++import { ExpensesPanel } from "./expenses-panel";
++
++const expenses = financialSnapshotFixture.expenses;
++
++function renderExpensesPanel({
++  items = expenses,
++  onCreateExpense = vi.fn().mockResolvedValue(undefined),
++  onUpdateExpense = vi.fn().mockResolvedValue(undefined),
++  onDeleteExpense = vi.fn().mockResolvedValue(undefined),
++}: {
++  items?: Expense[];
++  onCreateExpense?: (expense: Omit<Expense, "id">) => Promise<Expense | undefined>;
++  onUpdateExpense?: (id: string, expense: Omit<Expense, "id">) => Promise<void>;
++  onDeleteExpense?: (id: string) => Promise<void>;
++} = {}) {
++  return render(
++    <ExpensesPanel
++      expenses={items}
++      currency="PHP"
++      onCreateExpense={onCreateExpense}
++      onUpdateExpense={onUpdateExpense}
++      onDeleteExpense={onDeleteExpense}
++    />
++  );
++}
++
++describe("ExpensesPanel", () => {
++  it("renders expense summary and editable expense cards", () => {
++    renderExpensesPanel();
++
++    const summary = screen.getByTestId("expense-summary");
++    expect(within(summary).getByText("Tracked expenses")).toBeVisible();
++    expect(within(screen.getByLabelText("Tracked expenses metric")).getByText("2")).toBeVisible();
++    expect(within(summary).getByText("Monthly total")).toBeVisible();
++    expect(within(summary).getByText(/28,500/)).toBeVisible();
++    expect(within(summary).getByText("Day 1")).toBeVisible();
++
++    const rent = screen.getByRole("article", { name: "Rent expense" });
++    expect(within(rent).getByText("Rent")).toBeVisible();
++    expect(within(rent).getByText("Recurring")).toBeVisible();
++    expect(within(rent).getByText(/22,000/)).toBeVisible();
++    expect(within(rent).getByText("Due every month on day 1")).toBeVisible();
++    expect(within(rent).getByRole("button", { name: "Edit Rent" })).toBeEnabled();
++    expect(within(rent).getByRole("button", { name: "Delete Rent" })).toBeEnabled();
++  });
++
++  it("creates an expense from the form", async () => {
++    const user = userEvent.setup();
++    const onCreateExpense = vi.fn().mockResolvedValue(undefined);
++    renderExpensesPanel({ onCreateExpense });
++
++    await user.click(screen.getByRole("button", { name: "New Expense" }));
++    await user.type(screen.getByLabelText("Expense name"), "Phone plan");
++    await user.type(screen.getByLabelText("Amount"), "1200");
++    await user.clear(screen.getByLabelText("Due day"));
++    await user.type(screen.getByLabelText("Due day"), "10");
++    await user.selectOptions(screen.getByLabelText("Recurring"), "false");
++    await user.click(screen.getByRole("button", { name: "Create Expense" }));
++
++    expect(onCreateExpense).toHaveBeenCalledWith({
++      label: "Phone plan",
++      amount: 1200,
++      dueDay: 10,
++      isRecurring: false,
++    });
++  });
++
++  it("updates an existing expense", async () => {
++    const user = userEvent.setup();
++    const onUpdateExpense = vi.fn().mockResolvedValue(undefined);
++    renderExpensesPanel({ onUpdateExpense });
++
++    await user.click(screen.getByRole("button", { name: "Edit Utilities and internet" }));
++    await user.clear(screen.getByLabelText("Amount"));
++    await user.type(screen.getByLabelText("Amount"), "7000");
++    await user.click(screen.getByRole("button", { name: "Save Expense" }));
++
++    expect(onUpdateExpense).toHaveBeenCalledWith("expense_utilities", {
++      label: "Utilities and internet",
++      amount: 7000,
++      dueDay: 15,
++      isRecurring: true,
++    });
++  });
++
++  it("deletes an expense through its card action", async () => {
++    const user = userEvent.setup();
++    const onDeleteExpense = vi.fn().mockResolvedValue(undefined);
++    renderExpensesPanel({ onDeleteExpense });
++
++    await user.click(screen.getByRole("button", { name: "Delete Rent" }));
++
++    expect(onDeleteExpense).toHaveBeenCalledWith("expense_rent");
++  });
++
++  it("blocks invalid expense input with accessible errors", async () => {
++    const user = userEvent.setup();
++    const onCreateExpense = vi.fn().mockResolvedValue(undefined);
++    renderExpensesPanel({ onCreateExpense });
++
++    await user.click(screen.getByRole("button", { name: "New Expense" }));
++    await user.clear(screen.getByLabelText("Due day"));
++    await user.type(screen.getByLabelText("Due day"), "32");
++    await user.click(screen.getByRole("button", { name: "Create Expense" }));
++
++    const alert = await screen.findByRole("alert");
++    expect(alert).toHaveTextContent("Name this expense.");
++    expect(alert).toHaveTextContent("Enter a positive amount.");
++    expect(alert).toHaveTextContent("Use a due day from 1 to 31.");
++    expect(onCreateExpense).not.toHaveBeenCalled();
++  });
++});
+diff --git a/src/features/expenses/components/expenses-panel.tsx b/src/features/expenses/components/expenses-panel.tsx
+new file mode 100644
+index 0000000..8e8718d
+--- /dev/null
++++ b/src/features/expenses/components/expenses-panel.tsx
+@@ -0,0 +1,421 @@
++"use client";
++
++import { CalendarDays, Pencil, Plus, ReceiptText, Trash2, X } from "lucide-react";
++import { useState, type FormEvent } from "react";
++
++import { Badge } from "@/components/ui/badge";
++import { Button } from "@/components/ui/button";
++import { Card, CardContent } from "@/components/ui/card";
++import { FieldError, Input, Label, Select } from "@/components/ui/form-fields";
++import { formatCurrency } from "@/lib/utils";
++import type { CurrencyCode, Expense } from "@/types/finance";
++
++type ExpenseDraft = Omit<Expense, "id">;
++
++type ExpenseFormValues = {
++  label: string;
++  amount: string;
++  dueDay: string;
++  isRecurring: "true" | "false";
++};
++
++type ExpenseFormErrors = Partial<Record<keyof ExpenseFormValues, string>>;
++
++const emptyExpenseForm: ExpenseFormValues = {
++  label: "",
++  amount: "",
++  dueDay: "1",
++  isRecurring: "true",
++};
++
++export function ExpensesPanel({
++  expenses,
++  currency,
++  onCreateExpense,
++  onUpdateExpense,
++  onDeleteExpense,
++}: {
++  expenses: Expense[];
++  currency: CurrencyCode;
++  onCreateExpense: (expense: ExpenseDraft) => Promise<Expense | undefined>;
++  onUpdateExpense: (id: string, expense: ExpenseDraft) => Promise<void>;
++  onDeleteExpense: (id: string) => Promise<void>;
++}) {
++  const [isFormOpen, setIsFormOpen] = useState(false);
++  const [editingId, setEditingId] = useState<string | null>(null);
++  const [formValues, setFormValues] = useState<ExpenseFormValues>(emptyExpenseForm);
++  const [formErrors, setFormErrors] = useState<ExpenseFormErrors>({});
++  const [message, setMessage] = useState<string | null>(null);
++  const [pendingAction, setPendingAction] = useState<string | null>(null);
++  const totalMonthly = expenses.reduce((total, expense) => total + expense.amount, 0);
++  const recurringCount = expenses.filter((expense) => expense.isRecurring).length;
++  const formErrorMessages = Object.values(formErrors).filter(Boolean);
++
++  function updateField<K extends keyof ExpenseFormValues>(field: K, value: ExpenseFormValues[K]) {
++    setFormValues((current) => ({ ...current, [field]: value }));
++    setFormErrors((current) => {
++      const rest = { ...current };
++      delete rest[field];
++      return rest;
++    });
++    setMessage(null);
++  }
++
++  function openCreateForm() {
++    setEditingId(null);
++    setFormValues(emptyExpenseForm);
++    setFormErrors({});
++    setMessage(null);
++    setIsFormOpen(true);
++  }
++
++  function openEditForm(expense: Expense) {
++    setEditingId(expense.id);
++    setFormValues({
++      label: expense.label,
++      amount: String(expense.amount),
++      dueDay: String(expense.dueDay),
++      isRecurring: expense.isRecurring ? "true" : "false",
++    });
++    setFormErrors({});
++    setMessage(null);
++    setIsFormOpen(true);
++  }
++
++  function closeForm() {
++    setIsFormOpen(false);
++    setEditingId(null);
++    setFormValues(emptyExpenseForm);
++    setFormErrors({});
++  }
++
++  async function submitExpense(event: FormEvent<HTMLFormElement>) {
++    event.preventDefault();
++    setMessage(null);
++    const parsed = parseExpenseForm(formValues);
++
++    if (!parsed.ok) {
++      setFormErrors(parsed.errors);
++      return;
++    }
++
++    setPendingAction("save");
++
++    try {
++      if (editingId) {
++        await onUpdateExpense(editingId, parsed.expense);
++        setMessage("Expense updated.");
++      } else {
++        await onCreateExpense(parsed.expense);
++        setMessage("Expense created.");
++      }
++
++      closeForm();
++    } catch {
++      setMessage("We couldn't save this expense. Please try again.");
++    } finally {
++      setPendingAction(null);
++    }
++  }
++
++  async function deleteExpense(expense: Expense) {
++    setMessage(null);
++    setPendingAction(`delete-${expense.id}`);
++
++    try {
++      await onDeleteExpense(expense.id);
++      setMessage("Expense deleted.");
++    } catch {
++      setMessage("We couldn't delete this expense. Please try again.");
++    } finally {
++      setPendingAction(null);
++    }
++  }
++
++  return (
++    <div className="grid gap-5">
++      <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-5 shadow-card sm:flex-row sm:items-center sm:justify-between">
++        <div className="flex items-start gap-3">
++          <div className="grid size-11 place-items-center rounded-control bg-primary/10 text-primary">
++            <ReceiptText className="size-5" aria-hidden="true" />
++          </div>
++          <div>
++            <p className="text-xs font-semibold uppercase tracking-normal text-muted">
++              Monthly commitments
++            </p>
++            <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">
++              Expenses
++            </h2>
++            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
++              Keep bills current so safe-to-spend protects money that is already spoken for.
++            </p>
++          </div>
++        </div>
++        <Button type="button" className="sm:w-auto" onClick={openCreateForm}>
++          <Plus className="size-4" aria-hidden="true" />
++          New Expense
++        </Button>
++      </div>
++
++      {message ? (
++        <p
++          role={message.startsWith("We couldn't") ? "alert" : "status"}
++          className="rounded-control border border-border bg-slate-50 px-3 py-2 text-sm text-muted"
++        >
++          {message}
++        </p>
++      ) : null}
++
++      {isFormOpen ? (
++        <Card aria-labelledby="expense-form-heading">
++          <CardContent>
++            <form className="grid gap-4" onSubmit={submitExpense} noValidate>
++              <div className="flex items-start justify-between gap-4">
++                <div>
++                  <h3 id="expense-form-heading" className="text-lg font-semibold text-foreground">
++                    {editingId ? "Edit expense" : "New expense"}
++                  </h3>
++                  <p className="mt-1 text-sm leading-6 text-muted">
++                    Due dates keep the 30-day bill window honest.
++                  </p>
++                </div>
++                <Button
++                  type="button"
++                  variant="ghost"
++                  size="icon"
++                  aria-label="Cancel expense form"
++                  onClick={closeForm}
++                >
++                  <X className="size-4" aria-hidden="true" />
++                </Button>
++              </div>
++
++              {formErrorMessages.length > 0 ? (
++                <div
++                  role="alert"
++                  className="rounded-control border border-risk/20 bg-red-50 px-3 py-2 text-sm text-risk"
++                >
++                  <p className="font-semibold">Check the expense fields.</p>
++                  <ul className="mt-1 list-disc space-y-1 pl-4">
++                    {formErrorMessages.map((error) => (
++                      <li key={error}>{error}</li>
++                    ))}
++                  </ul>
++                </div>
++              ) : null}
++
++              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
++                <div className="grid gap-2 xl:col-span-2">
++                  <Label htmlFor="expense-label">Expense name</Label>
++                  <Input
++                    id="expense-label"
++                    value={formValues.label}
++                    onChange={(event) => updateField("label", event.target.value)}
++                    aria-invalid={formErrors.label ? "true" : undefined}
++                  />
++                  <FieldError>{formErrors.label}</FieldError>
++                </div>
++                <div className="grid gap-2">
++                  <Label htmlFor="expense-amount">Amount</Label>
++                  <Input
++                    id="expense-amount"
++                    inputMode="decimal"
++                    type="number"
++                    min="0"
++                    value={formValues.amount}
++                    onChange={(event) => updateField("amount", event.target.value)}
++                    aria-invalid={formErrors.amount ? "true" : undefined}
++                  />
++                  <FieldError>{formErrors.amount}</FieldError>
++                </div>
++                <div className="grid gap-2">
++                  <Label htmlFor="expense-due-day">Due day</Label>
++                  <Input
++                    id="expense-due-day"
++                    inputMode="numeric"
++                    type="number"
++                    min="1"
++                    max="31"
++                    value={formValues.dueDay}
++                    onChange={(event) => updateField("dueDay", event.target.value)}
++                    aria-invalid={formErrors.dueDay ? "true" : undefined}
++                  />
++                  <FieldError>{formErrors.dueDay}</FieldError>
++                </div>
++                <div className="grid gap-2 md:max-w-xs">
++                  <Label htmlFor="expense-recurring">Recurring</Label>
++                  <Select
++                    id="expense-recurring"
++                    value={formValues.isRecurring}
++                    onChange={(event) =>
++                      updateField("isRecurring", event.target.value as "true" | "false")
++                    }
++                  >
++                    <option value="true">Recurring</option>
++                    <option value="false">One-time</option>
++                  </Select>
++                </div>
++              </div>
++
++              <div className="flex flex-wrap justify-end gap-2">
++                <Button type="button" variant="secondary" onClick={closeForm}>
++                  Cancel
++                </Button>
++                <Button type="submit" disabled={pendingAction === "save"} isLoading={pendingAction === "save"}>
++                  {editingId ? "Save Expense" : "Create Expense"}
++                </Button>
++              </div>
++            </form>
++          </CardContent>
++        </Card>
++      ) : null}
++
++      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="expense-summary">
++        <SummaryMetric label="Tracked expenses" value={String(expenses.length)} helper="Active rows" />
++        <SummaryMetric
++          label="Monthly total"
++          value={formatCurrency(totalMonthly, currency)}
++          helper="Current expense load"
++        />
++        <SummaryMetric
++          label="Recurring"
++          value={String(recurringCount)}
++          helper="Bills that repeat"
++        />
++        <SummaryMetric
++          label="Next due"
++          value={getNextDueDay(expenses)}
++          helper="Earliest due day"
++        />
++      </div>
++
++      {expenses.length > 0 ? (
++        <div className="grid gap-4 lg:grid-cols-2">
++          {expenses.map((expense) => (
++            <article
++              key={expense.id}
++              aria-label={`${expense.label} expense`}
++              className="grid gap-4 rounded-card border border-border bg-surface p-5 shadow-card"
++            >
++              <div className="flex items-start justify-between gap-4">
++                <div className="min-w-0">
++                  <div className="flex flex-wrap items-center gap-2">
++                    <h3 className="text-lg font-semibold tracking-tight text-foreground">
++                      {expense.label}
++                    </h3>
++                    <Badge tone={expense.isRecurring ? "green" : "zinc"}>
++                      {expense.isRecurring ? "Recurring" : "One-time"}
++                    </Badge>
++                  </div>
++                  <p className="mt-2 text-sm text-muted">
++                    {formatCurrency(expense.amount, currency)} monthly estimate
++                  </p>
++                </div>
++                <div className="flex shrink-0 gap-1">
++                  <Button
++                    type="button"
++                    variant="ghost"
++                    size="icon"
++                    aria-label={`Edit ${expense.label}`}
++                    onClick={() => openEditForm(expense)}
++                  >
++                    <Pencil className="size-4" aria-hidden="true" />
++                  </Button>
++                  <Button
++                    type="button"
++                    variant="ghost"
++                    size="icon"
++                    aria-label={`Delete ${expense.label}`}
++                    disabled={pendingAction === `delete-${expense.id}`}
++                    isLoading={pendingAction === `delete-${expense.id}`}
++                    onClick={() => void deleteExpense(expense)}
++                  >
++                    <Trash2 className="size-4" aria-hidden="true" />
++                  </Button>
++                </div>
++              </div>
++              <p className="flex items-center gap-2 text-sm text-muted">
++                <CalendarDays className="size-4" aria-hidden="true" />
++                Due every month on day {expense.dueDay}
++              </p>
++            </article>
++          ))}
++        </div>
++      ) : (
++        <Card>
++          <CardContent>
++            <p className="rounded-control border border-dashed border-border bg-muted/40 p-5 text-sm leading-6 text-muted">
++              Add rent, utilities, subscriptions, and fixed bills so the checker does not treat
++              committed cash as spendable.
++            </p>
++          </CardContent>
++        </Card>
++      )}
++    </div>
++  );
++}
++
++function SummaryMetric({
++  label,
++  value,
++  helper,
++}: {
++  label: string;
++  value: string;
++  helper: string;
++}) {
++  return (
++    <Card aria-label={`${label} metric`} className="min-w-0">
++      <CardContent className="grid min-h-28 content-between gap-3">
++        <h3 className="text-xs font-semibold uppercase tracking-normal text-muted">{label}</h3>
++        <div>
++          <p className="truncate text-2xl font-semibold text-foreground">{value}</p>
++          <p className="mt-2 text-xs leading-5 text-muted">{helper}</p>
++        </div>
++      </CardContent>
++    </Card>
++  );
++}
++
++function getNextDueDay(expenses: Expense[]) {
++  if (expenses.length === 0) {
++    return "None";
++  }
++
++  return `Day ${Math.min(...expenses.map((expense) => expense.dueDay))}`;
++}
++
++function parseExpenseForm(values: ExpenseFormValues):
++  | { ok: true; expense: ExpenseDraft }
++  | { ok: false; errors: ExpenseFormErrors } {
++  const errors: ExpenseFormErrors = {};
++  const label = values.label.trim();
++  const amount = Number(values.amount);
++  const dueDay = Number(values.dueDay);
++
++  if (!label) {
++    errors.label = "Name this expense.";
++  }
++
++  if (values.amount.trim() === "" || !Number.isFinite(amount) || amount < 0) {
++    errors.amount = "Enter a positive amount.";
++  }
++
++  if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31) {
++    errors.dueDay = "Use a due day from 1 to 31.";
++  }
++
++  if (Object.keys(errors).length > 0) {
++    return { ok: false, errors };
++  }
++
++  return {
++    ok: true,
++    expense: {
++      label,
++      amount,
++      dueDay,
++      isRecurring: values.isRecurring === "true",
++    },
++  };
++}
+diff --git a/src/features/expenses/index.ts b/src/features/expenses/index.ts
+new file mode 100644
+index 0000000..4de9103
+--- /dev/null
++++ b/src/features/expenses/index.ts
+@@ -0,0 +1 @@
++export { ExpensesPanel } from "./components/expenses-panel";
+diff --git a/src/features/settings/api/manage-settings.test.ts b/src/features/settings/api/manage-settings.test.ts
+new file mode 100644
+index 0000000..3f28964
+--- /dev/null
++++ b/src/features/settings/api/manage-settings.test.ts
+@@ -0,0 +1,116 @@
++import { beforeEach, describe, expect, it, vi } from "vitest";
++import { deleteFinancialDataAction, updateProfileSettingsAction } from "./manage-settings";
++
++vi.mock("@/lib/supabase/server", () => ({ requireUserId: vi.fn() }));
++
++import { requireUserId } from "@/lib/supabase/server";
++
++const mockedRequireUserId = vi.mocked(requireUserId);
++
++describe("settings actions", () => {
++  beforeEach(() => {
++    vi.clearAllMocks();
++  });
++
++  it("upserts profile settings for the authenticated user", async () => {
++    const upsert = vi.fn(async () => ({ error: null }));
++    const supabase = { from: vi.fn(() => ({ upsert })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await updateProfileSettingsAction({
++      currency: "PHP",
++      monthlyIncome: 95_000,
++      currentSavings: 180_000,
++      emergencyFundTarget: 150_000,
++      fullName: "  Askia  ",
++      payFrequency: "weekly",
++      estimatedVariableExpenses: 12_000,
++    });
++
++    expect(result).toEqual({ ok: true, data: null });
++    expect(supabase.from).toHaveBeenCalledWith("profiles");
++    expect(upsert).toHaveBeenCalledWith(
++      {
++        user_id: "user-1",
++        currency: "PHP",
++        monthly_income: 95_000,
++        current_savings: 180_000,
++        emergency_fund_target: 150_000,
++        full_name: "Askia",
++        pay_frequency: "weekly",
++        estimated_variable_expenses: 12_000,
++        onboarding_completed: true,
++      },
++      { onConflict: "user_id" }
++    );
++  });
++
++  it("rejects invalid settings before auth or database access", async () => {
++    const result = await updateProfileSettingsAction({
++      currency: "BTC",
++      monthlyIncome: -1,
++      currentSavings: -1,
++      emergencyFundTarget: -1,
++      payFrequency: "hourly",
++      estimatedVariableExpenses: -1,
++    });
++
++    expect(result.ok).toBe(false);
++    expect(result).toMatchObject({ error: "Check the settings fields." });
++    expect(mockedRequireUserId).not.toHaveBeenCalled();
++  });
++
++  it("returns a friendly error when profile update fails", async () => {
++    const upsert = vi.fn(async () => ({ error: { message: "upsert failed" } }));
++    const supabase = { from: vi.fn(() => ({ upsert })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await updateProfileSettingsAction({
++      currency: "PHP",
++      monthlyIncome: 95_000,
++      currentSavings: 180_000,
++      emergencyFundTarget: 150_000,
++      payFrequency: "monthly",
++      estimatedVariableExpenses: 0,
++    });
++
++    expect(result).toEqual({ ok: false, error: "Unable to update your settings." });
++  });
++
++  it("deletes all app financial rows for the authenticated user", async () => {
++    const eq = vi.fn(async () => ({ error: null }));
++    const remove = vi.fn(() => ({ eq }));
++    const supabase = { from: vi.fn(() => ({ delete: remove })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await deleteFinancialDataAction();
++
++    expect(result).toEqual({ ok: true, data: null });
++    expect(supabase.from).toHaveBeenCalledTimes(9);
++    expect(supabase.from).toHaveBeenCalledWith("profiles");
++    expect(supabase.from).toHaveBeenCalledWith("expenses");
++    expect(supabase.from).toHaveBeenCalledWith("debts");
++    expect(supabase.from).toHaveBeenCalledWith("goals");
++    expect(supabase.from).toHaveBeenCalledWith("purchase_checks");
++    expect(supabase.from).toHaveBeenCalledWith("cooldown_items");
++    expect(supabase.from).toHaveBeenCalledWith("weekly_reports");
++    expect(supabase.from).toHaveBeenCalledWith("transactions");
++    expect(supabase.from).toHaveBeenCalledWith("voice_sessions");
++    expect(eq).toHaveBeenCalledTimes(9);
++    expect(eq).toHaveBeenCalledWith("user_id", "user-1");
++  });
++
++  it("returns a friendly error when any data deletion fails", async () => {
++    const eq = vi
++      .fn()
++      .mockResolvedValueOnce({ error: null })
++      .mockResolvedValueOnce({ error: { message: "delete failed" } });
++    const remove = vi.fn(() => ({ eq }));
++    const supabase = { from: vi.fn(() => ({ delete: remove })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await deleteFinancialDataAction();
++
++    expect(result).toEqual({ ok: false, error: "Unable to delete your financial data." });
++  });
++});
+diff --git a/src/features/settings/api/manage-settings.ts b/src/features/settings/api/manage-settings.ts
+new file mode 100644
+index 0000000..2a7cad6
+--- /dev/null
++++ b/src/features/settings/api/manage-settings.ts
+@@ -0,0 +1,85 @@
++"use server";
++
++import { financialProfileSchema } from "@/lib/schemas/finance";
++import { requireUserId } from "@/lib/supabase/server";
++import type { ActionResult } from "@/types/action-result";
++import type { Database } from "@/types/database";
++
++const financialDataTables = [
++  "cooldown_items",
++  "weekly_reports",
++  "voice_sessions",
++  "transactions",
++  "purchase_checks",
++  "goals",
++  "expenses",
++  "debts",
++  "profiles",
++] as const satisfies readonly (keyof Database["public"]["Tables"])[];
++
++export async function updateProfileSettingsAction(input: unknown): Promise<ActionResult<null>> {
++  const parsed = financialProfileSchema.safeParse(input);
++
++  if (!parsed.success) {
++    return {
++      ok: false,
++      error: "Check the settings fields.",
++      fieldErrors: parsed.error.flatten().fieldErrors,
++    };
++  }
++
++  try {
++    const { supabase, userId } = await requireUserId();
++    const profile = parsed.data;
++    const { error } = await supabase
++      .from("profiles")
++      .upsert(
++        {
++          user_id: userId,
++          currency: profile.currency,
++          monthly_income: profile.monthlyIncome,
++          current_savings: profile.currentSavings,
++          emergency_fund_target: profile.emergencyFundTarget,
++          full_name: profile.fullName?.trim() || null,
++          pay_frequency: profile.payFrequency,
++          estimated_variable_expenses: profile.estimatedVariableExpenses,
++          onboarding_completed: true,
++        },
++        { onConflict: "user_id" }
++      );
++
++    if (error) {
++      console.error("Unable to update Supabase profile settings", error);
++      return { ok: false, error: "Unable to update your settings." };
++    }
++
++    return { ok: true, data: null };
++  } catch (error) {
++    return {
++      ok: false,
++      error: error instanceof Error ? error.message : "Unable to update settings.",
++    };
++  }
++}
++
++export async function deleteFinancialDataAction(): Promise<ActionResult<null>> {
++  try {
++    const { supabase, userId } = await requireUserId();
++    const deletions = await Promise.all(
++      financialDataTables.map((table) => supabase.from(table).delete().eq("user_id", userId))
++    );
++    const error = deletions.find((result) => result.error)?.error;
++
++    if (error) {
++      console.error("Unable to delete Supabase financial data", error);
++      return { ok: false, error: "Unable to delete your financial data." };
++    }
++
++    return { ok: true, data: null };
++  } catch (error) {
++    return {
++      ok: false,
++      error: error instanceof Error ? error.message : "Unable to delete financial data.",
++    };
++  }
++}
+diff --git a/src/features/settings/components/settings-panel.test.tsx b/src/features/settings/components/settings-panel.test.tsx
+new file mode 100644
+index 0000000..2d8cb15
+--- /dev/null
++++ b/src/features/settings/components/settings-panel.test.tsx
+@@ -0,0 +1,99 @@
++import { render, screen } from "@testing-library/react";
++import userEvent from "@testing-library/user-event";
++import { describe, expect, it, vi } from "vitest";
++
++import { financialSnapshotFixture } from "@/test/fixtures/financial-snapshot";
++import type { FinancialProfile } from "@/types/finance";
++import { SettingsPanel } from "./settings-panel";
++
++function renderSettingsPanel({
++  profile = financialSnapshotFixture.profile,
++  onUpdateProfile = vi.fn().mockResolvedValue(undefined),
++  onDeleteFinancialData = vi.fn().mockResolvedValue(undefined),
++}: {
++  profile?: FinancialProfile;
++  onUpdateProfile?: (profile: FinancialProfile) => Promise<void>;
++  onDeleteFinancialData?: () => Promise<void>;
++} = {}) {
++  return render(
++    <SettingsPanel
++      profile={profile}
++      onUpdateProfile={onUpdateProfile}
++      onDeleteFinancialData={onDeleteFinancialData}
++    />
++  );
++}
++
++describe("SettingsPanel", () => {
++  it("renders the current profile values", () => {
++    renderSettingsPanel();
++
++    expect(screen.getByRole("heading", { name: "Settings" })).toBeVisible();
++    expect(screen.getByLabelText("Full name")).toHaveValue("Askia");
++    expect(screen.getByLabelText("Currency")).toHaveValue("PHP");
++    expect(screen.getByLabelText("Monthly income")).toHaveValue(85000);
++    expect(screen.getByLabelText("Current savings")).toHaveValue(120000);
++    expect(screen.getByLabelText("Emergency fund target")).toHaveValue(180000);
++    expect(screen.getByLabelText("Pay frequency")).toHaveValue("monthly");
++    expect(screen.getByLabelText("Variable expenses")).toHaveValue(12000);
++  });
++
++  it("updates profile settings from the form", async () => {
++    const user = userEvent.setup();
++    const onUpdateProfile = vi.fn().mockResolvedValue(undefined);
++    renderSettingsPanel({ onUpdateProfile });
++
++    await user.clear(screen.getByLabelText("Monthly income"));
++    await user.type(screen.getByLabelText("Monthly income"), "95000");
++    await user.selectOptions(screen.getByLabelText("Pay frequency"), "weekly");
++    await user.selectOptions(screen.getByLabelText("Currency"), "USD");
++    await user.click(screen.getByRole("button", { name: "Save Settings" }));
++
++    expect(onUpdateProfile).toHaveBeenCalledWith({
++      currency: "USD",
++      fullName: "Askia",
++      monthlyIncome: 95_000,
++      currentSavings: 120_000,
++      emergencyFundTarget: 180_000,
++      payFrequency: "weekly",
++      estimatedVariableExpenses: 12_000,
++    });
++  });
++
++  it("blocks invalid profile input with accessible errors", async () => {
++    const user = userEvent.setup();
++    const onUpdateProfile = vi.fn().mockResolvedValue(undefined);
++    renderSettingsPanel({ onUpdateProfile });
++
++    await user.clear(screen.getByLabelText("Monthly income"));
++    await user.type(screen.getByLabelText("Monthly income"), "-1");
++    await user.clear(screen.getByLabelText("Current savings"));
++    await user.click(screen.getByRole("button", { name: "Save Settings" }));
++
++    const alert = await screen.findByRole("alert");
++    expect(alert).toHaveTextContent("Enter a positive monthly income.");
++    expect(alert).toHaveTextContent("Enter a positive current savings amount.");
++    expect(onUpdateProfile).not.toHaveBeenCalled();
++  });
++
++  it("requires confirmation before deleting financial data", async () => {
++    const user = userEvent.setup();
++    const onDeleteFinancialData = vi.fn().mockResolvedValue(undefined);
++    renderSettingsPanel({ onDeleteFinancialData });
++
++    await user.click(screen.getByRole("button", { name: "Delete Financial Data" }));
++    expect(await screen.findByRole("alert")).toHaveTextContent(
++      "Confirm that you want to delete your financial data."
++    );
++    expect(onDeleteFinancialData).not.toHaveBeenCalled();
++
++    await user.click(
++      screen.getByLabelText(
++        "I understand this deletes my financial data and keeps my login account."
++      )
++    );
++    await user.click(screen.getByRole("button", { name: "Delete Financial Data" }));
++
++    expect(onDeleteFinancialData).toHaveBeenCalledOnce();
++  });
++});
+diff --git a/src/features/settings/components/settings-panel.tsx b/src/features/settings/components/settings-panel.tsx
+new file mode 100644
+index 0000000..511e378
+--- /dev/null
++++ b/src/features/settings/components/settings-panel.tsx
+@@ -0,0 +1,371 @@
++"use client";
++
++import { ShieldCheck, Trash2 } from "lucide-react";
++import { useState, type FormEvent } from "react";
++
++import { Button } from "@/components/ui/button";
++import { Card, CardContent } from "@/components/ui/card";
++import { FieldError, Input, Label, Select } from "@/components/ui/form-fields";
++import { PAY_FREQUENCIES, PAY_FREQUENCY_LABELS, type FinancialProfile } from "@/types/finance";
++
++type SettingsFormValues = {
++  currency: FinancialProfile["currency"];
++  fullName: string;
++  monthlyIncome: string;
++  currentSavings: string;
++  emergencyFundTarget: string;
++  payFrequency: NonNullable<FinancialProfile["payFrequency"]>;
++  estimatedVariableExpenses: string;
++};
++
++type SettingsFormErrors = Partial<Record<keyof SettingsFormValues, string>>;
++
++const currencies: FinancialProfile["currency"][] = ["PHP", "USD", "EUR", "JPY", "SGD"];
++
++export function SettingsPanel({
++  profile,
++  onUpdateProfile,
++  onDeleteFinancialData,
++}: {
++  profile: FinancialProfile;
++  onUpdateProfile: (profile: FinancialProfile) => Promise<void>;
++  onDeleteFinancialData: () => Promise<void>;
++}) {
++  const [formValues, setFormValues] = useState<SettingsFormValues>(() => toSettingsForm(profile));
++  const [formErrors, setFormErrors] = useState<SettingsFormErrors>({});
++  const [message, setMessage] = useState<string | null>(null);
++  const [isSaving, setIsSaving] = useState(false);
++  const [isDeleting, setIsDeleting] = useState(false);
++  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
++  const formErrorMessages = Object.values(formErrors).filter(Boolean);
++
++  function updateField<K extends keyof SettingsFormValues>(field: K, value: SettingsFormValues[K]) {
++    setFormValues((current) => ({ ...current, [field]: value }));
++    setFormErrors((current) => {
++      const rest = { ...current };
++      delete rest[field];
++      return rest;
++    });
++    setMessage(null);
++  }
++
++  async function submitSettings(event: FormEvent<HTMLFormElement>) {
++    event.preventDefault();
++    setMessage(null);
++    const parsed = parseSettingsForm(formValues);
++
++    if (!parsed.ok) {
++      setFormErrors(parsed.errors);
++      return;
++    }
++
++    setIsSaving(true);
++
++    try {
++      await onUpdateProfile(parsed.profile);
++      setMessage("Settings updated.");
++      setFormErrors({});
++    } catch {
++      setMessage("We couldn't update your settings. Please try again.");
++    } finally {
++      setIsSaving(false);
++    }
++  }
++
++  async function deleteData() {
++    setMessage(null);
++
++    if (!deleteConfirmed) {
++      setMessage("Confirm that you want to delete your financial data.");
++      return;
++    }
++
++    setIsDeleting(true);
++
++    try {
++      await onDeleteFinancialData();
++      setDeleteConfirmed(false);
++      setMessage("Financial data deleted. Your login account remains active.");
++    } catch {
++      setMessage("We couldn't delete your financial data. Please try again.");
++    } finally {
++      setIsDeleting(false);
++    }
++  }
++
++  return (
++    <div className="grid gap-5">
++      <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-5 shadow-card sm:flex-row sm:items-center sm:justify-between">
++        <div className="flex items-start gap-3">
++          <div className="grid size-11 place-items-center rounded-control bg-safe/10 text-safe">
++            <ShieldCheck className="size-5" aria-hidden="true" />
++          </div>
++          <div>
++            <p className="text-xs font-semibold uppercase tracking-normal text-muted">
++              Account baseline
++            </p>
++            <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">
++              Settings
++            </h2>
++            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
++              Keep income, savings, currency, and pay cadence current for every decision.
++            </p>
++          </div>
++        </div>
++      </div>
++
++      {message ? (
++        <p
++          role={message.startsWith("We couldn't") || message.startsWith("Confirm") ? "alert" : "status"}
++          className="rounded-control border border-border bg-slate-50 px-3 py-2 text-sm text-muted"
++        >
++          {message}
++        </p>
++      ) : null}
++
++      <Card aria-labelledby="settings-form-heading">
++        <CardContent>
++          <form className="grid gap-4" onSubmit={submitSettings} noValidate>
++            <div>
++              <h3 id="settings-form-heading" className="text-lg font-semibold text-foreground">
++                Financial profile
++              </h3>
++              <p className="mt-1 text-sm leading-6 text-muted">
++                These values feed safe-to-spend, health score, and funding guidance.
++              </p>
++            </div>
++
++            {formErrorMessages.length > 0 ? (
++              <div
++                role="alert"
++                className="rounded-control border border-risk/20 bg-red-50 px-3 py-2 text-sm text-risk"
++              >
++                <p className="font-semibold">Check the settings fields.</p>
++                <ul className="mt-1 list-disc space-y-1 pl-4">
++                  {formErrorMessages.map((error) => (
++                    <li key={error}>{error}</li>
++                  ))}
++                </ul>
++              </div>
++            ) : null}
++
++            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
++              <div className="grid gap-2 md:col-span-2">
++                <Label htmlFor="settings-full-name">Full name</Label>
++                <Input
++                  id="settings-full-name"
++                  value={formValues.fullName}
++                  onChange={(event) => updateField("fullName", event.target.value)}
++                  aria-invalid={formErrors.fullName ? "true" : undefined}
++                />
++                <FieldError>{formErrors.fullName}</FieldError>
++              </div>
++              <div className="grid gap-2">
++                <Label htmlFor="settings-currency">Currency</Label>
++                <Select
++                  id="settings-currency"
++                  value={formValues.currency}
++                  onChange={(event) =>
++                    updateField("currency", event.target.value as FinancialProfile["currency"])
++                  }
++                >
++                  {currencies.map((currency) => (
++                    <option key={currency} value={currency}>
++                      {currency}
++                    </option>
++                  ))}
++                </Select>
++              </div>
++              <div className="grid gap-2">
++                <Label htmlFor="settings-pay-frequency">Pay frequency</Label>
++                <Select
++                  id="settings-pay-frequency"
++                  value={formValues.payFrequency}
++                  onChange={(event) =>
++                    updateField(
++                      "payFrequency",
++                      event.target.value as SettingsFormValues["payFrequency"]
++                    )
++                  }
++                >
++                  {PAY_FREQUENCIES.map((frequency) => (
++                    <option key={frequency} value={frequency}>
++                      {PAY_FREQUENCY_LABELS[frequency]}
++                    </option>
++                  ))}
++                </Select>
++              </div>
++              <MoneyField
++                id="settings-monthly-income"
++                label="Monthly income"
++                value={formValues.monthlyIncome}
++                error={formErrors.monthlyIncome}
++                onChange={(value) => updateField("monthlyIncome", value)}
++              />
++              <MoneyField
++                id="settings-current-savings"
++                label="Current savings"
++                value={formValues.currentSavings}
++                error={formErrors.currentSavings}
++                onChange={(value) => updateField("currentSavings", value)}
++              />
++              <MoneyField
++                id="settings-emergency-target"
++                label="Emergency fund target"
++                value={formValues.emergencyFundTarget}
++                error={formErrors.emergencyFundTarget}
++                onChange={(value) => updateField("emergencyFundTarget", value)}
++              />
++              <MoneyField
++                id="settings-variable-expenses"
++                label="Variable expenses"
++                value={formValues.estimatedVariableExpenses}
++                error={formErrors.estimatedVariableExpenses}
++                onChange={(value) => updateField("estimatedVariableExpenses", value)}
++              />
++            </div>
++
++            <div className="flex flex-wrap justify-end gap-2">
++              <Button type="submit" disabled={isSaving} isLoading={isSaving}>
++                Save Settings
++              </Button>
++            </div>
++          </form>
++        </CardContent>
++      </Card>
++
++      <Card aria-labelledby="delete-data-heading">
++        <CardContent className="grid gap-4">
++          <div>
++            <h3 id="delete-data-heading" className="text-lg font-semibold text-foreground">
++              Delete financial data
++            </h3>
++            <p className="mt-1 text-sm leading-6 text-muted">
++              This clears SpendGuard profile, expense, debt, goal, check, cooldown, report, voice,
++              and transaction rows for this login.
++            </p>
++          </div>
++          <label className="flex items-start gap-3 rounded-control border border-border bg-muted/30 p-3 text-sm text-muted">
++            <input
++              type="checkbox"
++              className="mt-1"
++              checked={deleteConfirmed}
++              onChange={(event) => setDeleteConfirmed(event.target.checked)}
++            />
++            <span>I understand this deletes my financial data and keeps my login account.</span>
++          </label>
++          <div className="flex justify-end">
++            <Button
++              type="button"
++              variant="danger"
++              disabled={isDeleting}
++              isLoading={isDeleting}
++              onClick={() => void deleteData()}
++            >
++              <Trash2 className="size-4" aria-hidden="true" />
++              Delete Financial Data
++            </Button>
++          </div>
++        </CardContent>
++      </Card>
++    </div>
++  );
++}
++
++function MoneyField({
++  id,
++  label,
++  value,
++  error,
++  onChange,
++}: {
++  id: string;
++  label: string;
++  value: string;
++  error?: string;
++  onChange: (value: string) => void;
++}) {
++  return (
++    <div className="grid gap-2">
++      <Label htmlFor={id}>{label}</Label>
++      <Input
++        id={id}
++        inputMode="decimal"
++        type="number"
++        min="0"
++        value={value}
++        onChange={(event) => onChange(event.target.value)}
++        aria-invalid={error ? "true" : undefined}
++      />
++      <FieldError>{error}</FieldError>
++    </div>
++  );
++}
++
++function toSettingsForm(profile: FinancialProfile): SettingsFormValues {
++  return {
++    currency: profile.currency,
++    fullName: profile.fullName ?? "",
++    monthlyIncome: String(profile.monthlyIncome),
++    currentSavings: String(profile.currentSavings),
++    emergencyFundTarget: String(profile.emergencyFundTarget),
++    payFrequency: profile.payFrequency ?? "monthly",
++    estimatedVariableExpenses: String(profile.estimatedVariableExpenses ?? 0),
++  };
++}
++
++function parseSettingsForm(values: SettingsFormValues):
++  | { ok: true; profile: FinancialProfile }
++  | { ok: false; errors: SettingsFormErrors } {
++  const errors: SettingsFormErrors = {};
++  const fullName = values.fullName.trim();
++  const monthlyIncome = Number(values.monthlyIncome);
++  const currentSavings = Number(values.currentSavings);
++  const emergencyFundTarget = Number(values.emergencyFundTarget);
++  const estimatedVariableExpenses = Number(values.estimatedVariableExpenses);
++
++  if (fullName.length > 120) {
++    errors.fullName = "Keep the name under 120 characters.";
++  }
++
++  if (values.monthlyIncome.trim() === "" || !Number.isFinite(monthlyIncome) || monthlyIncome < 0) {
++    errors.monthlyIncome = "Enter a positive monthly income.";
++  }
++
++  if (values.currentSavings.trim() === "" || !Number.isFinite(currentSavings) || currentSavings < 0) {
++    errors.currentSavings = "Enter a positive current savings amount.";
++  }
++
++  if (
++    values.emergencyFundTarget.trim() === "" ||
++    !Number.isFinite(emergencyFundTarget) ||
++    emergencyFundTarget < 0
++  ) {
++    errors.emergencyFundTarget = "Enter a positive emergency fund target.";
++  }
++
++  if (
++    values.estimatedVariableExpenses.trim() === "" ||
++    !Number.isFinite(estimatedVariableExpenses) ||
++    estimatedVariableExpenses < 0
++  ) {
++    errors.estimatedVariableExpenses = "Enter positive variable expenses.";
++  }
++
++  if (Object.keys(errors).length > 0) {
++    return { ok: false, errors };
++  }
++
++  return {
++    ok: true,
++    profile: {
++      currency: values.currency,
++      fullName: fullName || undefined,
++      monthlyIncome,
++      currentSavings,
++      emergencyFundTarget,
++      payFrequency: values.payFrequency,
++      estimatedVariableExpenses,
++    },
++  };
++}
+diff --git a/src/features/settings/index.ts b/src/features/settings/index.ts
+new file mode 100644
+index 0000000..47c0ad5
+--- /dev/null
++++ b/src/features/settings/index.ts
+@@ -0,0 +1 @@
++export { SettingsPanel } from "./components/settings-panel";
+diff --git a/src/hooks/use-financial-state.test.tsx b/src/hooks/use-financial-state.test.tsx
+index fa7e057..4063556 100644
+--- a/src/hooks/use-financial-state.test.tsx
++++ b/src/hooks/use-financial-state.test.tsx
+@@ -9,6 +9,14 @@ const actions = vi.hoisted(() => ({
+   markStatus: vi.fn(),
+   createGoal: vi.fn(),
+   deleteGoal: vi.fn(),
++  createExpense: vi.fn(),
++  updateExpense: vi.fn(),
++  deleteExpense: vi.fn(),
++  createDebt: vi.fn(),
++  updateDebt: vi.fn(),
++  deleteDebt: vi.fn(),
++  updateSettings: vi.fn(),
++  deleteData: vi.fn(),
+   createCooldown: vi.fn(),
+   deleteCooldown: vi.fn(),
+   createReport: vi.fn(),
+@@ -29,10 +37,24 @@ vi.mock("@/features/goals/api/create-goal", () => ({
+   createGoalAction: actions.createGoal,
+   deleteGoalAction: actions.deleteGoal,
+ }));
++vi.mock("@/features/expenses/api/manage-expense", () => ({
++  createExpenseAction: actions.createExpense,
++  updateExpenseAction: actions.updateExpense,
++  deleteExpenseAction: actions.deleteExpense,
++}));
++vi.mock("@/features/debts/api/manage-debt", () => ({
++  createDebtAction: actions.createDebt,
++  updateDebtAction: actions.updateDebt,
++  deleteDebtAction: actions.deleteDebt,
++}));
+ vi.mock("@/features/cooldown/api/create-cooldown-item", () => ({
+   createCooldownItemAction: actions.createCooldown,
+   deleteCooldownItemAction: actions.deleteCooldown,
+ }));
++vi.mock("@/features/settings/api/manage-settings", () => ({
++  updateProfileSettingsAction: actions.updateSettings,
++  deleteFinancialDataAction: actions.deleteData,
++}));
+ vi.mock("@/features/reports/api/create-weekly-report", () => ({
+   createWeeklyReportAction: actions.createReport,
+ }));
+@@ -64,6 +86,14 @@ describe("useFinancialState Supabase mode", () => {
+     actions.markStatus.mockResolvedValue({ ok: true, data: null });
+     actions.createGoal.mockResolvedValue({ ok: true, data: null });
+     actions.deleteGoal.mockResolvedValue({ ok: true, data: null });
++    actions.createExpense.mockResolvedValue({ ok: true, data: null });
++    actions.updateExpense.mockResolvedValue({ ok: true, data: null });
++    actions.deleteExpense.mockResolvedValue({ ok: true, data: null });
++    actions.createDebt.mockResolvedValue({ ok: true, data: null });
++    actions.updateDebt.mockResolvedValue({ ok: true, data: null });
++    actions.deleteDebt.mockResolvedValue({ ok: true, data: null });
++    actions.updateSettings.mockResolvedValue({ ok: true, data: null });
++    actions.deleteData.mockResolvedValue({ ok: true, data: null });
+     actions.createCooldown.mockResolvedValue({ ok: true, data: null });
+     actions.deleteCooldown.mockResolvedValue({ ok: true, data: null });
+     actions.createReport.mockResolvedValue({ ok: true, data: null });
+@@ -149,6 +179,43 @@ describe("useFinancialState Supabase mode", () => {
+         addedAt: "2026-06-20T02:00:00.000Z",
+         recheckAt: "2026-06-23T02:00:00.000Z",
+       });
++      await result.current.createExpense({
++        label: "Utilities",
++        amount: 6_500,
++        dueDay: 15,
++        isRecurring: true,
++      });
++      await result.current.updateExpense("expense-1", {
++        label: "Rent",
++        amount: 28_000,
++        dueDay: 1,
++        isRecurring: true,
++      });
++      await result.current.deleteExpense("expense-1");
++      await result.current.createDebt({
++        label: "Credit card",
++        outstandingBalance: 35_000,
++        minimumPayment: 5_000,
++        dueDay: 20,
++        interestRate: 0.32,
++      });
++      await result.current.updateDebt("debt-1", {
++        label: "Card",
++        outstandingBalance: 30_000,
++        minimumPayment: 4_000,
++        dueDay: 18,
++      });
++      await result.current.deleteDebt("debt-1");
++      await result.current.updateProfileSettings({
++        currency: "PHP",
++        monthlyIncome: 100_000,
++        currentSavings: 180_000,
++        emergencyFundTarget: 150_000,
++        fullName: "Askia",
++        payFrequency: "weekly",
++        estimatedVariableExpenses: 12_000,
++      });
++      await result.current.deleteFinancialData();
+       await result.current.addCooldownFromCheck(savedCheck!.check);
+       await result.current.markPurchaseCheckStatus(savedCheck!.check, "bought");
+       await result.current.deleteGoal("goal-1");
+@@ -177,6 +244,26 @@ describe("useFinancialState Supabase mode", () => {
+         priority: "high",
+       })
+     );
++    expect(actions.createExpense).toHaveBeenCalledWith(
++      expect.objectContaining({ label: "Utilities", dueDay: 15 })
++    );
++    expect(actions.updateExpense).toHaveBeenCalledWith(
++      "expense-1",
++      expect.objectContaining({ label: "Rent" })
++    );
++    expect(actions.deleteExpense).toHaveBeenCalledWith("expense-1");
++    expect(actions.createDebt).toHaveBeenCalledWith(
++      expect.objectContaining({ label: "Credit card", dueDay: 20 })
++    );
++    expect(actions.updateDebt).toHaveBeenCalledWith(
++      "debt-1",
++      expect.objectContaining({ label: "Card", dueDay: 18 })
++    );
++    expect(actions.deleteDebt).toHaveBeenCalledWith("debt-1");
++    expect(actions.updateSettings).toHaveBeenCalledWith(
++      expect.objectContaining({ monthlyIncome: 100_000, payFrequency: "weekly" })
++    );
++    expect(actions.deleteData).toHaveBeenCalledOnce();
+     expect(actions.createCooldown).toHaveBeenCalledWith(
+       expect.objectContaining({ sourceCheckId: savedCheck?.check.id })
+     );
+@@ -315,6 +402,69 @@ describe("useFinancialState Supabase mode", () => {
+     });
+     expect(result.current.error).toBe("Status failed.");
+ 
++    const mutationFailures = [
++      [
++        actions.createExpense,
++        () =>
++          result.current.createExpense({
++            label: "Rent",
++            amount: 28_000,
++            dueDay: 1,
++            isRecurring: true,
++          }),
++        "Expense failed.",
++      ],
++      [
++        actions.updateExpense,
++        () =>
++          result.current.updateExpense("expense-1", {
++            label: "Rent",
++            amount: 28_000,
++            dueDay: 1,
++            isRecurring: true,
++          }),
++        "Update expense failed.",
++      ],
++      [actions.deleteExpense, () => result.current.deleteExpense("expense-1"), "Delete expense failed."],
++      [
++        actions.createDebt,
++        () =>
++          result.current.createDebt({
++            label: "Card",
++            outstandingBalance: 10_000,
++            minimumPayment: 1_000,
++            dueDay: 1,
++          }),
++        "Debt failed.",
++      ],
++      [
++        actions.updateDebt,
++        () =>
++          result.current.updateDebt("debt-1", {
++            label: "Card",
++            outstandingBalance: 10_000,
++            minimumPayment: 1_000,
++            dueDay: 1,
++          }),
++        "Update debt failed.",
++      ],
++      [actions.deleteDebt, () => result.current.deleteDebt("debt-1"), "Delete debt failed."],
++      [
++        actions.updateSettings,
++        () => result.current.updateProfileSettings(emptySnapshot.profile),
++        "Settings failed.",
++      ],
++      [actions.deleteData, () => result.current.deleteFinancialData(), "Delete data failed."],
++    ] as const;
++
++    for (const [mock, operation, message] of mutationFailures) {
++      mock.mockResolvedValueOnce({ ok: false, error: message });
++      await act(async () => {
++        await expect(operation()).rejects.toThrow(message);
++      });
++      expect(result.current.error).toBe(message);
++    }
++
+     actions.saveVoice.mockResolvedValueOnce({ ok: false, error: "Voice failed." });
+     await act(async () => {
+       await result.current.confirmVoiceDraft({
+diff --git a/src/hooks/use-financial-state.ts b/src/hooks/use-financial-state.ts
+index 489972f..8eee045 100644
+--- a/src/hooks/use-financial-state.ts
++++ b/src/hooks/use-financial-state.ts
+@@ -6,6 +6,16 @@ import {
+   createCooldownItemAction,
+   deleteCooldownItemAction,
+ } from "@/features/cooldown/api/create-cooldown-item";
++import {
++  createDebtAction,
++  deleteDebtAction,
++  updateDebtAction,
++} from "@/features/debts/api/manage-debt";
++import {
++  createExpenseAction,
++  deleteExpenseAction,
++  updateExpenseAction,
++} from "@/features/expenses/api/manage-expense";
+ import { loadFinancialWorkspaceAction } from "@/features/financial-profile/api/load-financial-workspace";
+ import { saveFinancialProfileAction } from "@/features/financial-profile/api/save-financial-profile";
+ import { createGoalAction, deleteGoalAction } from "@/features/goals/api/create-goal";
+@@ -15,6 +25,10 @@ import {
+ } from "@/features/purchase-checker/api/save-purchase-check";
+ import { saveVoiceSessionAction } from "@/features/purchase-checker/api/save-voice-session";
+ import { createWeeklyReportAction } from "@/features/reports/api/create-weekly-report";
++import {
++  deleteFinancialDataAction,
++  updateProfileSettingsAction,
++} from "@/features/settings/api/manage-settings";
+ import {
+   calculateFinancialHealthScore,
+   calculateMonthlyFreeCashFlow,
+@@ -47,6 +61,8 @@ interface OnboardingPayload {
+ }
+ 
+ type GoalDraft = Omit<Goal, "id">;
++type ExpenseDraft = Omit<Expense, "id">;
++type DebtDraft = Omit<Debt, "id">;
+ 
+ export function useFinancialState() {
+   const [snapshot, setSnapshot] = useState<FinancialSnapshot>(() => emptySnapshot);
+@@ -278,6 +294,117 @@ export function useFinancialState() {
+     [refresh]
+   );
+ 
++  const createExpense = useCallback(
++    async (expenseDraft: ExpenseDraft) => {
++      const result = await createExpenseAction(expenseDraft);
++
++      if (!result.ok) {
++        setError(result.error);
++        throw new Error(result.error);
++      }
++
++      await refresh();
++      return { id: createId("expense"), ...expenseDraft };
++    },
++    [refresh]
++  );
++
++  const updateExpense = useCallback(
++    async (id: string, expenseDraft: ExpenseDraft) => {
++      const result = await updateExpenseAction(id, expenseDraft);
++
++      if (!result.ok) {
++        setError(result.error);
++        throw new Error(result.error);
++      }
++
++      await refresh();
++    },
++    [refresh]
++  );
++
++  const deleteExpense = useCallback(
++    async (id: string) => {
++      const result = await deleteExpenseAction(id);
++
++      if (!result.ok) {
++        setError(result.error);
++        throw new Error(result.error);
++      }
++
++      await refresh();
++    },
++    [refresh]
++  );
++
++  const createDebt = useCallback(
++    async (debtDraft: DebtDraft) => {
++      const result = await createDebtAction(debtDraft);
++
++      if (!result.ok) {
++        setError(result.error);
++        throw new Error(result.error);
++      }
++
++      await refresh();
++      return { id: createId("debt"), ...debtDraft };
++    },
++    [refresh]
++  );
++
++  const updateDebt = useCallback(
++    async (id: string, debtDraft: DebtDraft) => {
++      const result = await updateDebtAction(id, debtDraft);
++
++      if (!result.ok) {
++        setError(result.error);
++        throw new Error(result.error);
++      }
++
++      await refresh();
++    },
++    [refresh]
++  );
++
++  const deleteDebt = useCallback(
++    async (id: string) => {
++      const result = await deleteDebtAction(id);
++
++      if (!result.ok) {
++        setError(result.error);
++        throw new Error(result.error);
++      }
++
++      await refresh();
++    },
++    [refresh]
++  );
++
++  const updateProfileSettings = useCallback(
++    async (profile: FinancialProfile) => {
++      const result = await updateProfileSettingsAction(profile);
++
++      if (!result.ok) {
++        setError(result.error);
++        throw new Error(result.error);
++      }
++
++      await refresh();
++    },
++    [refresh]
++  );
++
++  const deleteFinancialData = useCallback(async () => {
++    const result = await deleteFinancialDataAction();
++
++    if (!result.ok) {
++      setError(result.error);
++      throw new Error(result.error);
++    }
++
++    await refresh();
++  }, [refresh]);
++
+   const generateWeeklyReport = useCallback(async () => {
+     const safeToSpend = calculateSafeToSpend(snapshot);
+     const healthScore = calculateFinancialHealthScore(snapshot);
+@@ -344,6 +471,14 @@ export function useFinancialState() {
+     markPurchaseCheckStatus,
+     removeCooldownItem,
+     deleteGoal,
++    createExpense,
++    updateExpense,
++    deleteExpense,
++    createDebt,
++    updateDebt,
++    deleteDebt,
++    updateProfileSettings,
++    deleteFinancialData,
+     generateWeeklyReport,
+     confirmVoiceDraft,
+     refresh,
+diff --git a/tasks/mvp-completion/ROADMAP.md b/tasks/mvp-completion/ROADMAP.md
+index cdf6e3c..9d0a6ac 100644
+--- a/tasks/mvp-completion/ROADMAP.md
++++ b/tasks/mvp-completion/ROADMAP.md
+@@ -59,7 +59,7 @@ invocation**. Expect to invoke it **twice** (P1–P10, then P11–P12), or pass
+ | 4  | Manual purchase checker completeness | §11.3, §27.3 | ✅ DONE | P3 | Wizard is missing PRD fields: `category`, `saleDeadline`, `location`, `notes`, and `downPayment` is "reference-only" (must feed P3's savings-after). Result must surface: decision, risk score, savings-after-purchase, EF impact, debt conflict, goal-delay months, cooldown recommendation, reasons, recommended next action, advisor text. Add `mark as bought` / `mark as skipped`; wire check history to Supabase via the existing action. |
+ | 5  | Goal planner completion | §11.5, §13(Story 5), §27.5 | ✅ DONE | P3 | Goal **creation UI is disabled** ("coming soon"); `createGoalAction` exists but is unwired; "Convert to goal" from a check is disabled. Enable goal CRUD UI; compute estimated completion date, needed monthly + **per-payday** contribution (uses `pay_frequency` from P2), realistic-or-not flag; show goal impact during purchase checks; enable convert-purchase-to-goal end to end. |
+ | 6  | Cooldown completion | §11.6, §27.6 | ✅ DONE | P3, P4 | `Recheck` and `Convert to goal` are disabled; no "did your status improve" indicator; default days not derived from price tier. Apply §11.6/§19.5 default cooldown by price; `Recheck` recomputes the decision against a fresh snapshot and reports whether safe-to-spend / decision improved since added; enable convert-to-goal. |
+-| 7  | Expenses / Debts / Settings management | §11.1, §13(Story 1), §14 | ⏳ PENDING | P2 | PRD §14 routes `/expenses`, `/debts`, `/settings` do not exist; expenses/debts are only set at onboarding with **no edit-later path** (PRD §11.1 "User can edit all values later"). Add update/delete server actions (auth + Zod + RLS) and the three routes: expense CRUD, debt CRUD (incl. due dates feeding P3's 30-day window), and settings (currency, profile edit, delete-my-data). |
++| 7  | Expenses / Debts / Settings management | §11.1, §13(Story 1), §14 | ✅ DONE | P2 | PRD §14 routes `/expenses`, `/debts`, `/settings` do not exist; expenses/debts are only set at onboarding with **no edit-later path** (PRD §11.1 "User can edit all values later"). Add update/delete server actions (auth + Zod + RLS) and the three routes: expense CRUD, debt CRUD (incl. due dates feeding P3's 30-day window), and settings (currency, profile edit, delete-my-data). |
+ | 8  | Dashboard completeness | §11.2, §27.2 | ⏳ PENDING | P3, P2 | Dashboard lacks the **upcoming-debt-within-30-days** card/alert and does not surface estimated variable expenses; advisor summary is partly static. Wire all PRD §11.2 cards to live deterministic metrics from P3, including the 30-day debt window and the strong/stable/caution/risky status banner. |
+ | 9  | Weekly advisor report from real metrics | §11.7, §13(Story 6) | ⏳ PENDING | P3 | Report insights are static placeholders. Generate wins / risks / recommendations / one next-best-action from real deterministic metrics + the week's purchase-check + cooldown history; store + show history; **rule-based fallback** narrative when the LLM is unavailable (report must work without AI). |
+ | 10 | LiteRT-LM advisor — real integration | §11.8, §20.5, §21 | ⏳ PENDING | P3 | Advisor is a stub (`window.LiteRTLM?.generateText`); only the deterministic fallback works. Implement the engine/model loader, prompt builder (§21 system + template), streaming explanation, robust fallback wiring, and transcript→structured-fields extraction via LiteRT (§20.5) with the existing regex parser as fallback; include one educational lesson. Invariant: the LLM explains, never overrides, the §19 decision. |
+diff --git a/tasks/mvp-completion/completed/7-expenses-debts-settings-management/GOAL.md b/tasks/mvp-completion/completed/7-expenses-debts-settings-management/GOAL.md
+new file mode 100644
+index 0000000..62865d5
+--- /dev/null
++++ b/tasks/mvp-completion/completed/7-expenses-debts-settings-management/GOAL.md
+@@ -0,0 +1,279 @@
++# Current Goal: 7 — Expenses / Debts / Settings Management
++
++## Goal metadata
++
++- Feature: `SpendGuard MVP completion`
++- Phase: `7`
++- Status: `READY TO START`
++- Source plan: `tasks/mvp-completion/ROADMAP.md`
++- Previous phase report: `tasks/mvp-completion/completed/6-cooldown-completion/REPORT.md`
++
++## 0. Repository harness (SpendGuard)
++
++- Stack: Next.js 16 (App Router) + React 19 + TypeScript (strict) + Supabase (Auth + Postgres + RLS) + Tailwind / shadcn. Tests: Vitest (jsdom) + React Testing Library; Playwright e2e.
++- READ FIRST: `AGENTS.md` warns "This is NOT the Next.js you know." Read the relevant guide under `node_modules/next/dist/docs/` before writing Next-specific code. Heed Next 16 / React 19 deprecations.
++- Exact commands (run in CODE ROOT):
++  - Typecheck: `npm run typecheck`
++  - Lint: `npm run lint`
++  - Unit + component tests: `npm test` / `npm test -- <path>`
++  - Coverage: `npm run test:coverage`
++  - Build: `npm run build`
++  - E2E/public path: Playwright against `127.0.0.1:3100` when practical; otherwise component tests must exercise the routed page adapters.
++  - DB migrations: not expected for this phase; if a migration becomes necessary, verify with `supabase db reset` and document rollback.
++- Frontend rule: this UI-bearing phase invoked the `frontend-design` skill before UI implementation.
++- Git boundary: Phase 6 was committed and pushed after explicit approval. For Phase 7, keep a focused checkpoint and exclude unrelated local dirty files unless the user asks otherwise.
++
++## 1. Current project state
++
++The following work is already complete:
++
++- Phase 1 verified the Supabase-first routed baseline and app shell.
++- Phase 2 added profile completeness fields, onboarding completion, pay frequency, and variable spending.
++- Phase 3 aligned the deterministic financial rules engine to PRD Section 19.
++- Phase 4 completed manual purchase checking and persisted check history.
++- Phase 5 enabled savings goal creation, deletion, and purchase-to-goal conversion.
++- Phase 6 completed cooldown recheck and cooldown-to-goal conversion, including hosted beta migration `20260623003000_cooldown_recheck_baseline.sql`.
++
++Do not redo, replace, or redesign completed work.
++
++Before changing code:
++
++1. inspect the current diff;
++2. inspect existing action, hook, mapper, navigation, and route conventions;
++3. preserve P1-P6 behavior;
++4. verify this goal still matches repository reality.
++
++## 2. Objective
++
++Implement edit-later management for expenses, debts, and account settings so onboarded users can manage the financial values that currently exist only in onboarding.
++
++This milestone owns:
++
++- Authenticated expense create, update, and delete actions plus `/expenses`.
++- Authenticated debt create, update, and delete actions plus `/debts`.
++- `/settings` profile editing for existing profile fields, plus a delete-financial-data control.
++- Hook and page-adapter wiring so the routed app uses the same Supabase workspace refresh path as earlier phases.
++- Navigation updates from placeholder links to the new routes.
++
++This milestone does not include:
++
++- Dashboard metric/card redesign from Phase 8.
++- Weekly report generation improvements from Phase 9.
++- LiteRT advisor integration from Phase 10.
++- Privacy/disclaimer/transcript deletion work from Phase 11, except the Phase 7 delete-financial-data control.
++- Broad E2E suite hardening from Phase 12.
++- Supabase Auth account deletion, bank links, receipt OCR, transaction tracking, CSV import, or investment advice.
++
++## 3. Required behavior
++
++The implementation must:
++
++1. expose `/expenses` where users can create, edit, and delete expenses with label, amount, due day, and recurring status;
++2. expose `/debts` where users can create, edit, and delete debts with label, outstanding balance, minimum payment, due day, and optional interest rate;
++3. expose `/settings` where users can edit currency, full name, monthly income, current savings, emergency fund target, pay frequency, and estimated variable expenses;
++4. persist writes through server actions that derive `user_id` from Supabase Auth and scope updates/deletes by both `id` and `user_id`;
++5. refresh the `useFinancialState` workspace after successful writes so downstream deterministic calculations consume fresh expense/debt/profile values;
++6. keep debt due dates in the same `snapshot.debts` path used by Phase 3 30-day debt calculations;
++7. return user-facing validation/action errors without swallowing server errors silently;
++8. provide a delete-financial-data control that removes app financial rows for the current user and leaves the Supabase Auth login account intact.
++
++## 4. Architectural invariants
++
++The implementation must preserve:
++
++1. The deterministic rules engine (`src/lib/calculations/**`) remains the single source of financial decisions; the LLM advisor only explains, never decides.
++2. Existing Zod schemas and Supabase mappers are reused rather than copied.
++3. Server actions check the authenticated user and derive `user_id` from Supabase Auth; never trust a client-supplied id.
++4. Existing public APIs and server-action signatures stay backward-compatible unless explicitly approved.
++5. New orchestration stays thin; business rules stay in the calculation/service layer.
++6. Work from completed phases is not redesigned.
++
++Stop and report if satisfying the goal would require violating one of these invariants.
++
++## 5. Important behavioral definitions
++
++### Delete financial data
++
++For Phase 7, "delete-my-data" means deleting app financial data rows owned by the current authenticated user from SpendGuard tables. It does not delete the Supabase Auth user account, rotate credentials, delete hosted project metadata, or modify other users' data.
++
++It may:
++
++- delete profile, expenses, debts, goals, purchase checks, cooldown items, weekly reports, and voice sessions for the current user;
++- return the app to an empty/onboarding state on the next workspace load.
++
++It must not:
++
++- use a service-role key in client code;
++- delete the Auth account;
++- delete or mutate rows without a current authenticated `user_id`.
++
++## 6. Existing implementation to inspect
++
++Before editing, inspect:
++
++- `src/features/financial-profile/api/save-financial-profile.ts`
++- `src/features/goals/api/create-goal.ts`
++- `src/features/financial-profile/api/load-financial-workspace.ts`
++- `src/lib/schemas/finance.ts`
++- `src/lib/supabase/finance-mappers.ts`
++- `src/hooks/use-financial-state.ts`
++- `src/app/(app)/_components/page-adapters.tsx`
++- `src/components/layout/app-navigation.tsx`
++- existing feature panels and tests under `src/features/goals`, `src/features/onboarding`, and `src/features/cooldown`
++
++Document current conventions in `STATUS.md` before implementing.
++
++## 7. Allowed files
++
++Prefer limiting changes to:
++
++- `src/features/expenses/**`
++- `src/features/debts/**`
++- `src/features/settings/**`
++- `src/hooks/use-financial-state.ts` and focused tests
++- `src/app/(app)/expenses/page.tsx`
++- `src/app/(app)/debts/page.tsx`
++- `src/app/(app)/settings/page.tsx`
++- `src/app/(app)/_components/page-adapters.tsx` and focused tests
++- `src/components/layout/app-navigation.tsx` and focused tests if they exist
++- `src/features/auth/api/auth-routing.test.ts` if route expectations require updating
++- `src/types/finance.ts`, `src/types/database.ts`, or `src/lib/schemas/finance.ts` only when required by the new action contracts
++- `tasks/mvp-completion/CURRENT_GOAL.md`
++- `tasks/mvp-completion/STATUS.md`
++- `tasks/mvp-completion/REPORT_DRAFT.md`
++- `tasks/mvp-completion/ROADMAP.md` when marking Phase 7 complete
++
++An additional file may be modified only when necessary, documented in `STATUS.md`, and still inside Phase 7 scope.
++
++## 8. Forbidden files and scope
++
++Do not modify:
++
++- `src/lib/calculations/**` unless a verified bug blocks Phase 7;
++- Phase 8 dashboard metric/card behavior;
++- Phase 9 report insight generation;
++- Phase 10 LiteRT advisor implementation;
++- Phase 11 disclaimer/privacy/transcript work beyond delete-financial-data;
++- broad `e2e/spendguard.spec.ts` hardening, except an optional targeted smoke if needed;
++- production/environment configuration;
++- unrelated migrations or unrelated UI/API files.
++
++Do not weaken or remove tests, bypass validation/RLS, introduce a competing persistence path, begin the next phase, or stage unrelated dirty files.
++
++## 9. Preferred implementation shape
++
++Preferred public seam:
++
++```text
++src/features/expenses/api/manage-expense.ts
++  createExpenseAction(input)
++  updateExpenseAction(id, input)
++  deleteExpenseAction(id)
++
++src/features/debts/api/manage-debt.ts
++  createDebtAction(input)
++  updateDebtAction(id, input)
++  deleteDebtAction(id)
++
++src/features/settings/api/manage-settings.ts
++  updateProfileSettingsAction(input)
++  deleteFinancialDataAction()
++
++useFinancialState()
++  createExpense / updateExpense / deleteExpense
++  createDebt / updateDebt / deleteDebt
++  updateProfileSettings / deleteFinancialData
++
++ExpensesPanel / DebtsPanel / SettingsPanel
++```
++
++Follow existing repository conventions if the inspected code shows a better compatible shape.
++
++## 10. Required tests
++
++At minimum, test:
++
++1. expense create, update, delete action success paths;
++2. debt create, update, delete action success paths;
++3. invalid expense/debt/settings input returns validation errors;
++4. updates/deletes include authenticated `user_id` scoping;
++5. delete-financial-data deletes only current-user app rows;
++6. hook methods call the server actions and refresh on success;
++7. public panels render existing rows and call create/update/delete handlers;
++8. settings panel updates profile fields and confirms delete-financial-data;
++9. page adapters pass snapshot data and callbacks to the new panels;
++10. navigation points to `/expenses`, `/debts`, and `/settings`;
++11. existing P5/P6 goal and cooldown behavior remains unchanged via focused regression or full suite.
++
++At least one test or smoke check must exercise:
++
++```text
++new route adapter/panel -> useFinancialState callback -> server-action-shaped result -> refreshed snapshot path
++```
++
++## 11. Verification commands
++
++Focused verification:
++
++```bash
++npm test -- src/features/expenses src/features/debts src/features/settings
++npm test -- src/hooks/use-financial-state.test.tsx
++npm test -- "src/app/(app)/_components/page-adapters.test.tsx"
++```
++
++Public-path or integration verification:
++
++```bash
++npm test -- src/features/expenses/components/expenses-panel.test.tsx src/features/debts/components/debts-panel.test.tsx src/features/settings/components/settings-panel.test.tsx
++```
++
++Relevant regressions:
++
++```bash
++npm test
++npm run typecheck
++npm run lint
++npm run test:coverage
++npm run build
++```
++
++Scope and diff verification:
++
++```bash
++git diff --check
++git diff --stat
++git diff --name-only
++git status --short
++```
++
++## 12. Claim-to-evidence matrix
++
++| Completion claim | Evidence | Status |
++| --- | --- | --- |
++| `/expenses` supports create, edit, and delete through authenticated actions | component/action/hook tests | NOT VERIFIED |
++| `/debts` supports create, edit, and delete through authenticated actions | component/action/hook tests | NOT VERIFIED |
++| `/settings` supports profile edits | component/action/hook tests | NOT VERIFIED |
++| Delete-financial-data removes app rows for current user only | settings action tests | NOT VERIFIED |
++| Debt due dates remain in `snapshot.debts` for deterministic calculations | mapper/hook/component tests | NOT VERIFIED |
++| Existing P1-P6 behavior unchanged | focused regressions and full suite | NOT VERIFIED |
++| Public path works | route adapter/component tests and optional Playwright smoke | NOT VERIFIED |
++| No forbidden files changed | `git diff --name-only` | NOT VERIFIED |
++| Diff is structurally valid | `git diff --check` | NOT VERIFIED |
++
++Allowed statuses: `VERIFIED`, `PARTIALLY VERIFIED`, `NOT VERIFIED`, `BLOCKED`.
++
++## 13. Execution workflow
++
++Before implementation: inspect repository state and current diff; determine current conventions; update `STATUS.md` findings; confirm the smallest coherent design.
++
++During implementation: add or update focused tests first where practical, implement one CRUD surface at a time, run focused tests after each coherent behavior, and update `STATUS.md`.
++
++Before finishing: run the public-path check, regressions, coverage, build, diff/scope checks, and a no-edit independent review. Update the claim-to-evidence matrix and report.
++
++## 14. Retry and stop conditions
++
++Make no more than three materially different repair attempts for the same failure. Stop immediately when a product decision is required, a forbidden file appears necessary, a destructive migration is required, production credentials are required, or an architectural invariant would be violated.
++
++## 15. Definition of Done
++
++This milestone is complete only when every required behavior is implemented, architectural invariants are preserved, focused tests pass, the actual public path is exercised, relevant regressions/lint/coverage/build pass, no forbidden files changed, `git diff --check` passes, all claims have evidence, `STATUS.md` is current, Phase 7 is archived, and Phase 8 has not started.
+diff --git a/tasks/mvp-completion/completed/7-expenses-debts-settings-management/STATUS_FINAL.md b/tasks/mvp-completion/completed/7-expenses-debts-settings-management/STATUS_FINAL.md
+new file mode 100644
+index 0000000..daef784
+--- /dev/null
++++ b/tasks/mvp-completion/completed/7-expenses-debts-settings-management/STATUS_FINAL.md
+@@ -0,0 +1,203 @@
++# Milestone Status: 7 — Expenses / Debts / Settings Management
++
++## Metadata
++
++- Feature: `SpendGuard MVP completion`
++- Phase: `7`
++- Goal: `tasks/mvp-completion/CURRENT_GOAL.md`
++- Source plan: `tasks/mvp-completion/ROADMAP.md`
++- Branch: `main`
++- State: `READY FOR HUMAN REVIEW`
++- Last updated: `2026-06-24 02:50 PST`
++- Updated by: `Codex`
++
++## Current objective
++
++Add edit-later management for expenses, debts, and settings through authenticated Supabase-backed actions and routed app pages.
++
++## Current step
++
++Phase 7 is implemented, verified, reviewed, archived, and ready for a scoped human checkpoint commit.
++
++## Completed prior phases
++
++- Phase 1 — Integration baseline
++- Phase 2 — Profile and schema completeness
++- Phase 3 — PRD Section 19 deterministic rules engine
++- Phase 4 — Manual purchase checker completeness
++- Phase 5 — Goal planner completion
++- Phase 6 — Cooldown completion
++
++Do not list partially implemented work.
++
++## Investigation findings
++
++- `saveFinancialProfileAction` currently replaces onboarding setup rows in bulk and marks onboarding complete.
++- `createGoalAction` and `deleteGoalAction` are the closest narrow CRUD pattern: validate with Zod, derive `user_id` from `requireUserId`, write to Supabase, return `ActionResult`.
++- `loadFinancialWorkspaceAction` already loads expenses and debts ordered by `due_day`, then maps them into `snapshot.expenses` and `snapshot.debts`.
++- `useFinancialState` owns all current app mutations and refreshes the Supabase workspace after successful writes.
++- `AppDesktopNavigation` still links Debts to `/goals#debts` and Settings to `/onboarding`; no real `/expenses`, `/debts`, or `/settings` routes exist.
++- `page-adapters.tsx` is the route-to-feature bridge for app pages and should expose the new panels through `FinancialStateProvider`.
++- Existing unrelated dirty files are present and excluded from Phase 7 unless they become necessary: `CLAUDE.md`, `package.json`, `.agents/`, `.claude/`, `.codex/`, `supabase/.branches/`, `supabase/.temp/`.
++
++## Completed in this milestone
++
++- Created Phase 7 `CURRENT_GOAL.md`.
++- Created Phase 7 `STATUS.md`.
++- Added authenticated expense create/update/delete actions and action tests.
++- Added authenticated debt create/update/delete actions and action tests.
++- Added settings profile update and delete-financial-data actions and action tests.
++- Wired expense, debt, and settings mutations through `useFinancialState`.
++- Added `/expenses`, `/debts`, and `/settings` routes and page-adapter wiring.
++- Added Expenses, Debts, and Settings panels with form validation and component tests.
++- Updated app navigation from placeholder Debts/Settings links to real routes and added Expenses.
++- Updated auth-routing and app-shell tests for the new protected routes/links.
++- Verified `/expenses`, `/debts`, and `/settings` with targeted Playwright smoke using hosted beta Supabase login; no data was mutated.
++
++## In progress
++
++- None.
++
++## Remaining work
++
++- [x] Add authenticated expense server actions and tests.
++- [x] Add authenticated debt server actions and tests.
++- [x] Add settings profile/delete-data server actions and tests.
++- [x] Wire `useFinancialState` callbacks and tests.
++- [x] Add Expenses, Debts, and Settings panels with component tests.
++- [x] Add `/expenses`, `/debts`, `/settings` routes and page-adapter tests.
++- [x] Update navigation to real routes and verify route expectations.
++- [x] Run focused tests, public-path checks, regression suite, typecheck, lint, coverage, build, diff checks.
++- [x] Perform independent no-edit review.
++- [x] Archive Phase 7 and prepare checkpoint.
++
++## Files changed
++
++| File | Status | Purpose |
++| --- | --- | --- |
++| `tasks/mvp-completion/CURRENT_GOAL.md` | new | Bounded Phase 7 goal and verification matrix |
++| `tasks/mvp-completion/STATUS.md` | new | Phase 7 progress and evidence tracker |
++| `src/features/expenses/api/manage-expense.ts` | new | Authenticated expense CRUD actions |
++| `src/features/expenses/api/manage-expense.test.ts` | new | Expense action validation/auth/RLS-scope tests |
++| `src/features/expenses/components/expenses-panel.tsx` | new | Expense management UI |
++| `src/features/expenses/components/expenses-panel.test.tsx` | new | Expense panel public-path interaction tests |
++| `src/features/expenses/index.ts` | new | Feature export |
++| `src/features/debts/api/manage-debt.ts` | new | Authenticated debt CRUD actions |
++| `src/features/debts/api/manage-debt.test.ts` | new | Debt action validation/auth/RLS-scope tests |
++| `src/features/debts/components/debts-panel.tsx` | new | Debt management UI |
++| `src/features/debts/components/debts-panel.test.tsx` | new | Debt panel public-path interaction tests |
++| `src/features/debts/index.ts` | new | Feature export |
++| `src/features/settings/api/manage-settings.ts` | new | Settings profile update and delete-financial-data actions |
++| `src/features/settings/api/manage-settings.test.ts` | new | Settings action validation/delete-data tests |
++| `src/features/settings/components/settings-panel.tsx` | new | Settings and data deletion UI |
++| `src/features/settings/components/settings-panel.test.tsx` | new | Settings panel interaction tests |
++| `src/features/settings/index.ts` | new | Feature export |
++| `src/app/(app)/expenses/page.tsx` | new | Expenses route |
++| `src/app/(app)/debts/page.tsx` | new | Debts route |
++| `src/app/(app)/settings/page.tsx` | new | Settings route |
++| `src/app/(app)/_components/page-adapters.tsx` | modified | Route adapter wiring for new panels |
++| `src/app/(app)/_components/page-adapters.test.tsx` | modified | Adapter prop/callback coverage |
++| `src/hooks/use-financial-state.ts` | modified | Central mutation callbacks for Phase 7 |
++| `src/hooks/use-financial-state.test.tsx` | modified | Hook action/refresh/failure coverage |
++| `src/components/layout/app-navigation.tsx` | modified | Real Expenses/Debts/Settings links |
++| `src/components/layout/app-shell.test.tsx` | modified | Navigation link regression coverage |
++| `src/features/auth/api/auth-routing.test.ts` | modified | Protected-route expectation coverage |
++
++## Decisions made
++
++### Delete financial data boundary
++
++- Decision: Phase 7 delete-my-data removes app financial rows for the current authenticated user, not the Supabase Auth account.
++- Reason: This satisfies the roadmap's settings control while staying inside current user-scoped RLS/server-action capability and avoiding service-role account deletion.
++- Alternatives rejected:
++  - Delete Auth user account: requires admin/service-role behavior outside the existing app action boundary.
++  - Leave delete-my-data for Phase 11: conflicts with the explicit Phase 7 settings scope.
++- Impact on future phases: Phase 11 can still add transcript-specific privacy copy and broader privacy surface without changing this Phase 7 data-deletion seam.
++
++## Verification status
++
++| Check | Command | Result | Evidence |
++| --- | --- | --- | --- |
++| Typecheck | `npm run typecheck` | PASS | `tsc --noEmit` passed |
++| Lint | `npm run lint` | PASS | 0 errors / 271 warnings from unrelated local skill bundles and existing React Hook Form compiler warning |
++| Focused test | `npm test -- src/features/expenses src/features/debts src/features/settings src/hooks/use-financial-state.test.tsx "src/app/(app)/_components/page-adapters.test.tsx" src/components/layout/app-shell.test.tsx src/features/auth/api/auth-routing.test.ts` | PASS | 10 files / 59 tests |
++| Hook test | included in focused test | PASS | `use-financial-state.test.tsx` covered new actions and failures |
++| Public-path test | focused component/adapter tests + targeted Playwright smoke | PASS | `/expenses`, `/debts`, `/settings` rendered, screenshot buffers captured, form/delete-guard interactions passed |
++| Regression suite | `npm test` | PASS | 43 files / 225 tests |
++| Coverage (>=80%) | `npm run test:coverage` | PASS | 91.32% statements / 81.94% branches / 94.94% functions / 91.32% lines |
++| Build | `npm run build` | PASS | Next build lists `/expenses`, `/debts`, `/settings` dynamic routes |
++| Migration replay | `supabase db reset` | NOT APPLICABLE | no migration expected |
++| Security audit | `npm audit --audit-level=high` | PASS | found 0 vulnerabilities |
++| Diff check | `git diff --check` | PASS | no whitespace errors for tracked diffs; staged Phase 7 diff check still pending at checkpoint |
++| Scope check | `git diff --name-only` + `git status --short` | PASS | Phase 7 files identified; unrelated dirty files remain excluded |
++
++Result values: `PASS`, `FAIL`, `BLOCKED`, `NOT RUN`, `NOT APPLICABLE`.
++
++## Claim-to-evidence progress
++
++| Completion claim | Status | Evidence |
++| --- | --- | --- |
++| `/expenses` supports create, edit, and delete through authenticated actions | VERIFIED | expense action tests, panel tests, hook tests, Playwright smoke |
++| `/debts` supports create, edit, and delete through authenticated actions | VERIFIED | debt action tests, panel tests, hook tests, Playwright smoke |
++| `/settings` supports profile edits | VERIFIED | settings action tests, panel tests, hook tests, Playwright smoke |
++| Delete-financial-data removes app rows for current user only | VERIFIED | settings action tests assert all deletes scoped by `user_id`; panel smoke only checked confirmation guard and did not mutate beta data |
++| Debt due dates remain in `snapshot.debts` for deterministic calculations | VERIFIED | adapter/hook/panel path uses `state.snapshot.debts`; existing mapper tests preserved |
++| Existing P1-P6 behavior unchanged | VERIFIED | full `npm test`, typecheck, coverage, build |
++| Public entry point works | VERIFIED | route adapter tests plus targeted Playwright smoke for `/expenses`, `/debts`, `/settings` |
++| No forbidden files changed | VERIFIED | scope review; no calculation/dashboard/report/AI files touched |
++
++## Review findings
++
++### Correctness review
++
++- State: `PASS`
++- Findings:
++  - None.
++
++### Regression review
++
++- State: `PASS`
++- Findings:
++  - None.
++
++### Simplification review
++
++- State: `PASS`
++- Findings:
++  - None.
++
++## Repair attempts
++
++None.
++
++## Blockers and open questions
++
++None.
++
++## Remaining risks
++
++- Broad `e2e/spendguard.spec.ts` has known stale/non-isolated failures from Phase 6 and was not used as the clean Phase 7 public-path gate.
++- Delete-financial-data keeps the login account by design; future privacy work may add Auth account deletion if the product requires it.
++- Hosted beta data may be messy per user instruction; Phase 7 must tolerate real rows and avoid assumptions that only seed data exists.
++- `CLAUDE.md`, `package.json`, `.agents/`, `.claude/`, `.codex/`, and Supabase temp directories remain unrelated local dirt and must stay out of the Phase 7 checkpoint.
++
++## Next action
++
++Review and commit only the scoped Phase 7 files; keep unrelated local dirty files out of the checkpoint.
++
++## Scope confirmation
++
++- [x] No next-phase work started
++- [x] No forbidden files modified
++- [x] No unrelated refactor introduced
++- [x] No tests weakened or removed
++- [x] No RLS / validation bypassed
++- [x] No new commit, push, merge, rebase, or deployment performed for Phase 7 yet
++
++## Human review readiness
++
++- State: `READY WITH KNOWN RISKS`
++
++## Session handoff
++
++For the next session: (1) read `CURRENT_GOAL.md`; (2) read this `STATUS.md`; (3) inspect the current Git diff; (4) preserve completed work; (5) resume from `Next action`; (6) do not repeat completed work; (7) do not begin the next milestone.

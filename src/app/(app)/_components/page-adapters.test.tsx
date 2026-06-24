@@ -2,21 +2,27 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CooldownPanel } from "@/features/cooldown";
 import { DashboardOverview } from "@/features/dashboard";
+import { DebtsPanel } from "@/features/debts";
+import { ExpensesPanel } from "@/features/expenses";
 import { GoalsPanel } from "@/features/goals";
 import { OnboardingSetup } from "@/features/onboarding";
 import { PurchaseCheckerWizard, PurchaseResult } from "@/features/purchase-checker";
 import { ReportsPanel } from "@/features/reports";
+import { SettingsPanel } from "@/features/settings";
 import { VoicePurchaseChecker } from "@/features/voice";
 import { financialSnapshotFixture as defaultSnapshot } from "@/test/fixtures/financial-snapshot";
 import { useFinancialStateContext } from "@/providers/financial-state-provider";
 import {
   CooldownPageContent,
   DashboardPageContent,
+  DebtsPageContent,
+  ExpensesPageContent,
   GoalsPageContent,
   OnboardingPageContent,
   PurchaseCheckerPageContent,
   PurchaseResultPageContent,
   ReportsPageContent,
+  SettingsPageContent,
   VoicePageContent,
 } from "./page-adapters";
 
@@ -26,6 +32,14 @@ vi.mock("@/features/cooldown", () => ({
 
 vi.mock("@/features/dashboard", () => ({
   DashboardOverview: vi.fn(() => <div data-testid="dashboard-overview" />),
+}));
+
+vi.mock("@/features/debts", () => ({
+  DebtsPanel: vi.fn(() => <div data-testid="debts-panel" />),
+}));
+
+vi.mock("@/features/expenses", () => ({
+  ExpensesPanel: vi.fn(() => <div data-testid="expenses-panel" />),
 }));
 
 vi.mock("@/features/goals", () => ({
@@ -45,6 +59,10 @@ vi.mock("@/features/purchase-checker", () => ({
 
 vi.mock("@/features/reports", () => ({
   ReportsPanel: vi.fn(() => <div data-testid="reports-panel" />),
+}));
+
+vi.mock("@/features/settings", () => ({
+  SettingsPanel: vi.fn(() => <div data-testid="settings-panel" />),
 }));
 
 vi.mock("@/features/voice", () => ({
@@ -116,6 +134,14 @@ describe("page adapters", () => {
       addGoalFromCheck: vi.fn(),
       addGoalFromCooldown: vi.fn(),
       createGoal: vi.fn(),
+      createExpense: vi.fn(),
+      updateExpense: vi.fn(),
+      deleteExpense: vi.fn(),
+      createDebt: vi.fn(),
+      updateDebt: vi.fn(),
+      deleteDebt: vi.fn(),
+      updateProfileSettings: vi.fn(),
+      deleteFinancialData: vi.fn(),
       addCooldownFromCheck: vi.fn(),
       markPurchaseCheckStatus: vi.fn(),
       removeCooldownItem: vi.fn(),
@@ -224,6 +250,34 @@ describe("page adapters", () => {
     expect(props.onDeleteGoal).toBe(financialState.deleteGoal);
   });
 
+  it("passes expense state and callback identities", () => {
+    render(<ExpensesPageContent />);
+
+    expect(screen.getByTestId("expenses-panel")).toBeInTheDocument();
+    expect(ExpensesPanel).toHaveBeenCalledOnce();
+
+    const props = vi.mocked(ExpensesPanel).mock.calls[0][0];
+    expect(props.expenses).toBe(financialState.snapshot.expenses);
+    expect(props.currency).toBe(financialState.snapshot.profile.currency);
+    expect(props.onCreateExpense).toBe(financialState.createExpense);
+    expect(props.onUpdateExpense).toBe(financialState.updateExpense);
+    expect(props.onDeleteExpense).toBe(financialState.deleteExpense);
+  });
+
+  it("passes debt state and callback identities", () => {
+    render(<DebtsPageContent />);
+
+    expect(screen.getByTestId("debts-panel")).toBeInTheDocument();
+    expect(DebtsPanel).toHaveBeenCalledOnce();
+
+    const props = vi.mocked(DebtsPanel).mock.calls[0][0];
+    expect(props.debts).toBe(financialState.snapshot.debts);
+    expect(props.currency).toBe(financialState.snapshot.profile.currency);
+    expect(props.onCreateDebt).toBe(financialState.createDebt);
+    expect(props.onUpdateDebt).toBe(financialState.updateDebt);
+    expect(props.onDeleteDebt).toBe(financialState.deleteDebt);
+  });
+
   it("passes cooldown state and callback identities", () => {
     render(<CooldownPageContent />);
 
@@ -248,6 +302,18 @@ describe("page adapters", () => {
     expect(props.reports).toBe(financialState.weeklyReports);
     expect(props.currency).toBe(financialState.snapshot.profile.currency);
     expect(props.onGenerateReport).toBe(financialState.generateWeeklyReport);
+  });
+
+  it("passes settings state and callback identities", () => {
+    render(<SettingsPageContent />);
+
+    expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+    expect(SettingsPanel).toHaveBeenCalledOnce();
+
+    const props = vi.mocked(SettingsPanel).mock.calls[0][0];
+    expect(props.profile).toBe(financialState.snapshot.profile);
+    expect(props.onUpdateProfile).toBe(financialState.updateProfileSettings);
+    expect(props.onDeleteFinancialData).toBe(financialState.deleteFinancialData);
   });
 
   it("shows the hydration notice before passing onboarding state and callback identities", () => {

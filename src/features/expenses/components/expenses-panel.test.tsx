@@ -1,0 +1,118 @@
+import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
+
+import { financialSnapshotFixture } from "@/test/fixtures/financial-snapshot";
+import type { Expense } from "@/types/finance";
+import { ExpensesPanel } from "./expenses-panel";
+
+const expenses = financialSnapshotFixture.expenses;
+
+function renderExpensesPanel({
+  items = expenses,
+  onCreateExpense = vi.fn().mockResolvedValue(undefined),
+  onUpdateExpense = vi.fn().mockResolvedValue(undefined),
+  onDeleteExpense = vi.fn().mockResolvedValue(undefined),
+}: {
+  items?: Expense[];
+  onCreateExpense?: (expense: Omit<Expense, "id">) => Promise<Expense | undefined>;
+  onUpdateExpense?: (id: string, expense: Omit<Expense, "id">) => Promise<void>;
+  onDeleteExpense?: (id: string) => Promise<void>;
+} = {}) {
+  return render(
+    <ExpensesPanel
+      expenses={items}
+      currency="PHP"
+      onCreateExpense={onCreateExpense}
+      onUpdateExpense={onUpdateExpense}
+      onDeleteExpense={onDeleteExpense}
+    />
+  );
+}
+
+describe("ExpensesPanel", () => {
+  it("renders expense summary and editable expense cards", () => {
+    renderExpensesPanel();
+
+    const summary = screen.getByTestId("expense-summary");
+    expect(within(summary).getByText("Tracked expenses")).toBeVisible();
+    expect(within(screen.getByLabelText("Tracked expenses metric")).getByText("2")).toBeVisible();
+    expect(within(summary).getByText("Monthly total")).toBeVisible();
+    expect(within(summary).getByText(/28,500/)).toBeVisible();
+    expect(within(summary).getByText("Day 1")).toBeVisible();
+
+    const rent = screen.getByRole("article", { name: "Rent expense" });
+    expect(within(rent).getByText("Rent")).toBeVisible();
+    expect(within(rent).getByText("Recurring")).toBeVisible();
+    expect(within(rent).getByText(/22,000/)).toBeVisible();
+    expect(within(rent).getByText("Due every month on day 1")).toBeVisible();
+    expect(within(rent).getByRole("button", { name: "Edit Rent" })).toBeEnabled();
+    expect(within(rent).getByRole("button", { name: "Delete Rent" })).toBeEnabled();
+  });
+
+  it("creates an expense from the form", async () => {
+    const user = userEvent.setup();
+    const onCreateExpense = vi.fn().mockResolvedValue(undefined);
+    renderExpensesPanel({ onCreateExpense });
+
+    await user.click(screen.getByRole("button", { name: "New Expense" }));
+    await user.type(screen.getByLabelText("Expense name"), "Phone plan");
+    await user.type(screen.getByLabelText("Amount"), "1200");
+    await user.clear(screen.getByLabelText("Due day"));
+    await user.type(screen.getByLabelText("Due day"), "10");
+    await user.selectOptions(screen.getByLabelText("Recurring"), "false");
+    await user.click(screen.getByRole("button", { name: "Create Expense" }));
+
+    expect(onCreateExpense).toHaveBeenCalledWith({
+      label: "Phone plan",
+      amount: 1200,
+      dueDay: 10,
+      isRecurring: false,
+    });
+  });
+
+  it("updates an existing expense", async () => {
+    const user = userEvent.setup();
+    const onUpdateExpense = vi.fn().mockResolvedValue(undefined);
+    renderExpensesPanel({ onUpdateExpense });
+
+    await user.click(screen.getByRole("button", { name: "Edit Utilities and internet" }));
+    await user.clear(screen.getByLabelText("Amount"));
+    await user.type(screen.getByLabelText("Amount"), "7000");
+    await user.click(screen.getByRole("button", { name: "Save Expense" }));
+
+    expect(onUpdateExpense).toHaveBeenCalledWith("expense_utilities", {
+      label: "Utilities and internet",
+      amount: 7000,
+      dueDay: 15,
+      isRecurring: true,
+    });
+  });
+
+  it("deletes an expense through its card action", async () => {
+    const user = userEvent.setup();
+    const onDeleteExpense = vi.fn().mockResolvedValue(undefined);
+    renderExpensesPanel({ onDeleteExpense });
+
+    await user.click(screen.getByRole("button", { name: "Delete Rent" }));
+
+    expect(onDeleteExpense).toHaveBeenCalledWith("expense_rent");
+  });
+
+  it("blocks invalid expense input with accessible errors", async () => {
+    const user = userEvent.setup();
+    const onCreateExpense = vi.fn().mockResolvedValue(undefined);
+    renderExpensesPanel({ onCreateExpense });
+
+    await user.click(screen.getByRole("button", { name: "New Expense" }));
+    await user.clear(screen.getByLabelText("Due day"));
+    await user.type(screen.getByLabelText("Due day"), "32");
+    await user.click(screen.getByRole("button", { name: "Create Expense" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Name this expense.");
+    expect(alert).toHaveTextContent("Enter a positive amount.");
+    expect(alert).toHaveTextContent("Use a due day from 1 to 31.");
+    expect(onCreateExpense).not.toHaveBeenCalled();
+  });
+});
