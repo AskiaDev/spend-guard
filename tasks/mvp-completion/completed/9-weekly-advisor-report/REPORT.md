@@ -9,9 +9,10 @@
 - Branch: `main`
 - Commit: created by agent (user-approved per-phase commits this run); pushed
 - Checkpoint patch: `tasks/mvp-completion/completed/9-weekly-advisor-report/9-weekly-advisor-report.patch`
-- Patch SHA-256: `a44731f00b62e8c18dd55064dfdf10b0f4dd2f7d282a3e45d5b6fc0afd20d969`
+- Patch SHA-256: `3d9432a1c4e7ca1b189af374cafe259c42c9386352943567465b3dc6a8e17af2`
 - Base commit SHA: `3e220f89cedd5c4e5b8cdf48b6a5e8098bd79013`
-- Patch contents: 7 files (2 new + 5 modified), 642 lines
+- Patch contents: 8 files (2 new + 6 modified), 658 lines
+- Commits: `effbccb` (phase) + a follow-up adding the hook-test assertion (initially omitted from the phase commit)
 - Started: `2026-06-24`
 - Finished: `2026-06-24`
 - Implemented by: `Claude Code`
@@ -135,6 +136,7 @@ Evidence: `use-financial-state.test.tsx` (`createReport` called with a summary c
 | `src/features/reports/components/reports-panel.test.tsx` | modified | Data-driven + history render tests |
 | `src/app/(app)/_components/page-adapters.tsx` | modified | Pass `checks`/`snapshot` to ReportsPanel |
 | `src/hooks/use-financial-state.ts` | modified | Store generator narrative in `generateWeeklyReport` |
+| `src/hooks/use-financial-state.test.tsx` | modified | Assert the stored summary uses the enriched narrative |
 | `src/components/feedback/feedback-states.test.tsx` | modified | Required-prop fix for new ReportsPanel contract |
 
 ### Files intentionally not changed

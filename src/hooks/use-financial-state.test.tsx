@@ -271,7 +271,10 @@ describe("useFinancialState Supabase mode", () => {
     expect(actions.deleteGoal).toHaveBeenCalledWith("goal-1");
     expect(actions.deleteCooldown).toHaveBeenCalledWith("cooldown-1");
     expect(actions.createReport).toHaveBeenCalledWith(
-      expect.objectContaining({ healthScore: expect.any(Number) })
+      expect.objectContaining({
+        healthScore: expect.any(Number),
+        summary: expect.stringContaining("guardrail-aligned"),
+      })
     );
     expect(actions.saveVoice).toHaveBeenCalledWith({
       transcript: "Can I buy a phone for 25k?",

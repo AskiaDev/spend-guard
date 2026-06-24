@@ -596,6 +596,22 @@ index 0000000..50fba69
 +function plural(count: number, word: string): string {
 +  return count === 1 ? word : `${word}s`;
 +}
+diff --git a/src/hooks/use-financial-state.test.tsx b/src/hooks/use-financial-state.test.tsx
+index 4063556..2686722 100644
+--- a/src/hooks/use-financial-state.test.tsx
++++ b/src/hooks/use-financial-state.test.tsx
+@@ -271,7 +271,10 @@ describe("useFinancialState Supabase mode", () => {
+     expect(actions.deleteGoal).toHaveBeenCalledWith("goal-1");
+     expect(actions.deleteCooldown).toHaveBeenCalledWith("cooldown-1");
+     expect(actions.createReport).toHaveBeenCalledWith(
+-      expect.objectContaining({ healthScore: expect.any(Number) })
++      expect.objectContaining({
++        healthScore: expect.any(Number),
++        summary: expect.stringContaining("guardrail-aligned"),
++      })
+     );
+     expect(actions.saveVoice).toHaveBeenCalledWith({
+       transcript: "Can I buy a phone for 25k?",
 diff --git a/src/hooks/use-financial-state.ts b/src/hooks/use-financial-state.ts
 index 8eee045..211d0f4 100644
 --- a/src/hooks/use-financial-state.ts
