@@ -1,1 +1,28 @@
-/* Midnight Vault theme - populated in Task 4 */
+.vault {
+  --vault-ink: #0a0e17;
+  --vault-deep: #17244e;
+  --vault-bg: radial-gradient(125% 85% at 28% -10%, #17244e 0%, #0a0e17 58%);
+  --vault-surface: rgba(255, 255, 255, 0.05);
+  --vault-border: rgba(255, 255, 255, 0.1);
+  --vault-text: #eaf0f7;
+  --vault-muted: #8a94a6;
+  --vault-accent: #c6f24e;
+  --vault-accent-2: #7fd93f;
+  --vault-radius-card: 22px;
+  --vault-radius-ctl: 12px;
+
+  min-height: 100dvh;
+  background: var(--vault-bg);
+  color: var(--vault-text);
+  font-family: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+}
+.vault h1, .vault h2, .vault .vault-display {
+  font-family: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+.vault .vault-eyebrow { font-size: 0.7rem; letter-spacing: 0.2em; font-weight: 700; color: var(--vault-accent); }
+.vault .vault-muted { color: var(--vault-muted); }
+.vault .vault-surface { background: var(--vault-surface); border: 1px solid var(--vault-border); }
+@media (prefers-reduced-motion: reduce) {
+  .vault * { animation: none !important; transition: none !important; }
+}
