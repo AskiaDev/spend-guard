@@ -1,8 +1,18 @@
+import { fileURLToPath } from "node:url";
+
 import { defineConfig } from "vitest/config";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
   plugins: [tsconfigPaths()],
+  resolve: {
+    alias: {
+      // `server-only` throws when imported in jsdom; stub it so server-only modules
+      // (e.g. src/lib/ai/model-spec.ts) remain unit-testable. The real package still
+      // guards the client/server boundary at production build time.
+      "server-only": fileURLToPath(new URL("./src/testing/server-only-stub.ts", import.meta.url)),
+    },
+  },
   test: {
     environment: "jsdom",
     globals: true,

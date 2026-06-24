@@ -9,6 +9,8 @@ import { Input, Label, Select, Textarea } from "@/components/ui/form-fields";
 import { purchaseInputSchema } from "@/lib/schemas/finance";
 import { formatCurrency } from "@/lib/utils";
 import { extractPurchaseFromTranscript } from "@/lib/voice/parsers";
+import { extractPurchaseWithModel } from "@/lib/voice/extract-with-model";
+import type { ExtractedPurchase } from "@/lib/voice/draft-schema";
 import type {
   PaymentMethod,
   PurchaseInput,
@@ -122,6 +124,23 @@ function buildReviewDraft(transcript: string): ReviewDraft {
   };
 }
 
+// Prefer the model's structured fields, keeping each regex value as the fallback
+// when the model leaves a field null. Same string-form ReviewDraft either way.
+function mergeModelDraft(regex: ReviewDraft, model: ExtractedPurchase): ReviewDraft {
+  const numberOr = (value: number | null, fallback: string) =>
+    value != null ? String(value) : fallback;
+
+  return {
+    itemName: model.itemName.trim() || regex.itemName,
+    amount: numberOr(model.amount, regex.amount),
+    downPayment: numberOr(model.downPayment, regex.downPayment),
+    installmentMonths: numberOr(model.installmentMonths, regex.installmentMonths),
+    monthlyPayment: numberOr(model.monthlyPayment, regex.monthlyPayment),
+    paymentMethod: model.paymentMethod || regex.paymentMethod,
+    urgency: model.urgency || regex.urgency,
+  };
+}
+
 function buildPurchaseCandidate(draft: ReviewDraft) {
   const purchase: Record<string, unknown> = {
     itemName: draft.itemName.trim(),
@@ -152,6 +171,7 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const transcriptRef = useRef("");
+  const userEditedRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -284,9 +304,23 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
 
     clearTimer(timerRef);
     releaseRecognition(recognitionRef, "abort");
-    setReviewDraft(buildReviewDraft(transcript));
+    const regexDraft = buildReviewDraft(transcript);
+    userEditedRef.current = false;
+    setReviewDraft(regexDraft);
     setAnalysisError(null);
     setStage("review");
+    void refineDraftWithModel(transcript, regexDraft);
+  }
+
+  async function refineDraftWithModel(source: string, regexDraft: ReviewDraft) {
+    const extracted = await extractPurchaseWithModel(source);
+
+    // Only upgrade if the model returned fields and the user hasn't started editing,
+    // so the model never overwrites a value the user is correcting. Regex stays
+    // otherwise — extraction is an enhancement, never a dependency.
+    if (extracted && mountedRef.current && !userEditedRef.current) {
+      setReviewDraft(mergeModelDraft(regexDraft, extracted));
+    }
   }
 
   function resetCapture() {
@@ -294,6 +328,7 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
     releaseRecognition(recognitionRef, "abort");
     updateTranscript("");
     setReviewDraft(emptyReviewDraft);
+    userEditedRef.current = false;
     setElapsedSeconds(0);
     setCaptureNotice(null);
     setAnalysisError(null);
@@ -301,6 +336,7 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
   }
 
   function updateReviewField<Key extends keyof ReviewDraft>(key: Key, value: ReviewDraft[Key]) {
+    userEditedRef.current = true;
     setReviewDraft((current) => ({ ...current, [key]: value }));
     setAnalysisError(null);
   }

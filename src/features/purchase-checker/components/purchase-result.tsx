@@ -15,6 +15,7 @@ import { StatusBadge } from "@/components/finance/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn, formatCurrency } from "@/lib/utils";
+import { AdvisorExplanation, LessonBlock } from "./advisor-explanation";
 import type {
   CurrencyCode,
   PurchaseCheck,
@@ -347,7 +348,7 @@ export function PurchaseResult({
                 <CardTitle id="advisor-explanation-heading">Advisor explanation</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-5">
-                <p className="text-sm leading-6 text-muted">{activeCheck.advisorText}</p>
+                <AdvisorExplanation key={activeCheck.id} check={activeCheck} live={!isExample} />
                 <div className="rounded-control border border-primary/20 bg-blue-50 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-primary">
                     Recommended action
@@ -356,6 +357,7 @@ export function PurchaseResult({
                     {recommendedActions[activeCheck.decision]}
                   </p>
                 </div>
+                <LessonBlock check={activeCheck} />
               </CardContent>
             </Card>
           </div>

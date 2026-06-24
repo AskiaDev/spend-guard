@@ -37,7 +37,7 @@ import {
   calculateSafeToSpend,
 } from "@/lib/calculations/purchase-decision";
 import { getCooldownDays } from "@/lib/calculations/cooldown";
-import { createAdvisorText } from "@/lib/advisor";
+import { createFallbackAdvice } from "@/lib/advisor";
 import { emptySnapshot } from "@/lib/storage/default-data";
 import { createId, toIsoDate } from "@/lib/utils";
 import type {
@@ -116,7 +116,9 @@ export function useFinancialState() {
   const runPurchaseCheck = useCallback(
     async (purchase: PurchaseInput) => {
       const result = calculatePurchaseDecision(snapshot, purchase);
-      const advisorText = await createAdvisorText(result, purchase);
+      // Persist the deterministic narrative — instant, offline-safe, and reproducible
+      // in history. The richer model explanation streams live in the result card.
+      const advisorText = createFallbackAdvice(result, purchase);
       const checkWithoutIdentity: Omit<PurchaseCheck, "id" | "createdAt"> = {
         ...purchase,
         decision: result.decision,

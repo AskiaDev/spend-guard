@@ -54,6 +54,7 @@ test("desktop purchase journey saves a check, goal, and cooldown item", async ({
   await expect(
     page.getByText("Waiting would give your monthly plan more room and reduce pressure on your priorities.")
   ).toBeVisible();
+  await expect(page.getByText("Lesson", { exact: true })).toBeVisible();
 
   const addToGoal = page.getByRole("button", { name: "Add to Goal" });
   await addToGoal.click();
