@@ -5,7 +5,6 @@ import { DashboardOverview } from "@/features/dashboard";
 import { DebtsPanel } from "@/features/debts";
 import { ExpensesPanel } from "@/features/expenses";
 import { GoalsPanel } from "@/features/goals";
-import { OnboardingSetup } from "@/features/onboarding";
 import { PurchaseCheckerWizard, PurchaseResult } from "@/features/purchase-checker";
 import { ReportsPanel } from "@/features/reports";
 import { SettingsPanel } from "@/features/settings";
@@ -18,7 +17,6 @@ import {
   DebtsPageContent,
   ExpensesPageContent,
   GoalsPageContent,
-  OnboardingPageContent,
   PurchaseCheckerPageContent,
   PurchaseResultPageContent,
   ReportsPageContent,
@@ -44,10 +42,6 @@ vi.mock("@/features/expenses", () => ({
 
 vi.mock("@/features/goals", () => ({
   GoalsPanel: vi.fn(() => <div data-testid="goals-panel" />),
-}));
-
-vi.mock("@/features/onboarding", () => ({
-  OnboardingSetup: vi.fn(() => <h1>Financial Profile</h1>),
 }));
 
 vi.mock("@/features/purchase-checker", () => ({
@@ -318,29 +312,5 @@ describe("page adapters", () => {
     expect(props.onDeleteVoiceTranscripts).toBe(financialState.deleteVoiceTranscripts);
   });
 
-  it("shows the hydration notice before passing onboarding state and callback identities", () => {
-    vi.mocked(useFinancialStateContext).mockReturnValue({
-      ...financialState,
-      isHydrated: false,
-    });
-    const { rerender } = render(<OnboardingPageContent />);
-
-    const hydrationStatus = screen.getByRole("status");
-    expect(hydrationStatus).toHaveTextContent("Loading local financial workspace...");
-    expect(hydrationStatus).toHaveAttribute("aria-live", "polite");
-    expect(screen.queryByRole("heading", { name: "Financial Profile" })).not.toBeInTheDocument();
-    expect(OnboardingSetup).not.toHaveBeenCalled();
-
-    vi.mocked(useFinancialStateContext).mockReturnValue(financialState);
-    rerender(<OnboardingPageContent />);
-
-    expect(screen.queryByText("Loading local financial workspace...")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Financial Profile" })).toBeInTheDocument();
-    expect(OnboardingSetup).toHaveBeenCalledOnce();
-
-    const props = vi.mocked(OnboardingSetup).mock.calls[0][0];
-    expect(props.snapshot).toBe(financialState.snapshot);
-    expect(props.isHydrated).toBe(financialState.isHydrated);
-    expect(props.onSave).toBe(financialState.replaceFinancialSetup);
-  });
 });
+

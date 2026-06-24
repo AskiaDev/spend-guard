@@ -3,6 +3,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { WorkspaceErrorBanner } from "@/components/layout/workspace-error-banner";
 import { env } from "@/config/env";
 import { signOutAction } from "@/features/auth/api/actions";
+import { readOnboardingCompleted } from "@/features/onboarding/api/read-onboarding-completed";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { FinancialStateProvider } from "@/providers/financial-state-provider";
 
@@ -20,6 +21,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (!user) {
     redirect("/login");
+  }
+
+  if (!(await readOnboardingCompleted(supabase, user.id))) {
+    redirect("/onboarding");
   }
 
   return (

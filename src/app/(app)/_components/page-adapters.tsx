@@ -6,7 +6,6 @@ import { DashboardOverview } from "@/features/dashboard";
 import { DebtsPanel } from "@/features/debts";
 import { ExpensesPanel } from "@/features/expenses";
 import { GoalsPanel } from "@/features/goals";
-import { OnboardingSetup } from "@/features/onboarding";
 import { PurchaseCheckerWizard, PurchaseResult } from "@/features/purchase-checker";
 import { ReportsPanel } from "@/features/reports";
 import { SettingsPanel } from "@/features/settings";
@@ -178,22 +177,6 @@ export function ReportsPageContent() {
       snapshot={state.snapshot}
       currency={state.snapshot.profile.currency}
       onGenerateReport={state.generateWeeklyReport}
-    />
-  );
-}
-
-export function OnboardingPageContent() {
-  const state = useFinancialStateContext();
-
-  if (!state.isHydrated) {
-    return <HydrationNotice />;
-  }
-
-  return (
-    <OnboardingSetup
-      snapshot={state.snapshot}
-      isHydrated={state.isHydrated}
-      onSave={state.replaceFinancialSetup}
     />
   );
 }

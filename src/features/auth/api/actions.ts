@@ -100,7 +100,7 @@ export async function signUpAction(
     };
   }
 
-  redirect("/");
+  redirect("/onboarding");
 }
 
 export async function signOutAction() {
