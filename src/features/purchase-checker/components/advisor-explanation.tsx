@@ -2,6 +2,7 @@
 
 import { GraduationCap } from "lucide-react";
 
+import { FinancialDisclaimer } from "@/components/legal/financial-disclaimer";
 import { getEducationalLesson } from "@/lib/advisor/lessons";
 import { buildAdvisorPrompt, buildAdvisorSystemPrompt } from "@/lib/advisor/prompt";
 import type { ModelClient } from "@/lib/ai/types";
@@ -73,6 +74,7 @@ export function AdvisorExplanation({
           </span>
         ) : null}
       </p>
+      <FinancialDisclaimer variant="inline" />
     </div>
   );
 }

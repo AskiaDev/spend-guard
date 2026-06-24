@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Mic, RotateCcw, Square } from "lucide-react";
+import { AlertTriangle, Mic, RotateCcw, ShieldCheck, Square } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -408,6 +408,15 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
                   type, or paste your request.
                 </p>
               </div>
+
+              <p className="flex items-start gap-2 rounded-control border border-border bg-slate-50 px-3 py-2 text-sm text-muted">
+                <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                <span>
+                  Your transcript may be sent to an AI service to read the purchase details, and
+                  saved checks store it on your account. Delete saved transcripts anytime in
+                  Settings.
+                </span>
+              </p>
 
               {captureNotice ? (
                 <p

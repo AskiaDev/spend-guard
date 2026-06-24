@@ -83,3 +83,22 @@ export async function deleteFinancialDataAction(): Promise<ActionResult<null>> {
     };
   }
 }
+
+export async function deleteVoiceSessionsAction(): Promise<ActionResult<null>> {
+  try {
+    const { supabase, userId } = await requireUserId();
+    const { error } = await supabase.from("voice_sessions").delete().eq("user_id", userId);
+
+    if (error) {
+      console.error("Unable to delete Supabase voice sessions", error);
+      return { ok: false, error: "Unable to delete your voice transcripts." };
+    }
+
+    return { ok: true, data: null };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Unable to delete voice transcripts.",
+    };
+  }
+}

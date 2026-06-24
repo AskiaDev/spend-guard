@@ -159,6 +159,7 @@ export function SettingsPageContent() {
       profile={state.snapshot.profile}
       onUpdateProfile={state.updateProfileSettings}
       onDeleteFinancialData={state.deleteFinancialData}
+      onDeleteVoiceTranscripts={state.deleteVoiceTranscripts}
     />
   );
 }

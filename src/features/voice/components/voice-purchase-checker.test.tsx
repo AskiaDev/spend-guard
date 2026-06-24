@@ -105,6 +105,14 @@ describe("VoicePurchaseChecker", () => {
     expect(recognitionConstructor).not.toHaveBeenCalled();
   });
 
+  it("surfaces a voice privacy note before capture", () => {
+    render(<VoicePurchaseChecker onRunCheck={vi.fn()} />);
+
+    const note = screen.getByText(/your transcript may be sent to an AI service/i);
+    expect(note).toBeVisible();
+    expect(note).toHaveTextContent(/delete saved transcripts anytime in Settings/i);
+  });
+
   it("uses non-blaming fallback copy and keeps typed transcript review usable when speech is unsupported", async () => {
     const user = userEvent.setup();
     removeSpeechRecognition();

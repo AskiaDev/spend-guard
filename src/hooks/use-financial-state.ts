@@ -28,6 +28,7 @@ import { createWeeklyReportAction } from "@/features/reports/api/create-weekly-r
 import { generateWeeklyReportInsights } from "@/features/reports/lib/weekly-report";
 import {
   deleteFinancialDataAction,
+  deleteVoiceSessionsAction,
   updateProfileSettingsAction,
 } from "@/features/settings/api/manage-settings";
 import {
@@ -408,6 +409,17 @@ export function useFinancialState() {
     await refresh();
   }, [refresh]);
 
+  const deleteVoiceTranscripts = useCallback(async () => {
+    const result = await deleteVoiceSessionsAction();
+
+    if (!result.ok) {
+      setError(result.error);
+      throw new Error(result.error);
+    }
+
+    await refresh();
+  }, [refresh]);
+
   const generateWeeklyReport = useCallback(async () => {
     const safeToSpend = calculateSafeToSpend(snapshot);
     const healthScore = calculateFinancialHealthScore(snapshot);
@@ -489,6 +501,7 @@ export function useFinancialState() {
     deleteDebt,
     updateProfileSettings,
     deleteFinancialData,
+    deleteVoiceTranscripts,
     generateWeeklyReport,
     confirmVoiceDraft,
     refresh,

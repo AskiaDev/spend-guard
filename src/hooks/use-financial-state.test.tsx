@@ -17,6 +17,7 @@ const actions = vi.hoisted(() => ({
   deleteDebt: vi.fn(),
   updateSettings: vi.fn(),
   deleteData: vi.fn(),
+  deleteVoice: vi.fn(),
   createCooldown: vi.fn(),
   deleteCooldown: vi.fn(),
   createReport: vi.fn(),
@@ -54,6 +55,7 @@ vi.mock("@/features/cooldown/api/create-cooldown-item", () => ({
 vi.mock("@/features/settings/api/manage-settings", () => ({
   updateProfileSettingsAction: actions.updateSettings,
   deleteFinancialDataAction: actions.deleteData,
+  deleteVoiceSessionsAction: actions.deleteVoice,
 }));
 vi.mock("@/features/reports/api/create-weekly-report", () => ({
   createWeeklyReportAction: actions.createReport,
@@ -94,10 +96,25 @@ describe("useFinancialState Supabase mode", () => {
     actions.deleteDebt.mockResolvedValue({ ok: true, data: null });
     actions.updateSettings.mockResolvedValue({ ok: true, data: null });
     actions.deleteData.mockResolvedValue({ ok: true, data: null });
+    actions.deleteVoice.mockResolvedValue({ ok: true, data: null });
     actions.createCooldown.mockResolvedValue({ ok: true, data: null });
     actions.deleteCooldown.mockResolvedValue({ ok: true, data: null });
     actions.createReport.mockResolvedValue({ ok: true, data: null });
     actions.saveVoice.mockResolvedValue({ ok: true, data: null });
+  });
+
+  it("deletes voice transcripts then refreshes the workspace", async () => {
+    const { result } = renderHook(() => useFinancialState());
+    await waitFor(() => expect(result.current.isHydrated).toBe(true));
+    actions.load.mockClear();
+
+    await act(async () => {
+      await result.current.deleteVoiceTranscripts();
+    });
+
+    expect(actions.deleteVoice).toHaveBeenCalledOnce();
+    expect(actions.load).toHaveBeenCalledOnce();
+    expect(result.current.error).toBeNull();
   });
 
   it("hydrates a new account from Supabase by default", async () => {
@@ -458,6 +475,11 @@ describe("useFinancialState Supabase mode", () => {
         "Settings failed.",
       ],
       [actions.deleteData, () => result.current.deleteFinancialData(), "Delete data failed."],
+      [
+        actions.deleteVoice,
+        () => result.current.deleteVoiceTranscripts(),
+        "Delete transcripts failed.",
+      ],
     ] as const;
 
     for (const [mock, operation, message] of mutationFailures) {

@@ -142,6 +142,7 @@ describe("page adapters", () => {
       deleteDebt: vi.fn(),
       updateProfileSettings: vi.fn(),
       deleteFinancialData: vi.fn(),
+      deleteVoiceTranscripts: vi.fn(),
       addCooldownFromCheck: vi.fn(),
       markPurchaseCheckStatus: vi.fn(),
       removeCooldownItem: vi.fn(),
@@ -314,6 +315,7 @@ describe("page adapters", () => {
     expect(props.profile).toBe(financialState.snapshot.profile);
     expect(props.onUpdateProfile).toBe(financialState.updateProfileSettings);
     expect(props.onDeleteFinancialData).toBe(financialState.deleteFinancialData);
+    expect(props.onDeleteVoiceTranscripts).toBe(financialState.deleteVoiceTranscripts);
   });
 
   it("shows the hydration notice before passing onboarding state and callback identities", () => {

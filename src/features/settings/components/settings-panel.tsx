@@ -26,10 +26,12 @@ export function SettingsPanel({
   profile,
   onUpdateProfile,
   onDeleteFinancialData,
+  onDeleteVoiceTranscripts,
 }: {
   profile: FinancialProfile;
   onUpdateProfile: (profile: FinancialProfile) => Promise<void>;
   onDeleteFinancialData: () => Promise<void>;
+  onDeleteVoiceTranscripts: () => Promise<void>;
 }) {
   const [formValues, setFormValues] = useState<SettingsFormValues>(() => toSettingsForm(profile));
   const [formErrors, setFormErrors] = useState<SettingsFormErrors>({});
@@ -37,6 +39,8 @@ export function SettingsPanel({
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
+  const [isDeletingTranscripts, setIsDeletingTranscripts] = useState(false);
+  const [transcriptsConfirmed, setTranscriptsConfirmed] = useState(false);
   const formErrorMessages = Object.values(formErrors).filter(Boolean);
 
   function updateField<K extends keyof SettingsFormValues>(field: K, value: SettingsFormValues[K]) {
@@ -90,6 +94,27 @@ export function SettingsPanel({
       setMessage("We couldn't delete your financial data. Please try again.");
     } finally {
       setIsDeleting(false);
+    }
+  }
+
+  async function deleteTranscripts() {
+    setMessage(null);
+
+    if (!transcriptsConfirmed) {
+      setMessage("Confirm that you want to delete your voice transcripts.");
+      return;
+    }
+
+    setIsDeletingTranscripts(true);
+
+    try {
+      await onDeleteVoiceTranscripts();
+      setTranscriptsConfirmed(false);
+      setMessage("Voice transcripts deleted.");
+    } catch {
+      setMessage("We couldn't delete your voice transcripts. Please try again.");
+    } finally {
+      setIsDeletingTranscripts(false);
     }
   }
 
@@ -231,6 +256,44 @@ export function SettingsPanel({
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card aria-labelledby="delete-transcripts-heading">
+        <CardContent className="grid gap-4">
+          <div>
+            <h3
+              id="delete-transcripts-heading"
+              className="text-lg font-semibold text-foreground"
+            >
+              Delete voice transcripts
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-muted">
+              Remove every saved voice transcript from your account. Your other financial data and
+              login stay as they are.
+            </p>
+          </div>
+          <label className="flex items-start gap-3 rounded-control border border-border bg-muted/30 p-3 text-sm text-muted">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={transcriptsConfirmed}
+              onChange={(event) => setTranscriptsConfirmed(event.target.checked)}
+            />
+            <span>I understand this permanently deletes my saved voice transcripts.</span>
+          </label>
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="danger"
+              disabled={isDeletingTranscripts}
+              isLoading={isDeletingTranscripts}
+              onClick={() => void deleteTranscripts()}
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+              Delete Voice Transcripts
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

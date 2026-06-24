@@ -1,0 +1,661 @@
+diff --git a/src/app/(app)/_components/page-adapters.test.tsx b/src/app/(app)/_components/page-adapters.test.tsx
+index 90e66d6..11e7eb2 100644
+--- a/src/app/(app)/_components/page-adapters.test.tsx
++++ b/src/app/(app)/_components/page-adapters.test.tsx
+@@ -142,6 +142,7 @@ describe("page adapters", () => {
+       deleteDebt: vi.fn(),
+       updateProfileSettings: vi.fn(),
+       deleteFinancialData: vi.fn(),
++      deleteVoiceTranscripts: vi.fn(),
+       addCooldownFromCheck: vi.fn(),
+       markPurchaseCheckStatus: vi.fn(),
+       removeCooldownItem: vi.fn(),
+@@ -314,6 +315,7 @@ describe("page adapters", () => {
+     expect(props.profile).toBe(financialState.snapshot.profile);
+     expect(props.onUpdateProfile).toBe(financialState.updateProfileSettings);
+     expect(props.onDeleteFinancialData).toBe(financialState.deleteFinancialData);
++    expect(props.onDeleteVoiceTranscripts).toBe(financialState.deleteVoiceTranscripts);
+   });
+ 
+   it("shows the hydration notice before passing onboarding state and callback identities", () => {
+diff --git a/src/app/(app)/_components/page-adapters.tsx b/src/app/(app)/_components/page-adapters.tsx
+index 2fcee51..4a7f06d 100644
+--- a/src/app/(app)/_components/page-adapters.tsx
++++ b/src/app/(app)/_components/page-adapters.tsx
+@@ -159,6 +159,7 @@ export function SettingsPageContent() {
+       profile={state.snapshot.profile}
+       onUpdateProfile={state.updateProfileSettings}
+       onDeleteFinancialData={state.deleteFinancialData}
++      onDeleteVoiceTranscripts={state.deleteVoiceTranscripts}
+     />
+   );
+ }
+diff --git a/src/components/layout/app-shell.test.tsx b/src/components/layout/app-shell.test.tsx
+index df69708..fc01188 100644
+--- a/src/components/layout/app-shell.test.tsx
++++ b/src/components/layout/app-shell.test.tsx
+@@ -59,4 +59,15 @@ describe("AppShell", () => {
+     );
+     expect(screen.getAllByRole("heading", { name: "Goals content" })).toHaveLength(1);
+   });
++
++  it("shows the financial disclaimer on every shell screen", () => {
++    render(
++      <AppShell userEmail="taylor@example.com" signOutAction={vi.fn()}>
++        <h1>Goals content</h1>
++      </AppShell>
++    );
++
++    const disclaimer = screen.getByRole("complementary", { name: "Financial disclaimer" });
++    expect(disclaimer).toHaveTextContent("not financial, investment, tax, or legal advice");
++  });
+ });
+diff --git a/src/components/layout/app-shell.tsx b/src/components/layout/app-shell.tsx
+index 13b0574..a38dd88 100644
+--- a/src/components/layout/app-shell.tsx
++++ b/src/components/layout/app-shell.tsx
+@@ -2,6 +2,7 @@ import { AdvisorAvatar } from "@/components/brand/advisor-avatar";
+ import { SpendGuardLogo } from "@/components/brand/spendguard-logo";
+ import { AppHeader } from "@/components/layout/app-header";
+ import { AppDesktopNavigation, AppMobileNavigation } from "@/components/layout/app-navigation";
++import { FinancialDisclaimer } from "@/components/legal/financial-disclaimer";
+ import { AuthStatus } from "@/features/auth/components/auth-status";
+ 
+ export function AppShell({
+@@ -40,8 +41,9 @@ export function AppShell({
+       <AppHeader userEmail={userEmail} signOutAction={signOutAction} />
+ 
+       <div className="lg:pl-[240px]">
+-        <main className="mx-auto min-h-screen w-full max-w-[1180px] px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-6 lg:px-8 lg:py-8 lg:pb-8">
+-          {children}
++        <main className="mx-auto flex min-h-screen w-full max-w-[1180px] flex-col px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-6 lg:px-8 lg:py-8 lg:pb-8">
++          <div className="flex-1">{children}</div>
++          <FinancialDisclaimer />
+         </main>
+       </div>
+ 
+diff --git a/src/components/legal/financial-disclaimer.test.tsx b/src/components/legal/financial-disclaimer.test.tsx
+new file mode 100644
+index 0000000..a2399ad
+--- /dev/null
++++ b/src/components/legal/financial-disclaimer.test.tsx
+@@ -0,0 +1,42 @@
++import { render, screen } from "@testing-library/react";
++import { describe, expect, it } from "vitest";
++
++import { FinancialDisclaimer } from "./financial-disclaimer";
++
++describe("FinancialDisclaimer", () => {
++  it("states it is educational and not financial advice in the footer variant", () => {
++    render(<FinancialDisclaimer />);
++
++    const note = screen.getByRole("complementary", { name: "Financial disclaimer" });
++    expect(note).toHaveTextContent(
++      "not financial, investment, tax, or legal advice"
++    );
++    expect(note).toHaveTextContent("educational estimates");
++  });
++
++  it("states the deterministic engine decides and the advisor only explains", () => {
++    render(<FinancialDisclaimer />);
++
++    const note = screen.getByRole("complementary", { name: "Financial disclaimer" });
++    expect(note).toHaveTextContent("rules engine makes every decision");
++    expect(note).toHaveTextContent("advisor only explains");
++  });
++
++  it("renders a compact inline variant for the advisor surface", () => {
++    render(<FinancialDisclaimer variant="inline" />);
++
++    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
++    expect(screen.getByText("Not financial advice.")).toBeVisible();
++    expect(
++      screen.getByText(/based only on the numbers you entered/i)
++    ).toBeVisible();
++  });
++
++  it("appends caller class names", () => {
++    render(<FinancialDisclaimer className="mt-10" />);
++
++    expect(screen.getByRole("complementary", { name: "Financial disclaimer" })).toHaveClass(
++      "mt-10"
++    );
++  });
++});
+diff --git a/src/components/legal/financial-disclaimer.tsx b/src/components/legal/financial-disclaimer.tsx
+new file mode 100644
+index 0000000..f6e1aaa
+--- /dev/null
++++ b/src/components/legal/financial-disclaimer.tsx
+@@ -0,0 +1,47 @@
++import { ShieldCheck } from "lucide-react";
++
++import { cn } from "@/lib/utils";
++
++/**
++ * Financial safety disclaimer (PRD §28). Display-only: it never alters, gates,
++ * or contradicts a §19 decision. The canonical PRD §28 string is not checked
++ * into this repo, so this is a standard "educational, not advice" disclaimer
++ * pending confirmation against the PRD.
++ *
++ * - `footer` (default): persistent, quiet landmark mounted app-wide.
++ * - `inline`: a single compact line for the advisor surface (§11.8).
++ */
++export function FinancialDisclaimer({
++  variant = "footer",
++  className,
++}: {
++  variant?: "footer" | "inline";
++  className?: string;
++}) {
++  if (variant === "inline") {
++    return (
++      <p className={cn("text-xs leading-5 text-muted", className)}>
++        <span className="font-semibold text-foreground">Not financial advice.</span>{" "}
++        This explanation is educational and based only on the numbers you entered.
++      </p>
++    );
++  }
++
++  return (
++    <aside
++      aria-label="Financial disclaimer"
++      className={cn(
++        "mt-8 flex items-start gap-2.5 border-t border-border pt-4 text-xs leading-5 text-muted",
++        className
++      )}
++    >
++      <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted" />
++      <p>
++        SpendGuard offers educational estimates based on the figures you enter. It is not
++        financial, investment, tax, or legal advice. A deterministic rules engine makes every
++        decision; the AI advisor only explains it. For major financial decisions, consult a
++        licensed professional.
++      </p>
++    </aside>
++  );
++}
+diff --git a/src/features/purchase-checker/components/advisor-explanation.test.tsx b/src/features/purchase-checker/components/advisor-explanation.test.tsx
+index 83e226f..0828ed5 100644
+--- a/src/features/purchase-checker/components/advisor-explanation.test.tsx
++++ b/src/features/purchase-checker/components/advisor-explanation.test.tsx
+@@ -47,6 +47,12 @@ describe("AdvisorExplanation", () => {
+     expect(screen.queryByText(/AI explanation/i)).not.toBeInTheDocument();
+   });
+ 
++  it("carries an inline not-financial-advice disclaimer", () => {
++    render(<AdvisorExplanation check={check} live={false} />);
++
++    expect(screen.getByText("Not financial advice.")).toBeInTheDocument();
++  });
++
+   it("shows a contradictory model only as a labelled AI explanation, never as a verdict", async () => {
+     const rogue = streamingClient(["Buy it now — you can clearly afford it!"]);
+     render(
+diff --git a/src/features/purchase-checker/components/advisor-explanation.tsx b/src/features/purchase-checker/components/advisor-explanation.tsx
+index 3b6e560..694ccfb 100644
+--- a/src/features/purchase-checker/components/advisor-explanation.tsx
++++ b/src/features/purchase-checker/components/advisor-explanation.tsx
+@@ -2,6 +2,7 @@
+ 
+ import { GraduationCap } from "lucide-react";
+ 
++import { FinancialDisclaimer } from "@/components/legal/financial-disclaimer";
+ import { getEducationalLesson } from "@/lib/advisor/lessons";
+ import { buildAdvisorPrompt, buildAdvisorSystemPrompt } from "@/lib/advisor/prompt";
+ import type { ModelClient } from "@/lib/ai/types";
+@@ -73,6 +74,7 @@ export function AdvisorExplanation({
+           </span>
+         ) : null}
+       </p>
++      <FinancialDisclaimer variant="inline" />
+     </div>
+   );
+ }
+diff --git a/src/features/settings/api/manage-settings.test.ts b/src/features/settings/api/manage-settings.test.ts
+index 3f28964..2443789 100644
+--- a/src/features/settings/api/manage-settings.test.ts
++++ b/src/features/settings/api/manage-settings.test.ts
+@@ -1,5 +1,9 @@
+ import { beforeEach, describe, expect, it, vi } from "vitest";
+-import { deleteFinancialDataAction, updateProfileSettingsAction } from "./manage-settings";
++import {
++  deleteFinancialDataAction,
++  deleteVoiceSessionsAction,
++  updateProfileSettingsAction,
++} from "./manage-settings";
+ 
+ vi.mock("@/lib/supabase/server", () => ({ requireUserId: vi.fn() }));
+ 
+@@ -113,4 +117,37 @@ describe("settings actions", () => {
+ 
+     expect(result).toEqual({ ok: false, error: "Unable to delete your financial data." });
+   });
++
++  it("deletes only voice transcripts for the authenticated user", async () => {
++    const eq = vi.fn(async () => ({ error: null }));
++    const remove = vi.fn(() => ({ eq }));
++    const supabase = { from: vi.fn(() => ({ delete: remove })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await deleteVoiceSessionsAction();
++
++    expect(result).toEqual({ ok: true, data: null });
++    expect(supabase.from).toHaveBeenCalledTimes(1);
++    expect(supabase.from).toHaveBeenCalledWith("voice_sessions");
++    expect(eq).toHaveBeenCalledExactlyOnceWith("user_id", "user-1");
++  });
++
++  it("returns a friendly error when transcript deletion fails", async () => {
++    const eq = vi.fn(async () => ({ error: { message: "delete failed" } }));
++    const remove = vi.fn(() => ({ eq }));
++    const supabase = { from: vi.fn(() => ({ delete: remove })) };
++    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
++
++    const result = await deleteVoiceSessionsAction();
++
++    expect(result).toEqual({ ok: false, error: "Unable to delete your voice transcripts." });
++  });
++
++  it("surfaces an error when the user is not authenticated", async () => {
++    mockedRequireUserId.mockRejectedValueOnce(new Error("Not authenticated."));
++
++    const result = await deleteVoiceSessionsAction();
++
++    expect(result).toEqual({ ok: false, error: "Not authenticated." });
++  });
+ });
+diff --git a/src/features/settings/api/manage-settings.ts b/src/features/settings/api/manage-settings.ts
+index 2a7cad6..7eafe16 100644
+--- a/src/features/settings/api/manage-settings.ts
++++ b/src/features/settings/api/manage-settings.ts
+@@ -83,3 +83,22 @@ export async function deleteFinancialDataAction(): Promise<ActionResult<null>> {
+     };
+   }
+ }
++
++export async function deleteVoiceSessionsAction(): Promise<ActionResult<null>> {
++  try {
++    const { supabase, userId } = await requireUserId();
++    const { error } = await supabase.from("voice_sessions").delete().eq("user_id", userId);
++
++    if (error) {
++      console.error("Unable to delete Supabase voice sessions", error);
++      return { ok: false, error: "Unable to delete your voice transcripts." };
++    }
++
++    return { ok: true, data: null };
++  } catch (error) {
++    return {
++      ok: false,
++      error: error instanceof Error ? error.message : "Unable to delete voice transcripts.",
++    };
++  }
++}
+diff --git a/src/features/settings/components/settings-panel.test.tsx b/src/features/settings/components/settings-panel.test.tsx
+index 2d8cb15..2642586 100644
+--- a/src/features/settings/components/settings-panel.test.tsx
++++ b/src/features/settings/components/settings-panel.test.tsx
+@@ -10,16 +10,19 @@ function renderSettingsPanel({
+   profile = financialSnapshotFixture.profile,
+   onUpdateProfile = vi.fn().mockResolvedValue(undefined),
+   onDeleteFinancialData = vi.fn().mockResolvedValue(undefined),
++  onDeleteVoiceTranscripts = vi.fn().mockResolvedValue(undefined),
+ }: {
+   profile?: FinancialProfile;
+   onUpdateProfile?: (profile: FinancialProfile) => Promise<void>;
+   onDeleteFinancialData?: () => Promise<void>;
++  onDeleteVoiceTranscripts?: () => Promise<void>;
+ } = {}) {
+   return render(
+     <SettingsPanel
+       profile={profile}
+       onUpdateProfile={onUpdateProfile}
+       onDeleteFinancialData={onDeleteFinancialData}
++      onDeleteVoiceTranscripts={onDeleteVoiceTranscripts}
+     />
+   );
+ }
+@@ -96,4 +99,25 @@ describe("SettingsPanel", () => {
+ 
+     expect(onDeleteFinancialData).toHaveBeenCalledOnce();
+   });
++
++  it("deletes only voice transcripts after its own confirmation", async () => {
++    const user = userEvent.setup();
++    const onDeleteVoiceTranscripts = vi.fn().mockResolvedValue(undefined);
++    const onDeleteFinancialData = vi.fn().mockResolvedValue(undefined);
++    renderSettingsPanel({ onDeleteVoiceTranscripts, onDeleteFinancialData });
++
++    await user.click(screen.getByRole("button", { name: "Delete Voice Transcripts" }));
++    expect(await screen.findByRole("alert")).toHaveTextContent(
++      "Confirm that you want to delete your voice transcripts."
++    );
++    expect(onDeleteVoiceTranscripts).not.toHaveBeenCalled();
++
++    await user.click(
++      screen.getByLabelText("I understand this permanently deletes my saved voice transcripts.")
++    );
++    await user.click(screen.getByRole("button", { name: "Delete Voice Transcripts" }));
++
++    expect(onDeleteVoiceTranscripts).toHaveBeenCalledOnce();
++    expect(onDeleteFinancialData).not.toHaveBeenCalled();
++  });
+ });
+diff --git a/src/features/settings/components/settings-panel.tsx b/src/features/settings/components/settings-panel.tsx
+index 511e378..c8ecf03 100644
+--- a/src/features/settings/components/settings-panel.tsx
++++ b/src/features/settings/components/settings-panel.tsx
+@@ -26,10 +26,12 @@ export function SettingsPanel({
+   profile,
+   onUpdateProfile,
+   onDeleteFinancialData,
++  onDeleteVoiceTranscripts,
+ }: {
+   profile: FinancialProfile;
+   onUpdateProfile: (profile: FinancialProfile) => Promise<void>;
+   onDeleteFinancialData: () => Promise<void>;
++  onDeleteVoiceTranscripts: () => Promise<void>;
+ }) {
+   const [formValues, setFormValues] = useState<SettingsFormValues>(() => toSettingsForm(profile));
+   const [formErrors, setFormErrors] = useState<SettingsFormErrors>({});
+@@ -37,6 +39,8 @@ export function SettingsPanel({
+   const [isSaving, setIsSaving] = useState(false);
+   const [isDeleting, setIsDeleting] = useState(false);
+   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
++  const [isDeletingTranscripts, setIsDeletingTranscripts] = useState(false);
++  const [transcriptsConfirmed, setTranscriptsConfirmed] = useState(false);
+   const formErrorMessages = Object.values(formErrors).filter(Boolean);
+ 
+   function updateField<K extends keyof SettingsFormValues>(field: K, value: SettingsFormValues[K]) {
+@@ -93,6 +97,27 @@ export function SettingsPanel({
+     }
+   }
+ 
++  async function deleteTranscripts() {
++    setMessage(null);
++
++    if (!transcriptsConfirmed) {
++      setMessage("Confirm that you want to delete your voice transcripts.");
++      return;
++    }
++
++    setIsDeletingTranscripts(true);
++
++    try {
++      await onDeleteVoiceTranscripts();
++      setTranscriptsConfirmed(false);
++      setMessage("Voice transcripts deleted.");
++    } catch {
++      setMessage("We couldn't delete your voice transcripts. Please try again.");
++    } finally {
++      setIsDeletingTranscripts(false);
++    }
++  }
++
+   return (
+     <div className="grid gap-5">
+       <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-5 shadow-card sm:flex-row sm:items-center sm:justify-between">
+@@ -234,6 +259,44 @@ export function SettingsPanel({
+         </CardContent>
+       </Card>
+ 
++      <Card aria-labelledby="delete-transcripts-heading">
++        <CardContent className="grid gap-4">
++          <div>
++            <h3
++              id="delete-transcripts-heading"
++              className="text-lg font-semibold text-foreground"
++            >
++              Delete voice transcripts
++            </h3>
++            <p className="mt-1 text-sm leading-6 text-muted">
++              Remove every saved voice transcript from your account. Your other financial data and
++              login stay as they are.
++            </p>
++          </div>
++          <label className="flex items-start gap-3 rounded-control border border-border bg-muted/30 p-3 text-sm text-muted">
++            <input
++              type="checkbox"
++              className="mt-1"
++              checked={transcriptsConfirmed}
++              onChange={(event) => setTranscriptsConfirmed(event.target.checked)}
++            />
++            <span>I understand this permanently deletes my saved voice transcripts.</span>
++          </label>
++          <div className="flex justify-end">
++            <Button
++              type="button"
++              variant="danger"
++              disabled={isDeletingTranscripts}
++              isLoading={isDeletingTranscripts}
++              onClick={() => void deleteTranscripts()}
++            >
++              <Trash2 className="size-4" aria-hidden="true" />
++              Delete Voice Transcripts
++            </Button>
++          </div>
++        </CardContent>
++      </Card>
++
+       <Card aria-labelledby="delete-data-heading">
+         <CardContent className="grid gap-4">
+           <div>
+diff --git a/src/features/voice/components/voice-purchase-checker.test.tsx b/src/features/voice/components/voice-purchase-checker.test.tsx
+index 0bd2f5f..c131310 100644
+--- a/src/features/voice/components/voice-purchase-checker.test.tsx
++++ b/src/features/voice/components/voice-purchase-checker.test.tsx
+@@ -105,6 +105,14 @@ describe("VoicePurchaseChecker", () => {
+     expect(recognitionConstructor).not.toHaveBeenCalled();
+   });
+ 
++  it("surfaces a voice privacy note before capture", () => {
++    render(<VoicePurchaseChecker onRunCheck={vi.fn()} />);
++
++    const note = screen.getByText(/your transcript may be sent to an AI service/i);
++    expect(note).toBeVisible();
++    expect(note).toHaveTextContent(/delete saved transcripts anytime in Settings/i);
++  });
++
+   it("uses non-blaming fallback copy and keeps typed transcript review usable when speech is unsupported", async () => {
+     const user = userEvent.setup();
+     removeSpeechRecognition();
+diff --git a/src/features/voice/components/voice-purchase-checker.tsx b/src/features/voice/components/voice-purchase-checker.tsx
+index 93878ff..1a755b2 100644
+--- a/src/features/voice/components/voice-purchase-checker.tsx
++++ b/src/features/voice/components/voice-purchase-checker.tsx
+@@ -1,6 +1,6 @@
+ "use client";
+ 
+-import { AlertTriangle, Mic, RotateCcw, Square } from "lucide-react";
++import { AlertTriangle, Mic, RotateCcw, ShieldCheck, Square } from "lucide-react";
+ import { useRouter } from "next/navigation";
+ import { useEffect, useRef, useState } from "react";
+ import { Button } from "@/components/ui/button";
+@@ -409,6 +409,15 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
+                 </p>
+               </div>
+ 
++              <p className="flex items-start gap-2 rounded-control border border-border bg-slate-50 px-3 py-2 text-sm text-muted">
++                <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
++                <span>
++                  Your transcript may be sent to an AI service to read the purchase details, and
++                  saved checks store it on your account. Delete saved transcripts anytime in
++                  Settings.
++                </span>
++              </p>
++
+               {captureNotice ? (
+                 <p
+                   aria-live="polite"
+diff --git a/src/hooks/use-financial-state.test.tsx b/src/hooks/use-financial-state.test.tsx
+index 2686722..551fd24 100644
+--- a/src/hooks/use-financial-state.test.tsx
++++ b/src/hooks/use-financial-state.test.tsx
+@@ -17,6 +17,7 @@ const actions = vi.hoisted(() => ({
+   deleteDebt: vi.fn(),
+   updateSettings: vi.fn(),
+   deleteData: vi.fn(),
++  deleteVoice: vi.fn(),
+   createCooldown: vi.fn(),
+   deleteCooldown: vi.fn(),
+   createReport: vi.fn(),
+@@ -54,6 +55,7 @@ vi.mock("@/features/cooldown/api/create-cooldown-item", () => ({
+ vi.mock("@/features/settings/api/manage-settings", () => ({
+   updateProfileSettingsAction: actions.updateSettings,
+   deleteFinancialDataAction: actions.deleteData,
++  deleteVoiceSessionsAction: actions.deleteVoice,
+ }));
+ vi.mock("@/features/reports/api/create-weekly-report", () => ({
+   createWeeklyReportAction: actions.createReport,
+@@ -94,12 +96,27 @@ describe("useFinancialState Supabase mode", () => {
+     actions.deleteDebt.mockResolvedValue({ ok: true, data: null });
+     actions.updateSettings.mockResolvedValue({ ok: true, data: null });
+     actions.deleteData.mockResolvedValue({ ok: true, data: null });
++    actions.deleteVoice.mockResolvedValue({ ok: true, data: null });
+     actions.createCooldown.mockResolvedValue({ ok: true, data: null });
+     actions.deleteCooldown.mockResolvedValue({ ok: true, data: null });
+     actions.createReport.mockResolvedValue({ ok: true, data: null });
+     actions.saveVoice.mockResolvedValue({ ok: true, data: null });
+   });
+ 
++  it("deletes voice transcripts then refreshes the workspace", async () => {
++    const { result } = renderHook(() => useFinancialState());
++    await waitFor(() => expect(result.current.isHydrated).toBe(true));
++    actions.load.mockClear();
++
++    await act(async () => {
++      await result.current.deleteVoiceTranscripts();
++    });
++
++    expect(actions.deleteVoice).toHaveBeenCalledOnce();
++    expect(actions.load).toHaveBeenCalledOnce();
++    expect(result.current.error).toBeNull();
++  });
++
+   it("hydrates a new account from Supabase by default", async () => {
+     const { result } = renderHook(() => useFinancialState());
+ 
+@@ -458,6 +475,11 @@ describe("useFinancialState Supabase mode", () => {
+         "Settings failed.",
+       ],
+       [actions.deleteData, () => result.current.deleteFinancialData(), "Delete data failed."],
++      [
++        actions.deleteVoice,
++        () => result.current.deleteVoiceTranscripts(),
++        "Delete transcripts failed.",
++      ],
+     ] as const;
+ 
+     for (const [mock, operation, message] of mutationFailures) {
+diff --git a/src/hooks/use-financial-state.ts b/src/hooks/use-financial-state.ts
+index f3d9ddf..ee78120 100644
+--- a/src/hooks/use-financial-state.ts
++++ b/src/hooks/use-financial-state.ts
+@@ -28,6 +28,7 @@ import { createWeeklyReportAction } from "@/features/reports/api/create-weekly-r
+ import { generateWeeklyReportInsights } from "@/features/reports/lib/weekly-report";
+ import {
+   deleteFinancialDataAction,
++  deleteVoiceSessionsAction,
+   updateProfileSettingsAction,
+ } from "@/features/settings/api/manage-settings";
+ import {
+@@ -408,6 +409,17 @@ export function useFinancialState() {
+     await refresh();
+   }, [refresh]);
+ 
++  const deleteVoiceTranscripts = useCallback(async () => {
++    const result = await deleteVoiceSessionsAction();
++
++    if (!result.ok) {
++      setError(result.error);
++      throw new Error(result.error);
++    }
++
++    await refresh();
++  }, [refresh]);
++
+   const generateWeeklyReport = useCallback(async () => {
+     const safeToSpend = calculateSafeToSpend(snapshot);
+     const healthScore = calculateFinancialHealthScore(snapshot);
+@@ -489,6 +501,7 @@ export function useFinancialState() {
+     deleteDebt,
+     updateProfileSettings,
+     deleteFinancialData,
++    deleteVoiceTranscripts,
+     generateWeeklyReport,
+     confirmVoiceDraft,
+     refresh,
+diff --git a/supabase/tests/rls_isolation_test.sql b/supabase/tests/rls_isolation_test.sql
+new file mode 100644
+index 0000000..d7a741b
+--- /dev/null
++++ b/supabase/tests/rls_isolation_test.sql
+@@ -0,0 +1,67 @@
++-- Cross-user RLS isolation test (PRD §22-25 / Phase 11).
++--
++-- Proves that an authenticated user CANNOT read or delete another user's rows,
++-- exercising the real per-user RLS policies (`*_all_own`, `profiles_*_own`).
++--
++-- SAFETY: rollback-only. The whole test is ONE anonymous DO block that ends with
++--   `raise exception 'RLS_ISOLATION_OK'`
++-- so a successful run ABORTS its own transaction and persists nothing — safe to
++-- run against the remote (even production) project. It never issues COMMIT.
++--
++-- Interpreting the result (run via the Supabase MCP `execute_sql`):
++--   * error message contains 'RLS_ISOLATION_OK'  -> PASS (all assertions held, rolled back)
++--   * error message contains 'RLS FAIL: ...'      -> FAIL (an isolation guarantee broke)
++--   * any other error                             -> test setup problem, fix and re-run
++--
++-- Seeded ids are fixed sentinels; the rollback removes them regardless.
++
++do $$
++declare
++  user_a uuid := '0badf00d-0000-4000-a000-0000000000aa';
++  user_b uuid := '0badf00d-0000-4000-b000-0000000000bb';
++  visible int;
++  deleted int;
++begin
++  -- Seed as the privileged session role: two users, and rows owned by user A.
++  insert into auth.users (id, aud, role, email)
++  values (user_a, 'authenticated', 'authenticated', 'rls-a@example.test'),
++         (user_b, 'authenticated', 'authenticated', 'rls-b@example.test')
++  on conflict (id) do nothing;
++
++  insert into public.profiles (user_id, currency, monthly_income, current_savings, emergency_fund_target)
++  values (user_a, 'PHP', 1, 1, 1)
++  on conflict (user_id) do nothing;
++  insert into public.expenses (user_id, label, amount, due_day)
++  values (user_a, 'Rent', 1000, 15);
++  insert into public.voice_sessions (user_id, transcript)
++  values (user_a, 'user A private transcript');
++
++  -- Become authenticated user B (drives auth.uid() through the JWT claim).
++  perform set_config('request.jwt.claims',
++    json_build_object('sub', user_b::text, 'role', 'authenticated')::text, true);
++  set local role authenticated;
++
++  select count(*) into visible from public.voice_sessions where user_id = user_a;
++  assert visible = 0, format('RLS FAIL: user B read %s of user A voice_sessions', visible);
++  select count(*) into visible from public.profiles where user_id = user_a;
++  assert visible = 0, format('RLS FAIL: user B read %s of user A profiles', visible);
++  select count(*) into visible from public.expenses where user_id = user_a;
++  assert visible = 0, format('RLS FAIL: user B read %s of user A expenses', visible);
++
++  -- B tries to delete A's transcript: RLS must scope the delete to B's own rows (0).
++  with d as (delete from public.voice_sessions where user_id = user_a returning 1)
++  select count(*) into deleted from d;
++  assert deleted = 0, format('RLS FAIL: user B deleted %s of user A voice_sessions', deleted);
++
++  -- Owner A must still see its own (undeleted) transcript.
++  reset role;
++  perform set_config('request.jwt.claims',
++    json_build_object('sub', user_a::text, 'role', 'authenticated')::text, true);
++  set local role authenticated;
++  select count(*) into visible from public.voice_sessions where user_id = user_a;
++  assert visible = 1, format('RLS FAIL: owner A sees %s of own voice_sessions (expected 1)', visible);
++  reset role;
++
++  -- All guarantees held. Force a rollback so nothing persists.
++  raise exception 'RLS_ISOLATION_OK';
++end $$;

@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { deleteFinancialDataAction, updateProfileSettingsAction } from "./manage-settings";
+import {
+  deleteFinancialDataAction,
+  deleteVoiceSessionsAction,
+  updateProfileSettingsAction,
+} from "./manage-settings";
 
 vi.mock("@/lib/supabase/server", () => ({ requireUserId: vi.fn() }));
 
@@ -112,5 +116,38 @@ describe("settings actions", () => {
     const result = await deleteFinancialDataAction();
 
     expect(result).toEqual({ ok: false, error: "Unable to delete your financial data." });
+  });
+
+  it("deletes only voice transcripts for the authenticated user", async () => {
+    const eq = vi.fn(async () => ({ error: null }));
+    const remove = vi.fn(() => ({ eq }));
+    const supabase = { from: vi.fn(() => ({ delete: remove })) };
+    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
+
+    const result = await deleteVoiceSessionsAction();
+
+    expect(result).toEqual({ ok: true, data: null });
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+    expect(supabase.from).toHaveBeenCalledWith("voice_sessions");
+    expect(eq).toHaveBeenCalledExactlyOnceWith("user_id", "user-1");
+  });
+
+  it("returns a friendly error when transcript deletion fails", async () => {
+    const eq = vi.fn(async () => ({ error: { message: "delete failed" } }));
+    const remove = vi.fn(() => ({ eq }));
+    const supabase = { from: vi.fn(() => ({ delete: remove })) };
+    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
+
+    const result = await deleteVoiceSessionsAction();
+
+    expect(result).toEqual({ ok: false, error: "Unable to delete your voice transcripts." });
+  });
+
+  it("surfaces an error when the user is not authenticated", async () => {
+    mockedRequireUserId.mockRejectedValueOnce(new Error("Not authenticated."));
+
+    const result = await deleteVoiceSessionsAction();
+
+    expect(result).toEqual({ ok: false, error: "Not authenticated." });
   });
 });

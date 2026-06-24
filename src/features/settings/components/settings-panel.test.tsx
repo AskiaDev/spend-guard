@@ -10,16 +10,19 @@ function renderSettingsPanel({
   profile = financialSnapshotFixture.profile,
   onUpdateProfile = vi.fn().mockResolvedValue(undefined),
   onDeleteFinancialData = vi.fn().mockResolvedValue(undefined),
+  onDeleteVoiceTranscripts = vi.fn().mockResolvedValue(undefined),
 }: {
   profile?: FinancialProfile;
   onUpdateProfile?: (profile: FinancialProfile) => Promise<void>;
   onDeleteFinancialData?: () => Promise<void>;
+  onDeleteVoiceTranscripts?: () => Promise<void>;
 } = {}) {
   return render(
     <SettingsPanel
       profile={profile}
       onUpdateProfile={onUpdateProfile}
       onDeleteFinancialData={onDeleteFinancialData}
+      onDeleteVoiceTranscripts={onDeleteVoiceTranscripts}
     />
   );
 }
@@ -95,5 +98,26 @@ describe("SettingsPanel", () => {
     await user.click(screen.getByRole("button", { name: "Delete Financial Data" }));
 
     expect(onDeleteFinancialData).toHaveBeenCalledOnce();
+  });
+
+  it("deletes only voice transcripts after its own confirmation", async () => {
+    const user = userEvent.setup();
+    const onDeleteVoiceTranscripts = vi.fn().mockResolvedValue(undefined);
+    const onDeleteFinancialData = vi.fn().mockResolvedValue(undefined);
+    renderSettingsPanel({ onDeleteVoiceTranscripts, onDeleteFinancialData });
+
+    await user.click(screen.getByRole("button", { name: "Delete Voice Transcripts" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Confirm that you want to delete your voice transcripts."
+    );
+    expect(onDeleteVoiceTranscripts).not.toHaveBeenCalled();
+
+    await user.click(
+      screen.getByLabelText("I understand this permanently deletes my saved voice transcripts.")
+    );
+    await user.click(screen.getByRole("button", { name: "Delete Voice Transcripts" }));
+
+    expect(onDeleteVoiceTranscripts).toHaveBeenCalledOnce();
+    expect(onDeleteFinancialData).not.toHaveBeenCalled();
   });
 });

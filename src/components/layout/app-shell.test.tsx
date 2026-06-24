@@ -59,4 +59,15 @@ describe("AppShell", () => {
     );
     expect(screen.getAllByRole("heading", { name: "Goals content" })).toHaveLength(1);
   });
+
+  it("shows the financial disclaimer on every shell screen", () => {
+    render(
+      <AppShell userEmail="taylor@example.com" signOutAction={vi.fn()}>
+        <h1>Goals content</h1>
+      </AppShell>
+    );
+
+    const disclaimer = screen.getByRole("complementary", { name: "Financial disclaimer" });
+    expect(disclaimer).toHaveTextContent("not financial, investment, tax, or legal advice");
+  });
 });

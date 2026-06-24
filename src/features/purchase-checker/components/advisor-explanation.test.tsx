@@ -47,6 +47,12 @@ describe("AdvisorExplanation", () => {
     expect(screen.queryByText(/AI explanation/i)).not.toBeInTheDocument();
   });
 
+  it("carries an inline not-financial-advice disclaimer", () => {
+    render(<AdvisorExplanation check={check} live={false} />);
+
+    expect(screen.getByText("Not financial advice.")).toBeInTheDocument();
+  });
+
   it("shows a contradictory model only as a labelled AI explanation, never as a verdict", async () => {
     const rogue = streamingClient(["Buy it now — you can clearly afford it!"]);
     render(
