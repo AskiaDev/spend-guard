@@ -4,10 +4,13 @@ import {
   Activity,
   ArrowUpRight,
   CalendarDays,
+  CircleAlert,
+  Coins,
   Landmark,
   PiggyBank,
   ReceiptText,
   ShieldCheck,
+  TriangleAlert,
   WalletCards,
 } from "lucide-react";
 import Image from "next/image";
@@ -21,11 +24,16 @@ import { ScoreGauge } from "@/components/finance/score-gauge";
 import { StatusBadge } from "@/components/finance/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  advisorInsight,
+  describeHealthStatus,
+  generateAdvisorInsight,
+} from "@/features/dashboard/lib/advisor-insight";
+import {
   exampleOnlyPurchaseReferences,
   referenceGoals,
   referencePurchases,
 } from "@/features/reference-data";
+import { getHealthStatus, type HealthStatus } from "@/lib/calculations/health-score";
+import { getUpcomingDebts, getUpcomingDebtTotal } from "@/lib/calculations/upcoming-debt";
 import { cn, formatCurrency } from "@/lib/utils";
 import type {
   CurrencyCode,
@@ -43,9 +51,16 @@ interface DashboardOverviewProps {
     monthlyFreeCashFlow: number;
     healthScore: number;
   };
+  /** Reference "today" for the upcoming-debt window. Defaults to now; injectable for deterministic tests. */
+  referenceDate?: Date;
 }
 
-export function DashboardOverview({ snapshot, checks, metrics }: DashboardOverviewProps) {
+export function DashboardOverview({
+  snapshot,
+  checks,
+  metrics,
+  referenceDate,
+}: DashboardOverviewProps) {
   const currency = snapshot.profile.currency;
   const totalExpenses = snapshot.expenses.reduce((total, expense) => total + expense.amount, 0);
   const totalDebtPayments = snapshot.debts.reduce((total, debt) => total + debt.minimumPayment, 0);
@@ -62,9 +77,17 @@ export function DashboardOverview({ snapshot, checks, metrics }: DashboardOvervi
     snapshot.profile.emergencyFundTarget
   );
   const recentChecks = checks.slice(0, 3);
+  const variableExpenses = snapshot.profile.estimatedVariableExpenses ?? 0;
+  const healthStatus = getHealthStatus(metrics.healthScore);
+  const now = referenceDate ?? new Date();
+  const upcomingDebts = getUpcomingDebts(snapshot.debts, now);
+  const upcomingDebtTotal = getUpcomingDebtTotal(snapshot.debts, now);
+  const advisor = generateAdvisorInsight({ metrics, snapshot });
 
   return (
     <div className="grid gap-5">
+      <HealthStatusBanner status={healthStatus} />
+
       <InlineNotice tone="warning" title="Spending guardrail">
         Safe to spend is a guardrail, not permission to drain savings. Re-check expensive wants
         before using credit.
@@ -121,7 +144,57 @@ export function DashboardOverview({ snapshot, checks, metrics }: DashboardOvervi
           helper={`${formatCurrency(monthlyGoalFunding, currency)} goal funding`}
           tone={metrics.monthlyFreeCashFlow > 0 ? "safe" : "risk"}
         />
+        <KpiCard
+          icon={<Coins className="size-5" />}
+          label="Variable Expenses"
+          value={formatCurrency(variableExpenses, currency)}
+          helper="Estimated, factored into free cash flow"
+          tone="neutral"
+        />
       </div>
+
+      <Card data-testid="upcoming-debt-card" aria-labelledby="upcoming-debt-heading">
+        <CardHeader>
+          <CardTitle id="upcoming-debt-heading">Upcoming Debt (30 days)</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          {upcomingDebts.length > 0 ? (
+            <>
+              <p className="text-sm text-muted">
+                <span className="font-semibold text-foreground">
+                  {formatCurrency(upcomingDebtTotal, currency)}
+                </span>{" "}
+                due across {upcomingDebts.length}{" "}
+                {upcomingDebts.length === 1 ? "payment" : "payments"}
+              </p>
+              <ul className="grid gap-3">
+                {upcomingDebts.map(({ debt, nextDueDate, daysUntilDue }) => (
+                  <li
+                    key={debt.id}
+                    className="flex items-center justify-between gap-3 rounded-control border border-border bg-muted/30 p-4"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-semibold text-foreground">{debt.label}</p>
+                      <p className="mt-1 flex items-center gap-2 text-xs text-muted">
+                        <CalendarDays aria-hidden="true" className="size-3.5" />
+                        Due {formatShortDate(nextDueDate)} · {formatDueWindow(daysUntilDue)}
+                      </p>
+                    </div>
+                    <p className="shrink-0 font-semibold text-foreground">
+                      {formatCurrency(debt.minimumPayment, currency)}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="text-sm leading-6 text-muted">
+              No debt payments are due in the next 30 days. Debts you add with a due date will show
+              up here.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card aria-labelledby="active-goals-heading">
@@ -202,10 +275,10 @@ export function DashboardOverview({ snapshot, checks, metrics }: DashboardOvervi
               Advisor insight
             </p>
             <h2 id="advisor-insight-heading" className="text-xl font-semibold text-foreground">
-              {advisorInsight.title}
+              {advisor.title}
             </h2>
             <p className="max-w-3xl text-sm leading-6 text-muted">
-              {advisorInsight.body} You currently have{" "}
+              {advisor.body} You currently have{" "}
               {formatCurrency(metrics.monthlyFreeCashFlow, currency)} in monthly free cash flow
               after committed expenses, debt payments, and goal funding.
             </p>
@@ -228,6 +301,50 @@ export function DashboardOverview({ snapshot, checks, metrics }: DashboardOvervi
       </Card>
     </div>
   );
+}
+
+const healthStatusPresentation: Record<
+  HealthStatus,
+  { Icon: typeof ShieldCheck; className: string }
+> = {
+  Strong: { Icon: ShieldCheck, className: "border-safe/25 bg-safe/10 text-safe" },
+  Stable: { Icon: Activity, className: "border-primary/25 bg-primary/10 text-primary" },
+  Caution: { Icon: TriangleAlert, className: "border-caution/25 bg-caution/10 text-caution" },
+  Risky: { Icon: CircleAlert, className: "border-risk/25 bg-risk/10 text-risk" },
+};
+
+function HealthStatusBanner({ status }: { status: HealthStatus }) {
+  const { Icon, className } = healthStatusPresentation[status];
+
+  return (
+    <div
+      data-testid="health-status-banner"
+      role="region"
+      aria-label="Financial health status"
+      className={cn("flex items-start gap-4 rounded-card border px-5 py-4", className)}
+    >
+      <div className="grid size-11 shrink-0 place-items-center rounded-control bg-surface/70">
+        <Icon aria-hidden="true" className="size-5" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xs font-semibold uppercase tracking-normal">Financial health</p>
+        <p className="text-lg font-semibold text-foreground">Your finances are {status}</p>
+        <p className="mt-0.5 text-sm leading-5 text-muted">{describeHealthStatus(status)}</p>
+      </div>
+    </div>
+  );
+}
+
+function formatDueWindow(daysUntilDue: number) {
+  if (daysUntilDue === 0) {
+    return "Due today";
+  }
+
+  if (daysUntilDue === 1) {
+    return "In 1 day";
+  }
+
+  return `In ${daysUntilDue} days`;
 }
 
 function ActionLink({

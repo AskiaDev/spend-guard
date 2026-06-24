@@ -160,3 +160,72 @@ describe("DashboardOverview", () => {
     }
   });
 });
+
+describe("DashboardOverview — Phase 8 dashboard completeness", () => {
+  it("renders the health-status banner from the live health score", () => {
+    render(<DashboardOverview snapshot={defaultSnapshot} checks={checks} metrics={metrics} />);
+
+    const banner = screen.getByTestId("health-status-banner");
+    expect(within(banner).getByText(/your finances are strong/i)).toBeVisible();
+    expect(
+      within(banner).getByText(/healthy margin across savings, cash flow, and debt/i)
+    ).toBeVisible();
+  });
+
+  it("reflects a risky band when the health score is low", () => {
+    render(
+      <DashboardOverview
+        snapshot={defaultSnapshot}
+        checks={checks}
+        metrics={{ ...metrics, healthScore: 30 }}
+      />
+    );
+
+    const banner = screen.getByTestId("health-status-banner");
+    expect(within(banner).getByText(/your finances are risky/i)).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Protect your buffer first" })).toBeVisible();
+  });
+
+  it("surfaces estimated variable expenses as a KPI card", () => {
+    render(<DashboardOverview snapshot={defaultSnapshot} checks={checks} metrics={metrics} />);
+
+    const card = screen.getByLabelText("Variable Expenses card");
+    expect(within(card).getByText("₱12,000")).toBeVisible();
+  });
+
+  it("lists debts due within 30 days with their next date, amount, and total", () => {
+    render(
+      <DashboardOverview
+        snapshot={defaultSnapshot}
+        checks={checks}
+        metrics={metrics}
+        referenceDate={new Date(2026, 5, 24)} // 2026-06-24, so dueDay 20 rolls to 2026-07-20
+      />
+    );
+
+    const card = screen.getByTestId("upcoming-debt-card");
+    const row = within(card).getByText("Credit card").closest("li");
+    expect(row).not.toBeNull();
+    expect(within(row as HTMLElement).getByText("₱5,000")).toBeVisible();
+    expect(within(row as HTMLElement).getByText(/Jul 20/)).toBeVisible();
+    expect(within(row as HTMLElement).getByText(/In 26 days/)).toBeVisible();
+    expect(within(card).getByText(/due across 1 payment/i)).toBeVisible();
+  });
+
+  it("shows an empty state when no debts are due in the window", () => {
+    const snapshotWithoutDebts: FinancialSnapshot = { ...defaultSnapshot, debts: [] };
+    render(<DashboardOverview snapshot={snapshotWithoutDebts} checks={checks} metrics={metrics} />);
+
+    const card = screen.getByTestId("upcoming-debt-card");
+    expect(
+      within(card).getByText(/no debt payments are due in the next 30 days/i)
+    ).toBeVisible();
+  });
+
+  it("renders the generated advisor insight instead of the static copy", () => {
+    render(<DashboardOverview snapshot={defaultSnapshot} checks={checks} metrics={metrics} />);
+
+    expect(screen.getByRole("heading", { name: "You're ahead of the guardrail" })).toBeVisible();
+    expect(screen.queryByText("Keep the guardrail active")).not.toBeInTheDocument();
+  });
+});

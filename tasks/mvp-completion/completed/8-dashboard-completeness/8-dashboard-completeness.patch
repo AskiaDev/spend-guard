@@ -1,0 +1,683 @@
+diff --git a/src/features/dashboard/components/dashboard-overview.test.tsx b/src/features/dashboard/components/dashboard-overview.test.tsx
+index c1878b9..bb9d103 100644
+--- a/src/features/dashboard/components/dashboard-overview.test.tsx
++++ b/src/features/dashboard/components/dashboard-overview.test.tsx
+@@ -160,3 +160,72 @@ describe("DashboardOverview", () => {
+     }
+   });
+ });
++
++describe("DashboardOverview — Phase 8 dashboard completeness", () => {
++  it("renders the health-status banner from the live health score", () => {
++    render(<DashboardOverview snapshot={defaultSnapshot} checks={checks} metrics={metrics} />);
++
++    const banner = screen.getByTestId("health-status-banner");
++    expect(within(banner).getByText(/your finances are strong/i)).toBeVisible();
++    expect(
++      within(banner).getByText(/healthy margin across savings, cash flow, and debt/i)
++    ).toBeVisible();
++  });
++
++  it("reflects a risky band when the health score is low", () => {
++    render(
++      <DashboardOverview
++        snapshot={defaultSnapshot}
++        checks={checks}
++        metrics={{ ...metrics, healthScore: 30 }}
++      />
++    );
++
++    const banner = screen.getByTestId("health-status-banner");
++    expect(within(banner).getByText(/your finances are risky/i)).toBeVisible();
++    expect(screen.getByRole("heading", { name: "Protect your buffer first" })).toBeVisible();
++  });
++
++  it("surfaces estimated variable expenses as a KPI card", () => {
++    render(<DashboardOverview snapshot={defaultSnapshot} checks={checks} metrics={metrics} />);
++
++    const card = screen.getByLabelText("Variable Expenses card");
++    expect(within(card).getByText("₱12,000")).toBeVisible();
++  });
++
++  it("lists debts due within 30 days with their next date, amount, and total", () => {
++    render(
++      <DashboardOverview
++        snapshot={defaultSnapshot}
++        checks={checks}
++        metrics={metrics}
++        referenceDate={new Date(2026, 5, 24)} // 2026-06-24, so dueDay 20 rolls to 2026-07-20
++      />
++    );
++
++    const card = screen.getByTestId("upcoming-debt-card");
++    const row = within(card).getByText("Credit card").closest("li");
++    expect(row).not.toBeNull();
++    expect(within(row as HTMLElement).getByText("₱5,000")).toBeVisible();
++    expect(within(row as HTMLElement).getByText(/Jul 20/)).toBeVisible();
++    expect(within(row as HTMLElement).getByText(/In 26 days/)).toBeVisible();
++    expect(within(card).getByText(/due across 1 payment/i)).toBeVisible();
++  });
++
++  it("shows an empty state when no debts are due in the window", () => {
++    const snapshotWithoutDebts: FinancialSnapshot = { ...defaultSnapshot, debts: [] };
++    render(<DashboardOverview snapshot={snapshotWithoutDebts} checks={checks} metrics={metrics} />);
++
++    const card = screen.getByTestId("upcoming-debt-card");
++    expect(
++      within(card).getByText(/no debt payments are due in the next 30 days/i)
++    ).toBeVisible();
++  });
++
++  it("renders the generated advisor insight instead of the static copy", () => {
++    render(<DashboardOverview snapshot={defaultSnapshot} checks={checks} metrics={metrics} />);
++
++    expect(screen.getByRole("heading", { name: "You're ahead of the guardrail" })).toBeVisible();
++    expect(screen.queryByText("Keep the guardrail active")).not.toBeInTheDocument();
++  });
++});
+diff --git a/src/features/dashboard/components/dashboard-overview.tsx b/src/features/dashboard/components/dashboard-overview.tsx
+index e78b9ac..2a9fb1c 100644
+--- a/src/features/dashboard/components/dashboard-overview.tsx
++++ b/src/features/dashboard/components/dashboard-overview.tsx
+@@ -4,10 +4,13 @@ import {
+   Activity,
+   ArrowUpRight,
+   CalendarDays,
++  CircleAlert,
++  Coins,
+   Landmark,
+   PiggyBank,
+   ReceiptText,
+   ShieldCheck,
++  TriangleAlert,
+   WalletCards,
+ } from "lucide-react";
+ import Image from "next/image";
+@@ -21,11 +24,16 @@ import { ScoreGauge } from "@/components/finance/score-gauge";
+ import { StatusBadge } from "@/components/finance/status-badge";
+ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+ import {
+-  advisorInsight,
++  describeHealthStatus,
++  generateAdvisorInsight,
++} from "@/features/dashboard/lib/advisor-insight";
++import {
+   exampleOnlyPurchaseReferences,
+   referenceGoals,
+   referencePurchases,
+ } from "@/features/reference-data";
++import { getHealthStatus, type HealthStatus } from "@/lib/calculations/health-score";
++import { getUpcomingDebts, getUpcomingDebtTotal } from "@/lib/calculations/upcoming-debt";
+ import { cn, formatCurrency } from "@/lib/utils";
+ import type {
+   CurrencyCode,
+@@ -43,9 +51,16 @@ interface DashboardOverviewProps {
+     monthlyFreeCashFlow: number;
+     healthScore: number;
+   };
++  /** Reference "today" for the upcoming-debt window. Defaults to now; injectable for deterministic tests. */
++  referenceDate?: Date;
+ }
+ 
+-export function DashboardOverview({ snapshot, checks, metrics }: DashboardOverviewProps) {
++export function DashboardOverview({
++  snapshot,
++  checks,
++  metrics,
++  referenceDate,
++}: DashboardOverviewProps) {
+   const currency = snapshot.profile.currency;
+   const totalExpenses = snapshot.expenses.reduce((total, expense) => total + expense.amount, 0);
+   const totalDebtPayments = snapshot.debts.reduce((total, debt) => total + debt.minimumPayment, 0);
+@@ -62,9 +77,17 @@ export function DashboardOverview({ snapshot, checks, metrics }: DashboardOvervi
+     snapshot.profile.emergencyFundTarget
+   );
+   const recentChecks = checks.slice(0, 3);
++  const variableExpenses = snapshot.profile.estimatedVariableExpenses ?? 0;
++  const healthStatus = getHealthStatus(metrics.healthScore);
++  const now = referenceDate ?? new Date();
++  const upcomingDebts = getUpcomingDebts(snapshot.debts, now);
++  const upcomingDebtTotal = getUpcomingDebtTotal(snapshot.debts, now);
++  const advisor = generateAdvisorInsight({ metrics, snapshot });
+ 
+   return (
+     <div className="grid gap-5">
++      <HealthStatusBanner status={healthStatus} />
++
+       <InlineNotice tone="warning" title="Spending guardrail">
+         Safe to spend is a guardrail, not permission to drain savings. Re-check expensive wants
+         before using credit.
+@@ -121,8 +144,58 @@ export function DashboardOverview({ snapshot, checks, metrics }: DashboardOvervi
+           helper={`${formatCurrency(monthlyGoalFunding, currency)} goal funding`}
+           tone={metrics.monthlyFreeCashFlow > 0 ? "safe" : "risk"}
+         />
++        <KpiCard
++          icon={<Coins className="size-5" />}
++          label="Variable Expenses"
++          value={formatCurrency(variableExpenses, currency)}
++          helper="Estimated, factored into free cash flow"
++          tone="neutral"
++        />
+       </div>
+ 
++      <Card data-testid="upcoming-debt-card" aria-labelledby="upcoming-debt-heading">
++        <CardHeader>
++          <CardTitle id="upcoming-debt-heading">Upcoming Debt (30 days)</CardTitle>
++        </CardHeader>
++        <CardContent className="grid gap-4">
++          {upcomingDebts.length > 0 ? (
++            <>
++              <p className="text-sm text-muted">
++                <span className="font-semibold text-foreground">
++                  {formatCurrency(upcomingDebtTotal, currency)}
++                </span>{" "}
++                due across {upcomingDebts.length}{" "}
++                {upcomingDebts.length === 1 ? "payment" : "payments"}
++              </p>
++              <ul className="grid gap-3">
++                {upcomingDebts.map(({ debt, nextDueDate, daysUntilDue }) => (
++                  <li
++                    key={debt.id}
++                    className="flex items-center justify-between gap-3 rounded-control border border-border bg-muted/30 p-4"
++                  >
++                    <div className="min-w-0">
++                      <p className="font-semibold text-foreground">{debt.label}</p>
++                      <p className="mt-1 flex items-center gap-2 text-xs text-muted">
++                        <CalendarDays aria-hidden="true" className="size-3.5" />
++                        Due {formatShortDate(nextDueDate)} · {formatDueWindow(daysUntilDue)}
++                      </p>
++                    </div>
++                    <p className="shrink-0 font-semibold text-foreground">
++                      {formatCurrency(debt.minimumPayment, currency)}
++                    </p>
++                  </li>
++                ))}
++              </ul>
++            </>
++          ) : (
++            <p className="text-sm leading-6 text-muted">
++              No debt payments are due in the next 30 days. Debts you add with a due date will show
++              up here.
++            </p>
++          )}
++        </CardContent>
++      </Card>
++
+       <div className="grid gap-4 lg:grid-cols-2">
+         <Card aria-labelledby="active-goals-heading">
+           <CardHeader>
+@@ -202,10 +275,10 @@ export function DashboardOverview({ snapshot, checks, metrics }: DashboardOvervi
+               Advisor insight
+             </p>
+             <h2 id="advisor-insight-heading" className="text-xl font-semibold text-foreground">
+-              {advisorInsight.title}
++              {advisor.title}
+             </h2>
+             <p className="max-w-3xl text-sm leading-6 text-muted">
+-              {advisorInsight.body} You currently have{" "}
++              {advisor.body} You currently have{" "}
+               {formatCurrency(metrics.monthlyFreeCashFlow, currency)} in monthly free cash flow
+               after committed expenses, debt payments, and goal funding.
+             </p>
+@@ -230,6 +303,50 @@ export function DashboardOverview({ snapshot, checks, metrics }: DashboardOvervi
+   );
+ }
+ 
++const healthStatusPresentation: Record<
++  HealthStatus,
++  { Icon: typeof ShieldCheck; className: string }
++> = {
++  Strong: { Icon: ShieldCheck, className: "border-safe/25 bg-safe/10 text-safe" },
++  Stable: { Icon: Activity, className: "border-primary/25 bg-primary/10 text-primary" },
++  Caution: { Icon: TriangleAlert, className: "border-caution/25 bg-caution/10 text-caution" },
++  Risky: { Icon: CircleAlert, className: "border-risk/25 bg-risk/10 text-risk" },
++};
++
++function HealthStatusBanner({ status }: { status: HealthStatus }) {
++  const { Icon, className } = healthStatusPresentation[status];
++
++  return (
++    <div
++      data-testid="health-status-banner"
++      role="region"
++      aria-label="Financial health status"
++      className={cn("flex items-start gap-4 rounded-card border px-5 py-4", className)}
++    >
++      <div className="grid size-11 shrink-0 place-items-center rounded-control bg-surface/70">
++        <Icon aria-hidden="true" className="size-5" />
++      </div>
++      <div className="min-w-0">
++        <p className="text-xs font-semibold uppercase tracking-normal">Financial health</p>
++        <p className="text-lg font-semibold text-foreground">Your finances are {status}</p>
++        <p className="mt-0.5 text-sm leading-5 text-muted">{describeHealthStatus(status)}</p>
++      </div>
++    </div>
++  );
++}
++
++function formatDueWindow(daysUntilDue: number) {
++  if (daysUntilDue === 0) {
++    return "Due today";
++  }
++
++  if (daysUntilDue === 1) {
++    return "In 1 day";
++  }
++
++  return `In ${daysUntilDue} days`;
++}
++
+ function ActionLink({
+   href,
+   children,
+diff --git a/src/features/dashboard/lib/advisor-insight.test.ts b/src/features/dashboard/lib/advisor-insight.test.ts
+new file mode 100644
+index 0000000..73738c0
+--- /dev/null
++++ b/src/features/dashboard/lib/advisor-insight.test.ts
+@@ -0,0 +1,113 @@
++import { describe, expect, it } from "vitest";
++
++import type { FinancialSnapshot } from "@/types/finance";
++
++import { describeHealthStatus, generateAdvisorInsight } from "./advisor-insight";
++
++function snapshot(overrides: Partial<FinancialSnapshot["profile"]> = {}): FinancialSnapshot {
++  return {
++    profile: {
++      currency: "PHP",
++      monthlyIncome: 60000,
++      currentSavings: 120000,
++      emergencyFundTarget: 120000,
++      estimatedVariableExpenses: 8000,
++      ...overrides,
++    },
++    expenses: [],
++    debts: [],
++    goals: [],
++  };
++}
++
++const baseMetrics = { safeToSpend: 20000, monthlyFreeCashFlow: 10000, healthScore: 82 };
++
++describe("generateAdvisorInsight", () => {
++  it("produces the Strong-band title for a high health score", () => {
++    const insight = generateAdvisorInsight({ metrics: baseMetrics, snapshot: snapshot() });
++
++    expect(insight.title).toBe("You're ahead of the guardrail");
++  });
++
++  it("produces the Stable-band title for a mid health score", () => {
++    const insight = generateAdvisorInsight({
++      metrics: { ...baseMetrics, healthScore: 65 },
++      snapshot: snapshot(),
++    });
++
++    expect(insight.title).toBe("Keep the guardrail active");
++  });
++
++  it("produces the Caution-band title for a low-mid health score", () => {
++    const insight = generateAdvisorInsight({
++      metrics: { ...baseMetrics, healthScore: 45 },
++      snapshot: snapshot(),
++    });
++
++    expect(insight.title).toBe("Tighten before the next want");
++  });
++
++  it("produces the Risky-band title and a hold message when cash flow is negative", () => {
++    const insight = generateAdvisorInsight({
++      metrics: { ...baseMetrics, healthScore: 25, monthlyFreeCashFlow: -2000 },
++      snapshot: snapshot({ currentSavings: 10000 }),
++    });
++
++    expect(insight.title).toBe("Protect your buffer first");
++    expect(insight.body).toMatch(/free cash flow is tight/i);
++  });
++
++  it("points spare cash flow at the emergency target when it is underfunded", () => {
++    const insight = generateAdvisorInsight({
++      metrics: baseMetrics,
++      snapshot: snapshot({ currentSavings: 60000, emergencyFundTarget: 120000 }),
++    });
++
++    expect(insight.body).toMatch(/emergency target/i);
++  });
++
++  it("affirms room for planned spending when funded, positive, and debt-free", () => {
++    const insight = generateAdvisorInsight({ metrics: baseMetrics, snapshot: snapshot() });
++
++    expect(insight.body).toMatch(/room for planned spending/i);
++  });
++
++  it("nudges clearing upcoming debt when funded and positive but still carrying debt", () => {
++    const withDebt: FinancialSnapshot = {
++      ...snapshot(),
++      debts: [
++        { id: "d", label: "Card", outstandingBalance: 10000, minimumPayment: 1000, dueDay: 5 },
++      ],
++    };
++
++    const insight = generateAdvisorInsight({ metrics: baseMetrics, snapshot: withDebt });
++
++    expect(insight.body).toMatch(/clear upcoming debt first/i);
++  });
++
++  it("is deterministic for identical inputs", () => {
++    const input = { metrics: baseMetrics, snapshot: snapshot() };
++
++    expect(generateAdvisorInsight(input)).toEqual(generateAdvisorInsight(input));
++  });
++
++  it("tolerates a profile without estimated variable expenses", () => {
++    const profileSnapshot = snapshot({ estimatedVariableExpenses: undefined });
++
++    expect(() => generateAdvisorInsight({ metrics: baseMetrics, snapshot: profileSnapshot })).not.toThrow();
++  });
++});
++
++describe("describeHealthStatus", () => {
++  it("returns a distinct one-line description per band", () => {
++    const descriptions = [
++      describeHealthStatus("Strong"),
++      describeHealthStatus("Stable"),
++      describeHealthStatus("Caution"),
++      describeHealthStatus("Risky"),
++    ];
++
++    expect(new Set(descriptions).size).toBe(4);
++    descriptions.forEach((line) => expect(line.length).toBeGreaterThan(0));
++  });
++});
+diff --git a/src/features/dashboard/lib/advisor-insight.ts b/src/features/dashboard/lib/advisor-insight.ts
+new file mode 100644
+index 0000000..6db8ebb
+--- /dev/null
++++ b/src/features/dashboard/lib/advisor-insight.ts
+@@ -0,0 +1,68 @@
++import { getHealthStatus, type HealthStatus } from "@/lib/calculations/health-score";
++import type { FinancialSnapshot } from "@/types/finance";
++
++export interface AdvisorInsight {
++  title: string;
++  body: string;
++}
++
++export interface AdvisorInsightInput {
++  metrics: {
++    safeToSpend: number;
++    monthlyFreeCashFlow: number;
++    healthScore: number;
++  };
++  snapshot: FinancialSnapshot;
++}
++
++const TITLE_BY_STATUS: Record<HealthStatus, string> = {
++  Strong: "You're ahead of the guardrail",
++  Stable: "Keep the guardrail active",
++  Caution: "Tighten before the next want",
++  Risky: "Protect your buffer first",
++};
++
++const DESCRIPTION_BY_STATUS: Record<HealthStatus, string> = {
++  Strong: "Your plan has healthy margin across savings, cash flow, and debt.",
++  Stable: "Your plan is on track, with a little room to tighten.",
++  Caution: "A few signals need attention before new spending.",
++  Risky: "Spending pressure is high relative to your buffer.",
++};
++
++/** One-line, status-specific description used by the dashboard health-status banner. */
++export function describeHealthStatus(status: HealthStatus): string {
++  return DESCRIPTION_BY_STATUS[status];
++}
++
++/**
++ * Deterministic, rule-based advisor insight for the dashboard. No LLM is involved — the weekly
++ * report (P9) and LiteRT advisor (P10) own generated narrative; this is the always-available
++ * fallback summary derived directly from the live metrics.
++ */
++export function generateAdvisorInsight({ metrics, snapshot }: AdvisorInsightInput): AdvisorInsight {
++  const status = getHealthStatus(metrics.healthScore);
++
++  return {
++    title: TITLE_BY_STATUS[status],
++    body: `${DESCRIPTION_BY_STATUS[status]} ${signalSentence(metrics, snapshot)}`,
++  };
++}
++
++function signalSentence(
++  metrics: AdvisorInsightInput["metrics"],
++  snapshot: FinancialSnapshot
++): string {
++  if (metrics.monthlyFreeCashFlow <= 0) {
++    return "Free cash flow is tight, so hold off on new commitments.";
++  }
++
++  if (snapshot.profile.currentSavings < snapshot.profile.emergencyFundTarget) {
++    return "Direct spare cash flow toward your emergency target.";
++  }
++
++  if (snapshot.debts.length > 0) {
++    return "You have room to spend, but clear upcoming debt first.";
++  }
++
++  return "You have room for planned spending this month.";
++}
+diff --git a/src/lib/calculations/upcoming-debt.test.ts b/src/lib/calculations/upcoming-debt.test.ts
+new file mode 100644
+index 0000000..7cd93f3
+--- /dev/null
++++ b/src/lib/calculations/upcoming-debt.test.ts
+@@ -0,0 +1,123 @@
++import { describe, expect, it } from "vitest";
++
++import type { Debt } from "@/types/finance";
++
++import { getUpcomingDebts, getUpcomingDebtTotal } from "./upcoming-debt";
++
++function debt(overrides: Partial<Debt> = {}): Debt {
++  return {
++    id: "debt_1",
++    label: "Credit card",
++    outstandingBalance: 50000,
++    minimumPayment: 2500,
++    dueDay: 15,
++    ...overrides,
++  };
++}
++
++describe("getUpcomingDebts", () => {
++  it("returns a debt whose due day is later this month with its next date and days remaining", () => {
++    const reference = new Date(2026, 6, 5); // 2026-07-05 (local)
++
++    const result = getUpcomingDebts([debt({ dueDay: 20 })], reference);
++
++    expect(result).toHaveLength(1);
++    expect(result[0].nextDueDate).toBe("2026-07-20");
++    expect(result[0].daysUntilDue).toBe(15);
++  });
++
++  it("rolls over to next month when the due day has already passed this month", () => {
++    const reference = new Date(2026, 6, 15); // 2026-07-15
++
++    const [upcoming] = getUpcomingDebts([debt({ dueDay: 10 })], reference);
++
++    expect(upcoming.nextDueDate).toBe("2026-08-10");
++    expect(upcoming.daysUntilDue).toBe(26);
++  });
++
++  it("treats a debt due today as zero days remaining and includes it", () => {
++    const reference = new Date(2026, 6, 20); // 2026-07-20
++
++    const [upcoming] = getUpcomingDebts([debt({ dueDay: 20 })], reference);
++
++    expect(upcoming.daysUntilDue).toBe(0);
++    expect(upcoming.nextDueDate).toBe("2026-07-20");
++  });
++
++  it("clamps a day-31 due date to the last day of a short month", () => {
++    const reference = new Date(2026, 1, 10); // 2026-02-10, Feb 2026 has 28 days
++
++    const [upcoming] = getUpcomingDebts([debt({ dueDay: 31 })], reference);
++
++    expect(upcoming.nextDueDate).toBe("2026-02-28");
++    expect(upcoming.daysUntilDue).toBe(18);
++  });
++
++  it("includes a debt due exactly 30 days out (window boundary)", () => {
++    const reference = new Date(2026, 6, 1); // 2026-07-01
++
++    const result = getUpcomingDebts([debt({ dueDay: 31 })], reference); // 2026-07-31
++
++    expect(result).toHaveLength(1);
++    expect(result[0].daysUntilDue).toBe(30);
++  });
++
++  it("sorts results ascending by days until due", () => {
++    const reference = new Date(2026, 6, 5); // 2026-07-05
++
++    const result = getUpcomingDebts(
++      [
++        debt({ id: "later", dueDay: 25 }),
++        debt({ id: "sooner", dueDay: 18 }),
++      ],
++      reference
++    );
++
++    expect(result.map((item) => item.debt.id)).toEqual(["sooner", "later"]);
++  });
++
++  it("breaks ties on the same due day by the larger minimum payment first", () => {
++    const reference = new Date(2026, 6, 5); // 2026-07-05
++
++    const result = getUpcomingDebts(
++      [
++        debt({ id: "small", dueDay: 18, minimumPayment: 1000 }),
++        debt({ id: "large", dueDay: 18, minimumPayment: 4000 }),
++      ],
++      reference
++    );
++
++    expect(result.map((item) => item.debt.id)).toEqual(["large", "small"]);
++  });
++
++  it("returns an empty array when there are no debts", () => {
++    expect(getUpcomingDebts([], new Date(2026, 6, 5))).toEqual([]);
++  });
++
++  it("is deterministic for a fixed reference date", () => {
++    const reference = new Date(2026, 6, 5);
++    const debts = [debt({ dueDay: 20 }), debt({ id: "d2", dueDay: 9 })];
++
++    expect(getUpcomingDebts(debts, reference)).toEqual(getUpcomingDebts(debts, reference));
++  });
++});
++
++describe("getUpcomingDebtTotal", () => {
++  it("sums the minimum payments of debts due within 30 days", () => {
++    const reference = new Date(2026, 6, 5);
++
++    const total = getUpcomingDebtTotal(
++      [
++        debt({ id: "a", dueDay: 10, minimumPayment: 2500 }),
++        debt({ id: "b", dueDay: 28, minimumPayment: 1500 }),
++      ],
++      reference
++    );
++
++    expect(total).toBe(4000);
++  });
++
++  it("returns zero when there are no debts", () => {
++    expect(getUpcomingDebtTotal([], new Date(2026, 6, 5))).toBe(0);
++  });
++});
+diff --git a/src/lib/calculations/upcoming-debt.ts b/src/lib/calculations/upcoming-debt.ts
+new file mode 100644
+index 0000000..bc772de
+--- /dev/null
++++ b/src/lib/calculations/upcoming-debt.ts
+@@ -0,0 +1,83 @@
++import type { Debt } from "@/types/finance";
++
++const DAY_MS = 24 * 60 * 60 * 1000;
++
++/**
++ * Number of calendar days, inclusive of today, that defines the "upcoming" window.
++ *
++ * For monthly-recurring debts the next occurrence of a `dueDay` is always 0–30 days away, so the
++ * upper bound is a defensive guard (the exclusion branch is unreachable today); it keeps the helper
++ * correct if a non-monthly debt cadence is ever introduced.
++ */
++export const UPCOMING_DEBT_WINDOW_DAYS = 30;
++
++export interface UpcomingDebt {
++  debt: Debt;
++  /** Next due date as a local `YYYY-MM-DD` string (safe to render with the existing date helpers). */
++  nextDueDate: string;
++  /** Whole days from the reference date until the next due date (0 when due today). */
++  daysUntilDue: number;
++}
++
++/**
++ * Display-only derivation of which debts fall due within the next 30 days.
++ *
++ * This never feeds the §19 decision engine — it only powers the dashboard card. The engine keeps
++ * its own `upcomingDebt30Days` input (the summed minimum payments). Pure given an explicit
++ * reference date so it is deterministic in tests; the UI passes `new Date()` at the render boundary.
++ */
++export function getUpcomingDebts(debts: Debt[], referenceDate: Date): UpcomingDebt[] {
++  const today = startOfDay(referenceDate);
++
++  return debts
++    .map((debt) => {
++      const next = nextOccurrence(debt.dueDay, today);
++      const daysUntilDue = Math.round((next.getTime() - today.getTime()) / DAY_MS);
++
++      return { debt, nextDueDate: toDateString(next), daysUntilDue };
++    })
++    .filter((item) => item.daysUntilDue >= 0 && item.daysUntilDue <= UPCOMING_DEBT_WINDOW_DAYS)
++    .sort(byDaysThenPayment);
++}
++
++/** Total minimum payment due within the next 30 days. */
++export function getUpcomingDebtTotal(debts: Debt[], referenceDate: Date): number {
++  return getUpcomingDebts(debts, referenceDate).reduce(
++    (total, item) => total + item.debt.minimumPayment,
++    0
++  );
++}
++
++function nextOccurrence(dueDay: number, today: Date): Date {
++  const candidate = clampToMonth(today.getFullYear(), today.getMonth(), dueDay);
++
++  if (candidate.getTime() >= today.getTime()) {
++    return candidate;
++  }
++
++  return clampToMonth(today.getFullYear(), today.getMonth() + 1, dueDay);
++}
++
++function clampToMonth(year: number, month: number, day: number): Date {
++  const lastDay = new Date(year, month + 1, 0).getDate();
++  return new Date(year, month, Math.min(day, lastDay));
++}
++
++function startOfDay(date: Date): Date {
++  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
++}
++
++function toDateString(date: Date): string {
++  const year = date.getFullYear();
++  const month = String(date.getMonth() + 1).padStart(2, "0");
++  const day = String(date.getDate()).padStart(2, "0");
++  return `${year}-${month}-${day}`;
++}
++
++function byDaysThenPayment(a: UpcomingDebt, b: UpcomingDebt): number {
++  if (a.daysUntilDue !== b.daysUntilDue) {
++    return a.daysUntilDue - b.daysUntilDue;
++  }
++
++  return b.debt.minimumPayment - a.debt.minimumPayment;
++}
