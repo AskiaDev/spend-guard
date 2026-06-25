@@ -58,7 +58,7 @@ export function SetupIntroStep({ onContinue }: SetupIntroStepProps) {
       </div>
 
       <VaultButton variant="primary" onClick={onContinue}>
-        Got it, let's go
+        {"Got it, let's go"}
       </VaultButton>
     </div>
   );

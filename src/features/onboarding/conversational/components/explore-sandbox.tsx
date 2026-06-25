@@ -161,7 +161,9 @@ export function ExploreSandbox() {
         <VaultButton onClick={handleCheck} disabled={!canCheck}>
           Check if I can buy this
         </VaultButton>
-        {ctaButton}
+        <VaultButton variant="ghost" onClick={handleSetupReal}>
+          Set up my real guardrail
+        </VaultButton>
       </div>
     </div>
   );

@@ -27,15 +27,6 @@ export function runFirstCheck(
 
 // ---- FirstPurchaseCheck -----------------------------------------------------
 
-const inlineLabel: React.CSSProperties = {
-  fontSize: "0.68rem",
-  letterSpacing: "0.16em",
-  fontWeight: 700,
-  color: "var(--vault-accent)",
-  display: "block",
-  marginBottom: 4,
-};
-
 export function FirstPurchaseCheck({
   values,
   onDone,
