@@ -1,29 +1,37 @@
+"use client";
+
+import * as React from "react";
+import { Progress as ProgressPrimitive } from "radix-ui";
+
 import { cn } from "@/lib/utils";
 
-export function Progress({
+function Progress({
+  className,
   value,
   label,
-  className,
-}: {
-  value: number;
-  label: string;
-  className?: string;
-}) {
-  const boundedValue = Math.max(0, Math.min(100, value));
+  ...props
+}: React.ComponentProps<typeof ProgressPrimitive.Root> & { label?: string }) {
+  const bounded = Math.max(0, Math.min(100, Math.round(value ?? 0)));
 
   return (
-    <div
-      role="progressbar"
+    <ProgressPrimitive.Root
+      data-slot="progress"
       aria-label={label}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuenow={Math.round(boundedValue)}
-      className={cn("h-2 overflow-hidden rounded-full bg-slate-100", className)}
+      value={bounded}
+      className={cn(
+        "relative h-2 w-full overflow-hidden rounded-full bg-secondary",
+        className
+      )}
+      {...props}
     >
-      <div
-        className="h-full rounded-full bg-safe transition-[width]"
-        style={{ width: `${boundedValue}%` }}
+      <ProgressPrimitive.Indicator
+        data-slot="progress-indicator"
+        className="h-full w-full flex-1 bg-primary transition-all"
+        // ponytail: width is data-driven (computed translate from value)
+        style={{ transform: `translateX(-${100 - bounded}%)` }}
       />
-    </div>
+    </ProgressPrimitive.Root>
   );
 }
+
+export { Progress };
