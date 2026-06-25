@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { OnboardingWizard } from "@/features/onboarding/vault/components/onboarding-wizard";
+import OnboardingWizard from "@/features/onboarding/conversational/components/onboarding-wizard";
 
 export const metadata: Metadata = { title: "Welcome | SpendGuard" };
 
