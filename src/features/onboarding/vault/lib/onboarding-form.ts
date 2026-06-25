@@ -21,7 +21,7 @@ export const emptyExpenseRow = (): ExpenseRow => ({ label: "", amount: "", dueDa
 export const emptyDebtRow = (): DebtRow => ({ label: "", outstandingBalance: "", minimumPayment: "", dueDay: "1", interestRate: "" });
 export const emptyGoalRow = (): GoalRow => ({ label: "", targetAmount: "", savedAmount: "", monthlyContribution: "", targetDate: "", priority: "medium" });
 
-const hasLabel = (row: { label: string }) => row.label.trim() !== "";
+export const hasLabel = (row: { label: string }) => row.label.trim() !== "";
 
 export function buildOnboardingPayload(values: OnboardingFormValues) {
   return {

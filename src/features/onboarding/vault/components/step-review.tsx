@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { PAY_FREQUENCY_LABELS } from "@/types/finance";
-import type { OnboardingFormValues } from "../lib/onboarding-form";
+import { hasLabel, type OnboardingFormValues } from "../lib/onboarding-form";
 import { VaultButton } from "./primitives/vault-button";
 
 // ---- Helpers ----------------------------------------------------------------
@@ -156,9 +156,9 @@ export function StepReview({
   onEdit: (stepIndex: number) => void;
 }) {
   const { currency } = values;
-  const expenses = values.expenses.filter((row) => row.label.trim() !== "");
-  const debts = values.debts.filter((row) => row.label.trim() !== "");
-  const goals = values.goals.filter((row) => row.label.trim() !== "");
+  const expenses = values.expenses.filter(hasLabel);
+  const debts = values.debts.filter(hasLabel);
+  const goals = values.goals.filter(hasLabel);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>

@@ -35,21 +35,19 @@ const PRIORITY_OPTIONS = [
 
 function GoalRow({
   index,
-  fieldId,
   control,
   register,
   errors,
   onRemove,
 }: {
   index: number;
-  fieldId: string;
   control: Control<OnboardingFormValues>;
   register: UseFormRegister<OnboardingFormValues>;
   errors: FieldErrors<OnboardingFormValues>;
   onRemove: () => void;
 }) {
   return (
-    <RepeatableRow key={fieldId} onRemove={onRemove}>
+    <RepeatableRow onRemove={onRemove}>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {/* Row 1: label (full width) */}
         <div>
@@ -176,7 +174,6 @@ export function StepGoals({
         <GoalRow
           key={field.id}
           index={index}
-          fieldId={field.id}
           control={control}
           register={register}
           errors={errors}

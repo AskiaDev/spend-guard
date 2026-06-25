@@ -174,14 +174,12 @@ function RecurringToggle({
 
 function ExpenseRow({
   index,
-  fieldId,
   control,
   register,
   errors,
   onRemove,
 }: {
   index: number;
-  fieldId: string;
   control: Control<OnboardingFormValues>;
   register: UseFormRegister<OnboardingFormValues>;
   errors: FieldErrors<OnboardingFormValues>;
@@ -190,7 +188,7 @@ function ExpenseRow({
   const isRecurring = useWatch({ control, name: `expenses.${index}.isRecurring` });
 
   return (
-    <RepeatableRow key={fieldId} onRemove={onRemove}>
+    <RepeatableRow onRemove={onRemove}>
       <div
         style={{
           ...rowGrid,
@@ -280,7 +278,6 @@ function ExpenseList({
         <ExpenseRow
           key={field.id}
           index={index}
-          fieldId={field.id}
           control={control}
           register={register}
           errors={errors}
