@@ -6,18 +6,26 @@ import { VaultStepper } from "./vault-stepper";
 
 interface OnboardingShellProps {
   step: number;
-  labels: string[];
+  labels?: string[];
   hero: ReactNode;
   children: ReactNode;
   footer: ReactNode;
+  /**
+   * Optional progress indicator slot. When provided it replaces the built-in
+   * VaultStepper + "STEP x / y" eyebrow (the conversational flow supplies its
+   * own ProgressPath and per-screen eyebrows). When omitted the shell keeps its
+   * original VaultStepper behaviour for the vault wizard.
+   */
+  progress?: ReactNode;
 }
 
 export function OnboardingShell({
   step,
-  labels,
+  labels = [],
   hero,
   children,
   footer,
+  progress,
 }: OnboardingShellProps) {
   const prefersReducedMotion = useReducedMotion();
 
@@ -120,21 +128,29 @@ export function OnboardingShell({
             minHeight: 0,
           }}
         >
-          {/* Stepper */}
-          <div style={{ flexShrink: 0, marginBottom: "28px" }}>
-            <VaultStepper step={step} labels={labels} />
-          </div>
+          {/* Progress indicator: caller-supplied slot, or the default stepper + eyebrow */}
+          {progress ? (
+            <div style={{ flexShrink: 0, marginBottom: "28px" }}>{progress}</div>
+          ) : (
+            <>
+              <div style={{ flexShrink: 0, marginBottom: "28px" }}>
+                <VaultStepper step={step} labels={labels} />
+              </div>
+              <div style={{ flexShrink: 0, marginBottom: "20px" }}>
+                <span className="vault-eyebrow">
+                  STEP {step} / {total} - {currentLabel}
+                </span>
+              </div>
+            </>
+          )}
 
-          {/* Eyebrow */}
-          <div style={{ flexShrink: 0, marginBottom: "20px" }}>
-            <span className="vault-eyebrow">
-              STEP {step} / {total} - {currentLabel}
-            </span>
-          </div>
-
-          {/* Step body - animated on step change */}
+          {/* Step body - animated on step change. The vault wizard uses
+              mode="wait" (one panel at a time). The conversational flow (which
+              supplies its own `progress`) uses the default sync mode so the
+              incoming step mounts immediately and cross-fades, with no flash of
+              empty content across its many short screens. */}
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-            <AnimatePresence mode="wait" initial={false}>
+            <AnimatePresence mode={progress ? "sync" : "wait"} initial={false}>
               <motion.div
                 key={step}
                 initial={{
