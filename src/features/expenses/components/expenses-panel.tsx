@@ -303,7 +303,7 @@ export function ExpensesPanel({
                     <h3 className="text-lg font-semibold tracking-tight text-foreground">
                       {expense.label}
                     </h3>
-                    <Badge tone={expense.isRecurring ? "green" : "zinc"}>
+                    <Badge variant={expense.isRecurring ? "safe" : "neutral"}>
                       {expense.isRecurring ? "Recurring" : "One-time"}
                     </Badge>
                   </div>

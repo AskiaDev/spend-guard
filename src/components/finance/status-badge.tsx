@@ -12,13 +12,13 @@ export const decisionLabels: Record<PurchaseDecision, string> = {
 };
 
 const decisionPresentation = {
-  SAFE_TO_BUY: { Icon: ShieldCheck, tone: "green" },
-  BUY_WITH_CAUTION: { Icon: TriangleAlert, tone: "amber" },
-  WAIT: { Icon: Clock3, tone: "amber" },
-  NOT_RECOMMENDED: { Icon: CircleX, tone: "red" },
+  SAFE_TO_BUY: { Icon: ShieldCheck, variant: "safe" },
+  BUY_WITH_CAUTION: { Icon: TriangleAlert, variant: "caution" },
+  WAIT: { Icon: Clock3, variant: "caution" },
+  NOT_RECOMMENDED: { Icon: CircleX, variant: "risk" },
 } as const satisfies Record<
   PurchaseDecision,
-  { Icon: typeof ShieldCheck; tone: "green" | "amber" | "red" }
+  { Icon: typeof ShieldCheck; variant: "safe" | "caution" | "risk" }
 >;
 
 export interface StatusBadgeProps {
@@ -27,10 +27,10 @@ export interface StatusBadgeProps {
 }
 
 export function StatusBadge({ decision, className }: StatusBadgeProps) {
-  const { Icon, tone } = decisionPresentation[decision];
+  const { Icon, variant } = decisionPresentation[decision];
 
   return (
-    <Badge tone={tone} className={cn("gap-1.5", className)}>
+    <Badge variant={variant} className={cn("gap-1.5", className)}>
       <Icon aria-hidden="true" className="size-3.5 shrink-0" />
       {decisionLabels[decision]}
     </Badge>

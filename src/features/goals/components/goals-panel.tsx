@@ -424,7 +424,7 @@ function GoalCard({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-lg font-semibold tracking-tight text-foreground">{goal.label}</h3>
-            {goal.priority === "high" ? <Badge tone="green">Most important</Badge> : null}
+            {goal.priority === "high" ? <Badge variant="safe">Most important</Badge> : null}
           </div>
           <p className="mt-2 text-sm text-muted">
             {formatCurrency(goal.savedAmount, currency)} of{" "}

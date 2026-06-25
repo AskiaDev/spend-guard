@@ -318,7 +318,7 @@ export function DebtsPanel({
                       {debt.label}
                     </h3>
                     {debt.interestRate !== undefined ? (
-                      <Badge tone="amber">{Math.round(debt.interestRate * 100)}% APR</Badge>
+                      <Badge variant="caution">{Math.round(debt.interestRate * 100)}% APR</Badge>
                     ) : null}
                   </div>
                   <p className="mt-2 text-sm text-muted">
