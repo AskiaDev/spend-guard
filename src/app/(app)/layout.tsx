@@ -3,7 +3,6 @@ import { AppShell } from "@/components/layout/app-shell";
 import { WorkspaceErrorBanner } from "@/components/layout/workspace-error-banner";
 import { env } from "@/config/env";
 import { signOutAction } from "@/features/auth/api/actions";
-import { readOnboardingCompleted } from "@/features/onboarding/api/read-onboarding-completed";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { FinancialStateProvider } from "@/providers/financial-state-provider";
 
@@ -23,10 +22,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect("/login");
   }
 
-  if (!(await readOnboardingCompleted(supabase, user.id))) {
-    redirect("/onboarding");
-  }
-
+  // Onboarding gating (funnel un-onboarded users to /onboarding) is handled
+  // centrally in src/proxy.ts, so it is intentionally not duplicated here.
   return (
     <FinancialStateProvider>
       <AppShell userEmail={user.email ?? "Signed in"} signOutAction={signOutAction}>
