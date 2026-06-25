@@ -33,6 +33,7 @@ export function IntentStep({ value, onChange }: IntentStepProps) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <ConversationalPrompt
+        eyebrow="Goals"
         headline="What do you want SpendGuard to help with?"
         subtext="Pick as many as feel right. This helps us set the right tone."
       />

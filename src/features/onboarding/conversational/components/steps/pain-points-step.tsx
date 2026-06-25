@@ -33,6 +33,7 @@ export function PainPointsStep({ value, onChange }: PainPointsStepProps) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
       <ConversationalPrompt
+        eyebrow="Habits"
         headline="What tends to trip you up with spending?"
         subtext="No judgment here - these patterns are common. Knowing them helps SpendGuard protect you better."
       />

@@ -14,7 +14,7 @@ export function ConversationalPrompt({
   why,
 }: ConversationalPromptProps) {
   return (
-    <div className="vault conv-prompt" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+    <div className="conv-prompt" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
       {eyebrow && (
         <p className="vault-eyebrow" style={{ margin: 0 }}>
           {eyebrow}

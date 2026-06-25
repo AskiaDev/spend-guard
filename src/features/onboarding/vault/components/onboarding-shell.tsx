@@ -37,9 +37,7 @@ export function OnboardingShell({
       <div
         className="vault-shell-grid"
         style={{
-          flex: 1,
           display: "grid",
-          minHeight: "100dvh",
         }}
       >
         {/* LEFT STAGE - brand + hero */}
@@ -202,6 +200,7 @@ export function OnboardingShell({
       <style>{`
         .vault-shell-grid {
           grid-template-columns: 1fr;
+          min-height: 100dvh;
         }
         .vault-shell-left {
           border-right: none;

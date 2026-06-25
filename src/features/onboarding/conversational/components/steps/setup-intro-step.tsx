@@ -11,6 +11,7 @@ export function SetupIntroStep({ onContinue }: SetupIntroStepProps) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
       <ConversationalPrompt
+        eyebrow="Setup"
         headline="Let's build your spending guardrail."
         subtext="We'll protect money for bills, debt, savings, and emergencies before calling anything safe to spend. The money already spoken for never counts as available."
       />

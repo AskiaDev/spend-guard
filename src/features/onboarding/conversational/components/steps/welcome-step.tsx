@@ -12,6 +12,7 @@ export function WelcomeStep({ onStart, onExplore }: WelcomeStepProps) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 32 }}>
       <ConversationalPrompt
+        eyebrow="Start"
         headline="Before you buy, ask SpendGuard."
         subtext="Set up your real safe-to-spend number so you can check purchases before they become regrets."
       />

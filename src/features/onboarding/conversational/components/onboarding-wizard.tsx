@@ -39,25 +39,6 @@ import { CooldownStep } from "./steps/cooldown-step";
 import { FirstPurchaseCheck } from "./first-purchase-check";
 import { OnboardingSummary } from "./onboarding-summary";
 
-// Short progress labels - one word per screen so the dotted ProgressPath stays
-// legible at 14 steps. Order matches ONBOARDING_STEPS exactly.
-const PROGRESS_LABELS: Record<OnboardingStepId, string> = {
-  welcome: "Start",
-  intent: "Goals",
-  "pain-points": "Habits",
-  "setup-intro": "Setup",
-  income: "Income",
-  savings: "Savings",
-  "variable-spend": "Spending",
-  buffer: "Buffer",
-  commitments: "Bills",
-  debts: "Debt",
-  goals: "Targets",
-  cooldown: "Pause",
-  "first-check": "Check",
-  summary: "Ready",
-};
-
 // In-voice reflection shown after each input step is answered (BRAND_VOICE.md:
 // calm, protective, no shame, no em dash).
 const MICRO_RESPONSE: Partial<Record<OnboardingStepId, string>> = {
@@ -336,11 +317,6 @@ export default function OnboardingWizard() {
 
   const step = ONBOARDING_STEPS[stepIndex];
 
-  const progressSteps = useMemo(
-    () => ONBOARDING_STEPS.map((s) => ({ id: s.id, label: PROGRESS_LABELS[s.id] })),
-    []
-  );
-
   // The lock variant marks the signature "sealed" moment on the final screen;
   // memoize the element so wizard re-renders never restart the hero animation.
   const heroVariant = stepIndex >= FIRST_CHECK_INDEX ? "lock" : "loop";
@@ -405,7 +381,7 @@ export default function OnboardingWizard() {
     <OnboardingShell
       step={stepIndex + 1}
       hero={hero}
-      progress={<ProgressPath steps={progressSteps} currentIndex={stepIndex} />}
+      progress={<ProgressPath current={stepIndex + 1} total={ONBOARDING_STEPS.length} />}
       footer={
         usesFooter ? (
           <StepFooter
