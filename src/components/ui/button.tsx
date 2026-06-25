@@ -1,28 +1,33 @@
 import * as React from "react";
 import { type VariantProps, cva } from "class-variance-authority";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+const dangerClasses = "bg-[var(--risk)] text-[var(--risk-foreground)] hover:brightness-110";
+
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control text-sm font-semibold transition-[color,background-color,box-shadow,filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-primary text-white hover:bg-blue-700",
-        secondary: "bg-surface text-foreground ring-1 ring-border hover:bg-slate-50",
-        accent: "bg-safe text-white hover:bg-green-700",
-        ghost: "text-slate-700 hover:bg-slate-100",
-        danger: "bg-risk text-white hover:bg-red-700",
+        default:
+          "bg-primary text-primary-foreground hover:brightness-105 hover:shadow-[0_0_0_1px_rgb(198_242_78/0.35),0_8px_28px_rgb(198_242_78/0.20)]",
+        secondary: "glass text-secondary-foreground hover:brightness-110",
+        accent: "bg-[var(--chart-2)] text-[var(--safe-foreground)] hover:brightness-110",
+        ghost: "text-foreground hover:bg-accent",
+        outline: "border border-input bg-transparent text-foreground hover:bg-accent",
+        danger: dangerClasses,
+        destructive: dangerClasses,
+        link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
         default: "h-11 px-4",
         sm: "h-11 px-3 text-xs",
+        lg: "h-12 px-6",
         icon: "h-11 w-11",
       },
     },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
+    defaultVariants: { variant: "default", size: "default" },
   }
 );
 
@@ -35,16 +40,7 @@ export interface ButtonProps
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   (
-    {
-      children,
-      className,
-      disabled,
-      isLoading = false,
-      loadingText = "Loading...",
-      size,
-      variant,
-      ...props
-    },
+    { children, className, disabled, isLoading = false, loadingText = "Loading...", size, variant, ...props },
     ref
   ) => (
     <button
@@ -56,6 +52,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     >
       {isLoading ? (
         <>
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
           <span className="sr-only">{children}</span>
           <span aria-hidden="true">{loadingText}</span>
         </>
@@ -67,3 +64,5 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 );
 
 Button.displayName = "Button";
+
+export { buttonVariants };
