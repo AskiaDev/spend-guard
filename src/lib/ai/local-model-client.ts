@@ -21,8 +21,12 @@ interface LitertModule {
 // String specifier keeps `tsc` from hard-requiring the (early-preview) package at
 // compile time; the real import only runs in the browser when WebGPU is present.
 const LITERT_MODULE = "@litert-lm/core";
-const DEFAULT_MODEL_URL =
+export const DEFAULT_LITERT_MODEL_URL =
   "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.litertlm";
+const LITERT_CONSOLE_NOISE = [
+  /^(?:INFO|WARNING): \[(?:environment|npu_registry|accelerator_registry|gpu_registry|cpu_registry)\.cc:\d+\]/,
+  /Missing \d+ bands .*mel-frequency design/,
+];
 
 export interface LocalModelClientOptions {
   modelUrl?: string;
@@ -41,7 +45,7 @@ export interface LocalModelClientOptions {
  */
 export function createLocalModelClient(options: LocalModelClientOptions = {}): ModelClient {
   const modelUrl =
-    options.modelUrl ?? process.env.NEXT_PUBLIC_LITERT_MODEL_URL ?? DEFAULT_MODEL_URL;
+    options.modelUrl ?? process.env.NEXT_PUBLIC_LITERT_MODEL_URL ?? DEFAULT_LITERT_MODEL_URL;
   const maxNumTokens = options.maxNumTokens ?? 1024;
   const hasWebGpu = options.hasWebGpu ?? defaultHasWebGpu;
   const loadModule =
@@ -51,11 +55,15 @@ export function createLocalModelClient(options: LocalModelClientOptions = {}): M
   let enginePromise: Promise<LitertEngine> | null = null;
   const engine = async () => {
     if (!enginePromise) {
-      const mod = await loadModule();
-      enginePromise = mod.Engine.create({
-        model: modelUrl,
-        mainExecutorSettings: { maxNumTokens },
-      }).catch((error) => {
+      enginePromise = (async () => {
+        const mod = await loadModule();
+        return withSuppressedLitertConsoleNoise(() =>
+          mod.Engine.create({
+            model: modelUrl,
+            mainExecutorSettings: { maxNumTokens },
+          })
+        );
+      })().catch((error) => {
         enginePromise = null; // allow a later retry instead of caching the failure
         throw error;
       });
@@ -64,10 +72,16 @@ export function createLocalModelClient(options: LocalModelClientOptions = {}): M
   };
 
   async function* stream(input: ModelTextInput): AsyncIterable<string> {
-    const conversation = await (await engine()).createConversation({
-      preface: { messages: [{ role: "system", content: input.system }] },
-    });
-    for await (const chunk of conversation.sendMessageStreaming(input.prompt)) {
+    const conversation = await withSuppressedLitertConsoleNoise(async () =>
+      (await engine()).createConversation({
+        preface: { messages: [{ role: "system", content: input.system }] },
+      })
+    );
+    const chunks = conversation.sendMessageStreaming(input.prompt)[Symbol.asyncIterator]();
+
+    while (true) {
+      const { done, value: chunk } = await withSuppressedLitertConsoleNoise(() => chunks.next());
+      if (done) break;
       const piece = chunk.content?.[0]?.text;
       if (piece) yield piece;
     }
@@ -91,6 +105,69 @@ export function createLocalModelClient(options: LocalModelClientOptions = {}): M
   };
 }
 
+let sharedLocalModelClient: ModelClient | null = null;
+
+export function getLocalModelClient(): ModelClient {
+  sharedLocalModelClient ??= createLocalModelClient();
+  return sharedLocalModelClient;
+}
+
 function defaultHasWebGpu(): boolean {
   return typeof navigator !== "undefined" && "gpu" in navigator;
+}
+
+function isLitertConsoleNoise(args: unknown[]) {
+  const text = args.map((arg) => (typeof arg === "string" ? arg : "")).join(" ");
+  return LITERT_CONSOLE_NOISE.some((pattern) => pattern.test(text));
+}
+
+let consoleSuppressionDepth = 0;
+let originalConsole:
+  | Pick<Console, "error" | "info" | "warn">
+  | undefined;
+
+function beginLitertConsoleNoiseSuppression() {
+  if (typeof console === "undefined") {
+    return () => {};
+  }
+
+  if (consoleSuppressionDepth === 0) {
+    const original = {
+      error: console.error,
+      info: console.info,
+      warn: console.warn,
+    };
+    originalConsole = original;
+
+    console.error = (...args: unknown[]) => {
+      if (!isLitertConsoleNoise(args)) original.error(...args);
+    };
+    console.info = (...args: unknown[]) => {
+      if (!isLitertConsoleNoise(args)) original.info(...args);
+    };
+    console.warn = (...args: unknown[]) => {
+      if (!isLitertConsoleNoise(args)) original.warn(...args);
+    };
+  }
+
+  consoleSuppressionDepth += 1;
+
+  return () => {
+    consoleSuppressionDepth -= 1;
+    if (consoleSuppressionDepth === 0 && originalConsole) {
+      console.error = originalConsole.error;
+      console.info = originalConsole.info;
+      console.warn = originalConsole.warn;
+      originalConsole = undefined;
+    }
+  };
+}
+
+async function withSuppressedLitertConsoleNoise<T>(work: () => Promise<T>): Promise<T> {
+  const restore = beginLitertConsoleNoiseSuppression();
+  try {
+    return await work();
+  } finally {
+    restore();
+  }
 }

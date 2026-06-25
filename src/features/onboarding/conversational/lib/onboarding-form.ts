@@ -53,6 +53,11 @@ const parseMoney = (value: string): number => {
   return isNaN(parsed) ? 0 : parsed;
 };
 
+const hasCompleteGoal = (row: GoalRow): boolean =>
+  hasLabel(row) &&
+  parseMoney(row.targetAmount) > 0 &&
+  parseMoney(row.monthlyContribution) > 0;
+
 export const emptyExpenseRow = (): ExpenseRow => ({
   label: "",
   amount: "",
@@ -123,7 +128,7 @@ export function buildOnboardingPayload(values: OnboardingFormValues) {
       dueDay: parseInt(d.dueDay, 10) || 1,
       interestRate: d.interestRate === "" ? undefined : parseFloat(d.interestRate),
     })),
-    goals: values.goals.filter(hasLabel).map((g) => ({
+    goals: values.goals.filter(hasCompleteGoal).map((g) => ({
       label: g.label,
       targetAmount: parseMoney(g.targetAmount),
       savedAmount: parseMoney(g.savedAmount),
@@ -164,7 +169,7 @@ export function buildSnapshotFromValues(values: OnboardingFormValues): Financial
       dueDay: parseInt(d.dueDay, 10) || 1,
       interestRate: d.interestRate === "" ? undefined : parseFloat(d.interestRate),
     })),
-    goals: values.goals.filter(hasLabel).map((g) => ({
+    goals: values.goals.filter(hasCompleteGoal).map((g) => ({
       id: crypto.randomUUID(),
       label: g.label,
       targetAmount: parseMoney(g.targetAmount),

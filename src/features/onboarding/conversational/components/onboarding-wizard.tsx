@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useForm, useWatch, Controller, type Control } from "react-hook-form";
 import { useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 
 import { saveFinancialProfileAction } from "@/features/financial-profile/api/save-financial-profile";
 import { OnboardingShell } from "../../vault/components/onboarding-shell";
@@ -80,9 +81,27 @@ const GATE_FIELD: Partial<Record<OnboardingStepId, keyof OnboardingFormValues>> 
   savings: "currentSavings",
 };
 
+function GoBackButton({
+  onBack,
+  disabled,
+}: {
+  onBack: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <VaultButton variant="ghost" onClick={onBack} disabled={disabled}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <ArrowLeft size={15} aria-hidden="true" />
+        Go Back
+      </span>
+    </VaultButton>
+  );
+}
+
 function StepFooter({
   step,
   control,
+  onBack,
   onContinue,
   onSkip,
   saving,
@@ -90,6 +109,7 @@ function StepFooter({
 }: {
   step: OnboardingStep;
   control: Control<OnboardingFormValues>;
+  onBack: () => void;
   onContinue: () => void;
   onSkip: () => void;
   saving: boolean;
@@ -128,7 +148,8 @@ function StepFooter({
           gap: 12,
         }}
       >
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <GoBackButton onBack={onBack} disabled={saving} />
           {step.skippable ? (
             <button
               type="button"
@@ -343,6 +364,11 @@ export default function OnboardingWizard() {
     goToIndex(SUMMARY_INDEX);
   }, [goToIndex]);
 
+  const handleBack = useCallback(() => {
+    if (saving) return;
+    goToIndex(Math.max(0, stepIndex - 1));
+  }, [saving, stepIndex, goToIndex]);
+
   // Advance one input/interstitial step. Past cooldown we persist first.
   const handleContinue = useCallback(async () => {
     if (saving) return;
@@ -387,11 +413,14 @@ export default function OnboardingWizard() {
           <StepFooter
             step={step}
             control={control}
+            onBack={handleBack}
             onContinue={handleContinue}
             onSkip={handleSkip}
             saving={saving}
             error={saveError}
           />
+        ) : stepIndex > 0 ? (
+          <GoBackButton onBack={handleBack} disabled={saving} />
         ) : null
       }
     >

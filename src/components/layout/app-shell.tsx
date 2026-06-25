@@ -23,13 +23,15 @@ export function AppShell({
           <AppDesktopNavigation />
         </div>
 
-        <div className="grid gap-3">
-          <div className="rounded-card border border-border bg-advisor p-3">
+        <div className="grid min-w-0 gap-3">
+          <div className="min-w-0 rounded-control border border-border bg-advisor p-3">
             <div className="flex items-center gap-3">
               <AdvisorAvatar className="size-10" />
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground">Advisor ready</p>
-                <p className="mt-0.5 text-xs leading-5 text-muted">Check before you spend.</p>
+                <p className="mt-0.5 truncate text-xs leading-5 text-muted">
+                  Check before you spend.
+                </p>
               </div>
             </div>
           </div>

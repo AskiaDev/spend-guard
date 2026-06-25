@@ -95,4 +95,34 @@ describe("createLocalModelClient", () => {
     await expect(client.generateText(input)).resolves.toBe("ok");
     expect(create).toHaveBeenCalledTimes(2);
   });
+
+  it("suppresses known LiteRT runtime console noise without hiding other errors", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const client = createLocalModelClient({
+      hasWebGpu: () => true,
+      loadModule: async () => ({
+        Engine: {
+          create: vi.fn(async () => {
+            console.error("INFO: [environment.cc:30] Creating LiteRT environment with options");
+            console.error(
+              "WARNING: [npu_registry.cc:34] NPU accelerator could not be loaded and registered"
+            );
+            console.warn("Missing 10 bands starting at 0 in mel-frequency design.");
+            console.error("real application error");
+            return { createConversation: conversationYielding(["ok"]), delete: vi.fn() };
+          }),
+        },
+      }),
+    });
+
+    await expect(client.generateText(input)).resolves.toBe("ok");
+
+    expect(consoleError).toHaveBeenCalledOnce();
+    expect(consoleError).toHaveBeenCalledWith("real application error");
+    expect(consoleWarn).not.toHaveBeenCalled();
+
+    consoleError.mockRestore();
+    consoleWarn.mockRestore();
+  });
 });

@@ -98,23 +98,43 @@ function GoalRowCard({
           </div>
         </div>
 
-        {/* Target date (optional) */}
-        <div style={{ maxWidth: 200 }}>
-          <label htmlFor={`conv-goal-${index}-date`} style={inlineLabel}>
-            Target date (optional)
-          </label>
-          <Controller
-            control={control}
-            name={`goals.${index}.targetDate`}
-            render={({ field }) => (
-              <VaultInput
-                type="date"
-                id={`conv-goal-${index}-date`}
-                aria-label="Target date (optional)"
-                {...field}
-              />
-            )}
-          />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 12px" }}>
+          <div>
+            <label htmlFor={`conv-goal-${index}-monthly`} style={inlineLabel}>
+              Monthly contribution
+            </label>
+            <Controller
+              control={control}
+              name={`goals.${index}.monthlyContribution`}
+              render={({ field }) => (
+                <VaultInput
+                  id={`conv-goal-${index}-monthly`}
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  aria-label="Monthly contribution"
+                  {...field}
+                />
+              )}
+            />
+          </div>
+
+          <div>
+            <label htmlFor={`conv-goal-${index}-date`} style={inlineLabel}>
+              Target date (optional)
+            </label>
+            <Controller
+              control={control}
+              name={`goals.${index}.targetDate`}
+              render={({ field }) => (
+                <VaultInput
+                  type="date"
+                  id={`conv-goal-${index}-date`}
+                  aria-label="Target date (optional)"
+                  {...field}
+                />
+              )}
+            />
+          </div>
         </div>
       </div>
     </RepeatableRow>

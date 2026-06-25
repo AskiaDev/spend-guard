@@ -6,7 +6,11 @@ import { DashboardOverview } from "@/features/dashboard";
 import { DebtsPanel } from "@/features/debts";
 import { ExpensesPanel } from "@/features/expenses";
 import { GoalsPanel } from "@/features/goals";
-import { PurchaseCheckerWizard, PurchaseResult } from "@/features/purchase-checker";
+import {
+  LocalAdvisorGate,
+  PurchaseCheckerWizard,
+  PurchaseResult,
+} from "@/features/purchase-checker";
 import { ReportsPanel } from "@/features/reports";
 import { SettingsPanel } from "@/features/settings";
 import { VoicePurchaseChecker } from "@/features/voice";
@@ -39,7 +43,11 @@ export function PurchaseCheckerPageContent() {
     return <HydrationNotice />;
   }
 
-  return <PurchaseCheckerWizard onRunCheck={state.runPurchaseCheck} />;
+  return (
+    <LocalAdvisorGate>
+      <PurchaseCheckerWizard onRunCheck={state.runPurchaseCheck} />
+    </LocalAdvisorGate>
+  );
 }
 
 export function VoicePageContent() {
@@ -65,13 +73,15 @@ export function PurchaseResultPageContent() {
   }
 
   return (
-    <PurchaseResult
-      check={state.checks[0]}
-      currency={state.snapshot.profile.currency}
-      onAddGoal={state.addGoalFromCheck}
-      onAddCooldown={state.addCooldownFromCheck}
-      onMarkStatus={state.markPurchaseCheckStatus}
-    />
+    <LocalAdvisorGate>
+      <PurchaseResult
+        check={state.checks[0]}
+        currency={state.snapshot.profile.currency}
+        onAddGoal={state.addGoalFromCheck}
+        onAddCooldown={state.addCooldownFromCheck}
+        onMarkStatus={state.markPurchaseCheckStatus}
+      />
+    </LocalAdvisorGate>
   );
 }
 

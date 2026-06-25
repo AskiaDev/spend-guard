@@ -27,6 +27,26 @@ describe("buildOnboardingPayload", () => {
     expect(payload.profile.cooldownPreference).toBe("strict");
     expect(payload.expenses).toHaveLength(1);
   });
+
+  it("drops incomplete optional goal rows", () => {
+    const payload = buildOnboardingPayload({
+      ...createDefaultValues(),
+      monthlyIncome: "40000",
+      currentSavings: "20000",
+      goals: [
+        {
+          label: "Travel",
+          targetAmount: "",
+          savedAmount: "",
+          monthlyContribution: "",
+          targetDate: "",
+          priority: "medium",
+        },
+      ],
+    });
+
+    expect(payload.goals).toEqual([]);
+  });
 });
 
 describe("buildSnapshotFromValues", () => {

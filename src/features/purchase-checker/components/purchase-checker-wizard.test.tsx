@@ -325,6 +325,26 @@ describe("PurchaseCheckerWizard", () => {
     await waitFor(() => expect(pushSpy).toHaveBeenCalledWith("/checker/result"));
   });
 
+  it("runs one analysis when the final button is double-clicked", async () => {
+    const user = userEvent.setup();
+    let resolveAnalysis: (value: unknown) => void = () => {};
+    const analysis = new Promise((resolve) => {
+      resolveAnalysis = resolve;
+    });
+    const onRunCheck = vi.fn(() => analysis);
+
+    render(<PurchaseCheckerWizard onRunCheck={onRunCheck} />);
+
+    await completeWizardToPayment(user);
+    await user.dblClick(screen.getByRole("button", { name: /analyze purchase/i }));
+
+    await waitFor(() => expect(onRunCheck).toHaveBeenCalledTimes(1));
+
+    resolveAnalysis({});
+
+    await waitFor(() => expect(pushSpy).toHaveBeenCalledWith("/checker/result"));
+  });
+
   it("submits manual-check metadata fields with the analyzed purchase", async () => {
     const user = userEvent.setup();
     const onRunCheck = vi.fn().mockResolvedValue({});

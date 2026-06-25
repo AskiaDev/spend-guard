@@ -1,10 +1,10 @@
 import { createCloudModelClient } from "./cloud-model-client";
-import { createLocalModelClient } from "./local-model-client";
+import { getLocalModelClient } from "./local-model-client";
 import { createMockModelClient } from "./mock-model-client";
 import type { ModelClient, ModelClientId } from "./types";
 
 const FACTORIES: Record<ModelClientId, () => ModelClient> = {
-  local: createLocalModelClient,
+  local: getLocalModelClient,
   cloud: createCloudModelClient,
   mock: createMockModelClient,
 };

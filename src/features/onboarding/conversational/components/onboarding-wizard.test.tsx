@@ -25,3 +25,23 @@ it("starts on welcome and advances to the intent screen", async () => {
     screen.getByRole("heading", { name: /what do you want spendguard to help/i })
   ).toBeInTheDocument();
 });
+
+it("goes back one onboarding step", async () => {
+  render(<OnboardingWizard />);
+  await userEvent.click(screen.getByRole("button", { name: /set up my guardrail/i }));
+
+  await userEvent.click(screen.getByRole("button", { name: /go back/i }));
+
+  expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "1");
+});
+
+it("shows go back on interstitial onboarding steps", async () => {
+  render(<OnboardingWizard />);
+  await userEvent.click(screen.getByRole("button", { name: /set up my guardrail/i }));
+  await userEvent.click(screen.getByRole("button", { name: /continue/i }));
+  await userEvent.click(screen.getByRole("button", { name: /continue/i }));
+
+  await userEvent.click(screen.getByRole("button", { name: /go back/i }));
+
+  expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "3");
+});

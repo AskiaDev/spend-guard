@@ -5,7 +5,11 @@ import { DashboardOverview } from "@/features/dashboard";
 import { DebtsPanel } from "@/features/debts";
 import { ExpensesPanel } from "@/features/expenses";
 import { GoalsPanel } from "@/features/goals";
-import { PurchaseCheckerWizard, PurchaseResult } from "@/features/purchase-checker";
+import {
+  LocalAdvisorGate,
+  PurchaseCheckerWizard,
+  PurchaseResult,
+} from "@/features/purchase-checker";
 import { ReportsPanel } from "@/features/reports";
 import { SettingsPanel } from "@/features/settings";
 import { VoicePurchaseChecker } from "@/features/voice";
@@ -45,6 +49,9 @@ vi.mock("@/features/goals", () => ({
 }));
 
 vi.mock("@/features/purchase-checker", () => ({
+  LocalAdvisorGate: vi.fn(({ children }: { children: React.ReactNode }) => (
+    <div data-testid="local-advisor-gate">{children}</div>
+  )),
   PurchaseCheckerWizard: vi.fn(() => <div data-testid="purchase-checker-wizard" />),
   PurchaseResult: vi.fn(({ check }: { check?: { itemName: string } }) => (
     <div data-testid="purchase-result">{check?.itemName ?? "Example decision"}</div>
@@ -164,7 +171,9 @@ describe("page adapters", () => {
   it("passes the purchase-check mutation to the checker wizard", () => {
     render(<PurchaseCheckerPageContent />);
 
+    expect(screen.getByTestId("local-advisor-gate")).toBeInTheDocument();
     expect(screen.getByTestId("purchase-checker-wizard")).toBeInTheDocument();
+    expect(LocalAdvisorGate).toHaveBeenCalledOnce();
     expect(PurchaseCheckerWizard).toHaveBeenCalledOnce();
 
     const props = vi.mocked(PurchaseCheckerWizard).mock.calls[0][0];
@@ -202,8 +211,10 @@ describe("page adapters", () => {
     vi.mocked(useFinancialStateContext).mockReturnValue(initialState);
     const { rerender } = render(<PurchaseResultPageContent />);
 
+    expect(screen.getByTestId("local-advisor-gate")).toBeInTheDocument();
     expect(screen.getByTestId("purchase-result")).toBeInTheDocument();
     expect(screen.getByText("Example decision")).toBeInTheDocument();
+    expect(LocalAdvisorGate).toHaveBeenCalledOnce();
     expect(PurchaseResult).toHaveBeenCalledOnce();
 
     const initialProps = vi.mocked(PurchaseResult).mock.calls[0][0];
@@ -223,6 +234,7 @@ describe("page adapters", () => {
 
     expect(screen.queryByText("Example decision")).not.toBeInTheDocument();
     expect(screen.getByText(latestCheck.itemName)).toBeInTheDocument();
+    expect(LocalAdvisorGate).toHaveBeenCalledTimes(2);
     expect(PurchaseResult).toHaveBeenCalledTimes(2);
     const updatedProps = vi.mocked(PurchaseResult).mock.calls[1][0];
     expect(updatedProps.check).toBe(latestCheck);
@@ -313,4 +325,3 @@ describe("page adapters", () => {
   });
 
 });
-
