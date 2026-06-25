@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm, useWatch, type Path } from "react-hook-form";
+import { useForm, type Path } from "react-hook-form";
 import { useRouter } from "next/navigation";
 import { saveFinancialProfileAction } from "@/features/financial-profile/api/save-financial-profile";
 import { financialProfileSchema } from "@/lib/schemas/finance";
@@ -74,9 +74,6 @@ export function OnboardingWizard() {
     setError,
     clearErrors,
   } = useForm<OnboardingFormValues>({ defaultValues: DEFAULT_VALUES });
-
-  // Live snapshot so the Review summary reflects in-progress edits.
-  const watchedValues = useWatch({ control }) as OnboardingFormValues;
 
   /** Step 0 gate: validate the profile subset, surface field errors, allow/deny advance. */
   function isProfileStepValid(): boolean {
@@ -197,7 +194,7 @@ export function OnboardingWizard() {
         <StepGoals register={register} control={control} errors={errors} />
       ) : null}
       {isReview ? (
-        <StepReview values={watchedValues} onEdit={(index) => setStep(index)} />
+        <StepReview values={getValues()} onEdit={(index) => setStep(index)} />
       ) : null}
     </OnboardingShell>
   );
