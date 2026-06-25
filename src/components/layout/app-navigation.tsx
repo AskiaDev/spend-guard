@@ -61,8 +61,8 @@ function DesktopNavigationLink({ item }: { item: NavigationItem }) {
       aria-current={isCurrent ? "page" : undefined}
       aria-label={item.label}
       className={cn(
-        "flex h-11 items-center gap-3 rounded-control px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-foreground",
-        isCurrent && "bg-primary text-white shadow-sm hover:bg-primary hover:text-white"
+        "flex h-11 items-center gap-3 rounded-control px-3 text-sm font-semibold text-muted-foreground transition hover:bg-white/5 hover:text-foreground",
+        isCurrent && "bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary"
       )}
     >
       <Icon className="size-5" aria-hidden="true" />
@@ -82,8 +82,8 @@ function MobileNavigationLink({ item }: { item: (typeof primaryNavigation)[numbe
       aria-current={isCurrent ? "page" : undefined}
       aria-label={item.mobileLabel}
       className={cn(
-        "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-control px-1 py-2 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-foreground",
-        isCurrent && "bg-advisor text-primary hover:bg-advisor hover:text-primary"
+        "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-control px-1 py-2 text-xs font-semibold text-muted-foreground transition hover:bg-white/5 hover:text-foreground",
+        isCurrent && "bg-primary/10 text-primary hover:bg-primary/10 hover:text-primary"
       )}
     >
       <Icon className="size-5" aria-hidden="true" />
@@ -112,7 +112,7 @@ export function AppMobileNavigation() {
   return (
     <nav
       aria-label="Mobile primary navigation"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface/95 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] shadow-elevated backdrop-blur lg:hidden"
+      className="glass fixed inset-x-0 bottom-0 z-40 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] lg:hidden"
     >
       <div className="mx-auto flex max-w-md gap-1">
         {primaryNavigation.map((item) => (

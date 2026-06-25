@@ -1,7 +1,14 @@
 "use client";
 
 import { LogOut, UserRound } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface AuthStatusProps {
   email: string;
@@ -10,22 +17,26 @@ interface AuthStatusProps {
 
 export function AuthStatus(props: AuthStatusProps) {
   return (
-    <div
-      data-testid="auth-status"
-      className="grid min-w-0 gap-2 rounded-control border border-border bg-surface p-3 text-foreground"
-    >
-      <div className="flex min-w-0 items-center gap-2">
-        <UserRound className="size-4 shrink-0 text-muted" aria-hidden="true" />
-        <span className="min-w-0 truncate text-xs font-medium" title={props.email}>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        data-testid="auth-status"
+        className="flex min-w-0 items-center gap-2 rounded-control border border-border bg-card px-3 py-2 text-xs font-medium text-foreground transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        <UserRound className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <span className="min-w-0 truncate" title={props.email}>
           {props.email}
         </span>
-      </div>
-      <form action={props.signOutAction} className="w-full">
-        <Button type="submit" variant="ghost" size="sm" className="h-9 w-full justify-start px-2">
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="truncate text-xs font-normal text-muted-foreground">
+          {props.email}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => void props.signOutAction()}>
           <LogOut className="size-4" aria-hidden="true" />
           Sign out
-        </Button>
-      </form>
-    </div>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

@@ -16,7 +16,7 @@ export function AppShell({
 }) {
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[240px] flex-col border-r border-border bg-surface px-4 py-5 lg:flex">
+      <aside className="glass fixed inset-y-0 left-0 z-30 hidden w-[240px] flex-col px-4 py-5 lg:flex">
         <SpendGuardLogo />
 
         <div className="mt-8 flex-1">
@@ -24,12 +24,12 @@ export function AppShell({
         </div>
 
         <div className="grid min-w-0 gap-3">
-          <div className="min-w-0 rounded-control border border-border bg-advisor p-3">
+          <div className="glass-elevated min-w-0 rounded-control p-3">
             <div className="flex items-center gap-3">
               <AdvisorAvatar className="size-10" />
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground">Advisor ready</p>
-                <p className="mt-0.5 truncate text-xs leading-5 text-muted">
+                <p className="mt-0.5 truncate text-xs leading-5 text-muted-foreground">
                   Check before you spend.
                 </p>
               </div>

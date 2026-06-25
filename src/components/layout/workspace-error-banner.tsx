@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useFinancialStateContext } from "@/providers/financial-state-provider";
 
 export function WorkspaceErrorBanner() {
@@ -15,9 +16,9 @@ export function WorkspaceErrorBanner() {
       className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-control border border-risk/30 bg-red-50 p-4 text-sm text-risk"
     >
       <span>{error}</span>
-      <button type="button" className="font-semibold underline" onClick={() => void refresh()}>
+      <Button type="button" variant="ghost" size="sm" onClick={() => void refresh()}>
         Retry
-      </button>
+      </Button>
     </div>
   );
 }

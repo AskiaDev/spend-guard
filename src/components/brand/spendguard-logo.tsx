@@ -45,7 +45,7 @@ export function SpendGuardLogo({
           <p className="text-base font-semibold leading-none tracking-tight text-foreground">
             SpendGuard
           </p>
-          <p className="mt-1 text-xs font-medium text-muted">Personal finance coach</p>
+          <p className="mt-1 text-xs font-medium text-muted-foreground">Personal finance coach</p>
         </div>
       ) : (
         <span className="sr-only">SpendGuard</span>
