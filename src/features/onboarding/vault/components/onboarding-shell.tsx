@@ -146,10 +146,21 @@ export function OnboardingShell({
 
           {/* Step body - animated on step change. The vault wizard uses
               mode="wait" (one panel at a time). The conversational flow (which
-              supplies its own `progress`) uses the default sync mode so the
-              incoming step mounts immediately and cross-fades, with no flash of
-              empty content across its many short screens. */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+              supplies its own `progress`) uses sync mode so the incoming step
+              mounts immediately, avoiding the one-frame empty gap of wait mode.
+              The container is a single-cell grid and both motion.div children
+              occupy that same cell (gridArea "1 / 1"), so the exiting and
+              entering steps overlap and cross-fade with zero layout shift
+              instead of stacking vertically. In wait mode only one child is ever
+              mounted, so it simply fills the single cell - harmless. */}
+          <div
+            style={{
+              flex: 1,
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr)",
+              minHeight: 0,
+            }}
+          >
             <AnimatePresence mode={progress ? "sync" : "wait"} initial={false}>
               <motion.div
                 key={step}
@@ -169,7 +180,12 @@ export function OnboardingShell({
                   duration: 0.22,
                   ease: [0.4, 0, 0.2, 1],
                 }}
-                style={{ flex: 1, display: "flex", flexDirection: "column" }}
+                style={{
+                  gridArea: "1 / 1",
+                  display: "flex",
+                  flexDirection: "column",
+                  minWidth: 0,
+                }}
               >
                 {children}
               </motion.div>
