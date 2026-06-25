@@ -5,14 +5,22 @@ import type { FinancialSnapshot } from "@/types/finance";
 import { describeHealthStatus, generateAdvisorInsight } from "./advisor-insight";
 
 function snapshot(overrides: Partial<FinancialSnapshot["profile"]> = {}): FinancialSnapshot {
+  const baseProfile: FinancialSnapshot["profile"] = {
+    currency: "PHP",
+    monthlyIncome: 60000,
+    currentSavings: 120000,
+    emergencyFundTarget: 120000,
+    emergencyBuffer: 24000,
+    cooldownPreference: "balanced",
+    estimatedVariableExpenses: 8000,
+  };
+
   return {
     profile: {
-      currency: "PHP",
-      monthlyIncome: 60000,
-      currentSavings: 120000,
-      emergencyFundTarget: 120000,
-      estimatedVariableExpenses: 8000,
+      ...baseProfile,
       ...overrides,
+      emergencyBuffer: overrides.emergencyBuffer ?? baseProfile.emergencyBuffer,
+      cooldownPreference: overrides.cooldownPreference ?? baseProfile.cooldownPreference,
     },
     expenses: [],
     debts: [],

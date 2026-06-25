@@ -3,6 +3,7 @@ import { PAY_FREQUENCIES } from "@/types/finance";
 
 const money = z.coerce.number().min(0, "Enter a positive amount.");
 const dueDay = z.coerce.number().int().min(1).max(31);
+const nonBlankArrayItem = z.string().trim().min(1);
 const emptyToUndefined = (value: unknown) =>
   value === "" || value === null || value === undefined ? undefined : value;
 const optionalInstallmentMonths = z.preprocess(
@@ -71,7 +72,11 @@ export const financialProfileSchema = z.object({
   currency: z.enum(["PHP", "USD", "EUR", "JPY", "SGD"]).default("PHP"),
   monthlyIncome: money,
   currentSavings: money,
-  emergencyFundTarget: money,
+  emergencyBuffer: money.default(0),
+  cooldownPreference: z.enum(["light", "balanced", "strict"]).default("balanced"),
+  intent: z.array(nonBlankArrayItem).default([]),
+  spendingPainPoints: z.array(nonBlankArrayItem).default([]),
+  emergencyFundTarget: money.default(0),
   fullName: z.preprocess(
     emptyToUndefined,
     z.string().trim().max(120, "Keep the name under 120 characters.").optional()

@@ -6,42 +6,36 @@ import {
 } from "./emergency-fund";
 
 describe("PRD emergency-fund calculations", () => {
-  it("calculates emergency fund progress as a bounded percentage", () => {
-    expect(
-      calculateEmergencyFundProgress({
-        currentSavings: 120_000,
-        emergencyFundTarget: 180_000,
-      })
-    ).toBe(67);
-    expect(
-      calculateEmergencyFundProgress({
-        currentSavings: 250_000,
-        emergencyFundTarget: 180_000,
-      })
-    ).toBe(100);
+  describe("calculateEmergencyBuffer", () => {
+    it("returns the chosen buffer", () => {
+      expect(calculateEmergencyBuffer({ currentSavings: 8000, emergencyBuffer: 10000 })).toBe(
+        10000
+      );
+    });
+
+    it("does not cap the buffer at current savings", () => {
+      expect(calculateEmergencyBuffer({ currentSavings: 3000, emergencyBuffer: 20000 })).toBe(
+        20000
+      );
+    });
+
+    it("clamps a negative buffer to zero", () => {
+      expect(calculateEmergencyBuffer({ currentSavings: 5000, emergencyBuffer: -100 })).toBe(0);
+    });
   });
 
-  it("returns zero progress when the target is not positive", () => {
-    expect(
-      calculateEmergencyFundProgress({
-        currentSavings: 10_000,
-        emergencyFundTarget: 0,
-      })
-    ).toBe(0);
-  });
+  describe("calculateEmergencyFundProgress", () => {
+    it("is zero when the buffer is zero", () => {
+      expect(calculateEmergencyFundProgress({ currentSavings: 5000, emergencyBuffer: 0 })).toBe(0);
+    });
 
-  it("derives the snapshot emergency buffer from the PRD protected-savings example", () => {
-    expect(
-      calculateEmergencyBuffer({
-        currentSavings: 24_000,
-        emergencyFundTarget: 100_000,
-      })
-    ).toBe(20_000);
-    expect(
-      calculateEmergencyBuffer({
-        currentSavings: 5_000,
-        emergencyFundTarget: 100_000,
-      })
-    ).toBe(5_000);
+    it("is the savings-to-buffer ratio, capped at 100", () => {
+      expect(calculateEmergencyFundProgress({ currentSavings: 5000, emergencyBuffer: 10000 })).toBe(
+        50
+      );
+      expect(
+        calculateEmergencyFundProgress({ currentSavings: 12000, emergencyBuffer: 10000 })
+      ).toBe(100);
+    });
   });
 });

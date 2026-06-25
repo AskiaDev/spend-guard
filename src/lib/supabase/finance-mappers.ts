@@ -2,6 +2,7 @@ import { calculateCooldownDays } from "@/lib/calculations/purchase-decision";
 import { emptySnapshot } from "@/lib/storage/default-data";
 import type { Database, Json } from "@/types/database";
 import type {
+  CooldownPreference,
   CurrencyCode,
   FinancialWorkspace,
   GoalPriority,
@@ -34,6 +35,10 @@ function stringReasons(value: Json): string[] {
     : [];
 }
 
+function stringList(value: string[] | null | undefined): string[] {
+  return Array.isArray(value) ? [...value] : [];
+}
+
 export function mapFinancialWorkspaceRows(rows: FinancialWorkspaceRows): FinancialWorkspace {
   const profile = rows.profile
     ? {
@@ -45,6 +50,14 @@ export function mapFinancialWorkspaceRows(rows: FinancialWorkspaceRows): Financi
         monthlyIncome: Number(rows.profile.monthly_income),
         currentSavings: Number(rows.profile.current_savings),
         emergencyFundTarget: Number(rows.profile.emergency_fund_target),
+        emergencyBuffer: Number(rows.profile.emergency_buffer ?? 0),
+        cooldownPreference: enumValue<CooldownPreference>(
+          rows.profile.cooldown_preference ?? "balanced",
+          ["light", "balanced", "strict"],
+          "balanced"
+        ),
+        intent: stringList(rows.profile.intent),
+        spendingPainPoints: stringList(rows.profile.spending_pain_points),
         fullName: rows.profile.full_name ?? undefined,
         payFrequency: enumValue<PayFrequency>(
           rows.profile.pay_frequency ?? "monthly",

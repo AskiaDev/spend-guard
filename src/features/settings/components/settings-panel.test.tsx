@@ -58,6 +58,8 @@ describe("SettingsPanel", () => {
       monthlyIncome: 95_000,
       currentSavings: 120_000,
       emergencyFundTarget: 180_000,
+      emergencyBuffer: 36_000,
+      cooldownPreference: "balanced",
       payFrequency: "weekly",
       estimatedVariableExpenses: 12_000,
     });

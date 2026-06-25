@@ -13,6 +13,8 @@ const weakSnapshot: FinancialSnapshot = {
     monthlyIncome: 30_000,
     currentSavings: 3_000,
     emergencyFundTarget: 50_000,
+    emergencyBuffer: 3_000,
+    cooldownPreference: "balanced",
     estimatedVariableExpenses: 5_000,
   },
   expenses: [{ id: "rent", label: "Rent", amount: 10_000, dueDay: 1, isRecurring: true }],
@@ -28,6 +30,8 @@ const stableSnapshot: FinancialSnapshot = {
     monthlyIncome: 90_000,
     currentSavings: 180_000,
     emergencyFundTarget: 150_000,
+    emergencyBuffer: 30_000,
+    cooldownPreference: "balanced",
     estimatedVariableExpenses: 12_000,
   },
   expenses: [

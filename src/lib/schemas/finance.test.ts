@@ -2,6 +2,19 @@ import { describe, expect, it } from "vitest";
 import { financialProfileSchema, purchaseInputSchema } from "./finance";
 
 describe("financialProfileSchema", () => {
+  const baseProfile = {
+    currency: "PHP",
+    monthlyIncome: 40_000,
+    currentSavings: 20_000,
+    emergencyBuffer: 10_000,
+    cooldownPreference: "strict",
+    intent: ["stop_impulse"],
+    spendingPainPoints: ["only_check_balance"],
+    emergencyFundTarget: 0,
+    payFrequency: "monthly",
+    estimatedVariableExpenses: 8_000,
+  };
+
   it("parses profile completeness fields and applies safe defaults", () => {
     expect(
       financialProfileSchema.parse({
@@ -14,6 +27,10 @@ describe("financialProfileSchema", () => {
       currency: "PHP",
       monthlyIncome: 90_000,
       currentSavings: 130_000,
+      emergencyBuffer: 0,
+      cooldownPreference: "balanced",
+      intent: [],
+      spendingPainPoints: [],
       emergencyFundTarget: 240_000,
       fullName: undefined,
       payFrequency: "monthly",
@@ -35,6 +52,57 @@ describe("financialProfileSchema", () => {
       payFrequency: "biweekly",
       estimatedVariableExpenses: 12_000,
     });
+  });
+
+  it("parses new onboarding profile fields", () => {
+    const parsed = financialProfileSchema.parse(baseProfile);
+
+    expect(parsed.emergencyBuffer).toBe(10_000);
+    expect(parsed.cooldownPreference).toBe("strict");
+    expect(parsed.intent).toEqual(["stop_impulse"]);
+    expect(parsed.spendingPainPoints).toEqual(["only_check_balance"]);
+  });
+
+  it("defaults cooldownPreference to balanced and arrays to empty when omitted", () => {
+    const parsed = financialProfileSchema.parse({
+      currency: baseProfile.currency,
+      monthlyIncome: baseProfile.monthlyIncome,
+      currentSavings: baseProfile.currentSavings,
+      emergencyBuffer: 0,
+      emergencyFundTarget: baseProfile.emergencyFundTarget,
+      payFrequency: baseProfile.payFrequency,
+      estimatedVariableExpenses: baseProfile.estimatedVariableExpenses,
+    });
+
+    expect(parsed.emergencyBuffer).toBe(0);
+    expect(parsed.cooldownPreference).toBe("balanced");
+    expect(parsed.intent).toEqual([]);
+    expect(parsed.spendingPainPoints).toEqual([]);
+  });
+
+  it("trims profile array items and rejects blank entries", () => {
+    const parsed = financialProfileSchema.parse({
+      ...baseProfile,
+      intent: ["  stop_impulse  "],
+      spendingPainPoints: ["  only_check_balance  "],
+    });
+
+    expect(parsed.intent).toEqual(["stop_impulse"]);
+    expect(parsed.spendingPainPoints).toEqual(["only_check_balance"]);
+
+    expect(() =>
+      financialProfileSchema.parse({
+        ...baseProfile,
+        intent: ["   "],
+      })
+    ).toThrow();
+
+    expect(() =>
+      financialProfileSchema.parse({
+        ...baseProfile,
+        spendingPainPoints: ["   "],
+      })
+    ).toThrow();
   });
 
   it("rejects unsupported pay frequency and negative variable expenses", () => {

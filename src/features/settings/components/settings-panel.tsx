@@ -56,7 +56,7 @@ export function SettingsPanel({
   async function submitSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
-    const parsed = parseSettingsForm(formValues);
+    const parsed = parseSettingsForm(formValues, profile);
 
     if (!parsed.ok) {
       setFormErrors(parsed.errors);
@@ -377,7 +377,10 @@ function toSettingsForm(profile: FinancialProfile): SettingsFormValues {
   };
 }
 
-function parseSettingsForm(values: SettingsFormValues):
+function parseSettingsForm(
+  values: SettingsFormValues,
+  currentProfile: FinancialProfile
+):
   | { ok: true; profile: FinancialProfile }
   | { ok: false; errors: SettingsFormErrors } {
   const errors: SettingsFormErrors = {};
@@ -427,6 +430,8 @@ function parseSettingsForm(values: SettingsFormValues):
       monthlyIncome,
       currentSavings,
       emergencyFundTarget,
+      emergencyBuffer: currentProfile.emergencyBuffer,
+      cooldownPreference: currentProfile.cooldownPreference,
       payFrequency: values.payFrequency,
       estimatedVariableExpenses,
     },

@@ -16,6 +16,8 @@ const stableSnapshot: FinancialSnapshot = {
     monthlyIncome: 90_000,
     currentSavings: 180_000,
     emergencyFundTarget: 150_000,
+    emergencyBuffer: 30_000,
+    cooldownPreference: "balanced",
     estimatedVariableExpenses: 12_000,
   },
   expenses: [
@@ -80,6 +82,26 @@ describe("purchase decision compatibility wrapper", () => {
       cooldownDays: 3,
     });
     expect(result.reasons).toContain("You have debt due within the next 30 days.");
+  });
+
+  it("passes the profile cooldown preference into the cooldown calculation", () => {
+    const result = calculatePurchaseDecision(
+      {
+        ...stableSnapshot,
+        profile: {
+          ...stableSnapshot.profile,
+          cooldownPreference: "strict",
+        },
+      },
+      {
+        itemName: "Standing desk",
+        amount: 15_000,
+        urgency: "can_wait",
+        paymentMethod: "cash",
+      }
+    );
+
+    expect(result.cooldownDays).toBe(14);
   });
 
   it("uses down payment for savings-after-purchase on non-cash purchases", () => {

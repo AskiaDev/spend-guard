@@ -9,6 +9,7 @@ import {
 } from "@/lib/schemas/finance";
 import { requireUserId } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types/action-result";
+import { toProfileRow } from "./to-profile-row";
 
 const setupSchema = z.object({
   profile: financialProfileSchema,
@@ -36,19 +37,7 @@ export async function saveFinancialProfileAction(
 
     const profileResult = await supabase
       .from("profiles")
-      .upsert(
-        {
-          user_id: userId,
-          currency: profile.currency,
-          monthly_income: profile.monthlyIncome,
-          current_savings: profile.currentSavings,
-          emergency_fund_target: profile.emergencyFundTarget,
-          full_name: profile.fullName?.trim() || null,
-          pay_frequency: profile.payFrequency,
-          estimated_variable_expenses: profile.estimatedVariableExpenses,
-        },
-        { onConflict: "user_id" }
-      );
+      .upsert(toProfileRow(userId, profile), { onConflict: "user_id" });
 
     if (profileResult.error) {
       console.error("Unable to save Supabase profile", profileResult.error);

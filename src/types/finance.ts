@@ -12,6 +12,8 @@ export type PurchaseUrgency = "need_now" | "need_this_month" | "can_wait" | "wan
 
 export type GoalPriority = "high" | "medium" | "low";
 
+export type CooldownPreference = "light" | "balanced" | "strict";
+
 export const PURCHASE_CHECK_STATUSES = ["checked", "bought", "skipped"] as const;
 
 export type PurchaseCheckStatus = (typeof PURCHASE_CHECK_STATUSES)[number];
@@ -32,6 +34,10 @@ export interface FinancialProfile {
   monthlyIncome: number;
   currentSavings: number;
   emergencyFundTarget: number;
+  emergencyBuffer: number;
+  cooldownPreference: CooldownPreference;
+  intent?: string[];
+  spendingPainPoints?: string[];
   fullName?: string;
   payFrequency?: PayFrequency;
   estimatedVariableExpenses?: number;

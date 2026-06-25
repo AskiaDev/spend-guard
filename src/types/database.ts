@@ -11,6 +11,10 @@ export interface Database {
           monthly_income: number;
           current_savings: number;
           emergency_fund_target: number;
+          emergency_buffer: number;
+          cooldown_preference: string;
+          intent: string[];
+          spending_pain_points: string[];
           full_name: string | null;
           pay_frequency: string;
           estimated_variable_expenses: number;
@@ -24,6 +28,10 @@ export interface Database {
           monthly_income: number;
           current_savings: number;
           emergency_fund_target: number;
+          emergency_buffer?: number;
+          cooldown_preference?: string;
+          intent?: string[];
+          spending_pain_points?: string[];
           full_name?: string | null;
           pay_frequency?: string;
           estimated_variable_expenses?: number;

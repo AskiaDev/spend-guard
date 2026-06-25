@@ -7,14 +7,22 @@ import { generateWeeklyReportInsights } from "./weekly-report";
 const WEEK_START = "2026-06-15"; // Monday
 
 function snapshot(overrides: Partial<FinancialSnapshot["profile"]> = {}, debts: FinancialSnapshot["debts"] = []): FinancialSnapshot {
+  const baseProfile: FinancialSnapshot["profile"] = {
+    currency: "PHP",
+    monthlyIncome: 85000,
+    currentSavings: 200000,
+    emergencyFundTarget: 100000,
+    emergencyBuffer: 20000,
+    cooldownPreference: "balanced",
+    estimatedVariableExpenses: 10000,
+  };
+
   return {
     profile: {
-      currency: "PHP",
-      monthlyIncome: 85000,
-      currentSavings: 200000,
-      emergencyFundTarget: 100000,
-      estimatedVariableExpenses: 10000,
+      ...baseProfile,
       ...overrides,
+      emergencyBuffer: overrides.emergencyBuffer ?? baseProfile.emergencyBuffer,
+      cooldownPreference: overrides.cooldownPreference ?? baseProfile.cooldownPreference,
     },
     expenses: [],
     debts,

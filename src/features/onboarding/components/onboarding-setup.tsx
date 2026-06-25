@@ -591,14 +591,19 @@ function buildDefaultValues(snapshot: FinancialSnapshot): OnboardingFormValues {
 }
 
 function buildSnapshotPayload(values: OnboardingFormValues): FinancialSnapshot {
+  const currentSavings = toNumber(values.currentSavings);
+  const emergencyFundTarget = toNumber(values.emergencyFundTarget);
   const profile = {
     currency: values.currency,
     fullName: values.fullName.trim() || undefined,
     payFrequency: values.payFrequency,
     monthlyIncome: toNumber(values.monthlyIncome),
     estimatedVariableExpenses: toNumber(values.estimatedVariableExpenses),
-    currentSavings: toNumber(values.currentSavings),
-    emergencyFundTarget: toNumber(values.emergencyFundTarget),
+    currentSavings,
+    emergencyFundTarget,
+    // TODO: Replace the old vault flow with the conversational onboarding chosen buffer.
+    emergencyBuffer: emergencyFundTarget,
+    cooldownPreference: "balanced" as const,
   };
   const expenses = [
     { label: "Housing", amount: toNumber(values.housingExpense), dueDay: 1 },

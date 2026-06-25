@@ -32,6 +32,10 @@ describe("mapFinancialWorkspaceRows", () => {
         monthly_income: 90_000,
         current_savings: 180_000,
         emergency_fund_target: 150_000,
+        emergency_buffer: 100_000,
+        cooldown_preference: "strict",
+        intent: ["stop_impulse"],
+        spending_pain_points: ["forget_bills"],
         full_name: "Askia Manjares",
         pay_frequency: "biweekly",
         estimated_variable_expenses: 12_500,
@@ -135,6 +139,10 @@ describe("mapFinancialWorkspaceRows", () => {
 
     expect(workspace.snapshot.profile).toMatchObject({
       monthlyIncome: 90_000,
+      emergencyBuffer: 100_000,
+      cooldownPreference: "strict",
+      intent: ["stop_impulse"],
+      spendingPainPoints: ["forget_bills"],
       fullName: "Askia Manjares",
       payFrequency: "biweekly",
       estimatedVariableExpenses: 12_500,
@@ -189,6 +197,10 @@ describe("mapFinancialWorkspaceRows", () => {
         monthly_income: 0,
         current_savings: 0,
         emergency_fund_target: 0,
+        emergency_buffer: 0,
+        cooldown_preference: "unexpected",
+        intent: [],
+        spending_pain_points: [],
         full_name: null,
         pay_frequency: "unexpected",
         estimated_variable_expenses: 0,
@@ -280,6 +292,10 @@ describe("mapFinancialWorkspaceRows", () => {
     });
 
     expect(workspace.snapshot.profile.currency).toBe("PHP");
+    expect(workspace.snapshot.profile.emergencyBuffer).toBe(0);
+    expect(workspace.snapshot.profile.cooldownPreference).toBe("balanced");
+    expect(workspace.snapshot.profile.intent).toEqual([]);
+    expect(workspace.snapshot.profile.spendingPainPoints).toEqual([]);
     expect(workspace.snapshot.profile.fullName).toBeUndefined();
     expect(workspace.snapshot.profile.payFrequency).toBe("monthly");
     expect(workspace.snapshot.profile.estimatedVariableExpenses).toBe(0);

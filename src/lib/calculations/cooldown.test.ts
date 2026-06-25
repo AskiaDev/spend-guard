@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getCooldownDays } from "./cooldown";
-import { calculateCooldownDays } from "./purchase-decision";
+import { calculateCooldownDays, getCooldownDays } from "./cooldown";
 
 describe("PRD cooldown recommendations", () => {
   it("uses price tiers from PRD section 19.5", () => {
@@ -21,5 +20,18 @@ describe("PRD cooldown recommendations", () => {
         urgency: "need_now",
       })
     ).toBe(30);
+  });
+
+  it("defaults to balanced strictness", () => {
+    expect(calculateCooldownDays({ amount: 15_000 })).toBe(getCooldownDays(15_000));
+  });
+
+  it("halves the cooldown on light, with a 1-day floor", () => {
+    expect(calculateCooldownDays({ amount: 15_000, preference: "light" })).toBe(4);
+    expect(calculateCooldownDays({ amount: 1_000, preference: "light" })).toBe(1);
+  });
+
+  it("doubles the cooldown on strict", () => {
+    expect(calculateCooldownDays({ amount: 15_000, preference: "strict" })).toBe(14);
   });
 });

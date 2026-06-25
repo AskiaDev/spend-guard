@@ -1,5 +1,6 @@
 "use server";
 
+import { toProfileRow } from "@/features/financial-profile/api/to-profile-row";
 import { financialProfileSchema } from "@/lib/schemas/finance";
 import { requireUserId } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types/action-result";
@@ -35,14 +36,7 @@ export async function updateProfileSettingsAction(input: unknown): Promise<Actio
       .from("profiles")
       .upsert(
         {
-          user_id: userId,
-          currency: profile.currency,
-          monthly_income: profile.monthlyIncome,
-          current_savings: profile.currentSavings,
-          emergency_fund_target: profile.emergencyFundTarget,
-          full_name: profile.fullName?.trim() || null,
-          pay_frequency: profile.payFrequency,
-          estimated_variable_expenses: profile.estimatedVariableExpenses,
+          ...toProfileRow(userId, profile),
           onboarding_completed: true,
         },
         { onConflict: "user_id" }

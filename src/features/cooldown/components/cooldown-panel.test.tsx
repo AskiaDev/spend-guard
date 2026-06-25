@@ -12,6 +12,8 @@ const snapshot: FinancialSnapshot = {
     monthlyIncome: 90_000,
     currentSavings: 200_000,
     emergencyFundTarget: 100_000,
+    emergencyBuffer: 20_000,
+    cooldownPreference: "balanced",
     estimatedVariableExpenses: 10_000,
   },
   expenses: [{ id: "rent", label: "Rent", amount: 20_000, dueDay: 1, isRecurring: true }],

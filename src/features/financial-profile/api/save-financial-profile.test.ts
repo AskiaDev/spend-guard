@@ -48,6 +48,11 @@ describe("saveFinancialProfileAction", () => {
       expect.objectContaining({
         user_id: "user-1",
         monthly_income: 90_000,
+        emergency_buffer: 0,
+        cooldown_preference: "balanced",
+        intent: [],
+        spending_pain_points: [],
+        emergency_fund_target: 0,
         full_name: null,
         pay_frequency: "monthly",
         estimated_variable_expenses: 0,
@@ -64,6 +69,10 @@ describe("saveFinancialProfileAction", () => {
           currency: "PHP",
           monthlyIncome: 90_000,
           currentSavings: 180_000,
+          emergencyBuffer: 100_000,
+          cooldownPreference: "strict",
+          intent: ["stop_impulse"],
+          spendingPainPoints: ["forget_bills"],
           emergencyFundTarget: 150_000,
           fullName: "  Askia  ",
           payFrequency: "weekly",
@@ -77,6 +86,11 @@ describe("saveFinancialProfileAction", () => {
 
     expect(mocks.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
+        emergency_buffer: 100_000,
+        cooldown_preference: "strict",
+        intent: ["stop_impulse"],
+        spending_pain_points: ["forget_bills"],
+        emergency_fund_target: 0,
         full_name: "Askia",
         pay_frequency: "weekly",
         estimated_variable_expenses: 12_000,

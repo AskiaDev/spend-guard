@@ -1,4 +1,4 @@
-import type { PurchaseUrgency } from "@/types/finance";
+import type { CooldownPreference, PurchaseUrgency } from "@/types/finance";
 
 export function getCooldownDays(price: number): number {
   if (price < 2_000) {
@@ -16,12 +16,21 @@ export function getCooldownDays(price: number): number {
   return 30;
 }
 
+const STRICTNESS_MULTIPLIER: Record<CooldownPreference, number> = {
+  light: 0.5,
+  balanced: 1,
+  strict: 2,
+};
+
 export function calculateCooldownDays({
   amount,
+  preference = "balanced",
 }: {
   amount: number;
+  preference?: CooldownPreference;
   safeToSpend?: number;
   urgency?: PurchaseUrgency;
 }): number {
-  return getCooldownDays(amount);
+  const base = getCooldownDays(amount);
+  return Math.max(1, Math.round(base * STRICTNESS_MULTIPLIER[preference]));
 }

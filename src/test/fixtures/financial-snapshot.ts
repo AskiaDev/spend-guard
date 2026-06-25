@@ -6,6 +6,8 @@ export const financialSnapshotFixture: FinancialSnapshot = {
     monthlyIncome: 85000,
     currentSavings: 120000,
     emergencyFundTarget: 180000,
+    emergencyBuffer: 36000,
+    cooldownPreference: "balanced",
     fullName: "Askia",
     payFrequency: "monthly",
     estimatedVariableExpenses: 12000,

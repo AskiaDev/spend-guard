@@ -146,6 +146,8 @@ describe("useFinancialState Supabase mode", () => {
         monthlyIncome: 90_000,
         currentSavings: 180_000,
         emergencyFundTarget: 150_000,
+        emergencyBuffer: 30_000,
+        cooldownPreference: "balanced" as const,
       },
       expenses: [
         { id: "expense-1", label: "Rent", amount: 28_000, dueDay: 1, isRecurring: true },
@@ -228,6 +230,8 @@ describe("useFinancialState Supabase mode", () => {
         monthlyIncome: 100_000,
         currentSavings: 180_000,
         emergencyFundTarget: 150_000,
+        emergencyBuffer: 30_000,
+        cooldownPreference: "balanced",
         fullName: "Askia",
         payFrequency: "weekly",
         estimatedVariableExpenses: 12_000,

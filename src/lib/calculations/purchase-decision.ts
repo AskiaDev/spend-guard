@@ -238,8 +238,7 @@ export function calculatePurchaseDecision(
   });
   const cooldownDays = calculateCooldownDays({
     amount: purchase.amount,
-    safeToSpend,
-    urgency: purchase.urgency,
+    preference: snapshot.profile.cooldownPreference,
   });
   const goalDelayMonths = calculateGoalDelayMonths(snapshot, purchase);
   const reasons =
