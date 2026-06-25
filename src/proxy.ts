@@ -39,6 +39,20 @@ export async function readOnboardingCompleted(
 }
 
 export async function proxy(request: NextRequest) {
+  // Self-heal email confirmation. Supabase delivers the auth `code` (PKCE) or
+  // `token_hash`+`type` (OTP) to the project's Site URL root when the exact
+  // /auth/confirm callback is missing from the redirect allowlist, which leaves
+  // the code unexchanged and the user on a blank page. Forward any stray
+  // confirmation params to the route that actually exchanges them.
+  const { pathname, searchParams } = request.nextUrl;
+  const hasConfirmationParams =
+    searchParams.has("code") || (searchParams.has("token_hash") && searchParams.has("type"));
+  if (hasConfirmationParams && !pathname.startsWith("/auth/")) {
+    const confirmUrl = new URL("/auth/confirm", request.url);
+    confirmUrl.search = searchParams.toString();
+    return NextResponse.redirect(confirmUrl);
+  }
+
   let response = NextResponse.next({ request });
 
   if (!env.hasSupabaseConfig || !env.supabaseUrl || !env.supabasePublishableKey) {

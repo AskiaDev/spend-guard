@@ -1,5 +1,6 @@
+import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readOnboardingCompleted } from "./proxy";
+import { proxy, readOnboardingCompleted } from "./proxy";
 
 function createStatusClient(result: {
   data: { onboarding_completed: boolean } | null;
@@ -47,6 +48,26 @@ describe("readOnboardingCompleted", () => {
     expect(consoleError).toHaveBeenCalledWith(
       "Unable to read onboarding status",
       { message: "temporary outage" }
+    );
+  });
+});
+
+describe("proxy email-confirmation rescue", () => {
+  it("forwards a stray PKCE code to /auth/confirm", async () => {
+    const response = await proxy(new NextRequest("http://localhost:3000/?code=abc123"));
+
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/auth/confirm?code=abc123"
+    );
+  });
+
+  it("forwards a stray OTP token_hash to /auth/confirm", async () => {
+    const response = await proxy(
+      new NextRequest("http://localhost:3000/?token_hash=h1&type=signup")
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/auth/confirm?token_hash=h1&type=signup"
     );
   });
 });
