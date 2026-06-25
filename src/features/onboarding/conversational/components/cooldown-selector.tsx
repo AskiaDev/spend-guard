@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import type { CooldownPreference } from "@/types/finance";
 
 const OPTIONS: {
@@ -31,26 +31,41 @@ interface CooldownSelectorProps {
 }
 
 export function CooldownSelector({ value, onChange }: CooldownSelectorProps) {
+  const optionRefs = useRef<Record<CooldownPreference, HTMLButtonElement | null>>({
+    light: null,
+    balanced: null,
+    strict: null,
+  });
+
+  // Select an option AND move DOM focus to it - required by the ARIA radio
+  // group pattern so keyboard and screen-reader users keep their place when
+  // arrow keys change the selection (roving tabIndex strands focus otherwise).
+  const select = useCallback(
+    (next: CooldownPreference) => {
+      onChange(next);
+      optionRefs.current[next]?.focus();
+    },
+    [onChange],
+  );
+
   const handleKey = useCallback(
-    (e: React.KeyboardEvent, opt: CooldownPreference) => {
+    (e: React.KeyboardEvent) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        onChange(opt);
+        select(value);
+        return;
       }
+      const idx = OPTIONS.findIndex((o) => o.value === value);
       if (e.key === "ArrowDown" || e.key === "ArrowRight") {
         e.preventDefault();
-        const idx = OPTIONS.findIndex((o) => o.value === value);
-        const next = OPTIONS[(idx + 1) % OPTIONS.length];
-        onChange(next.value);
+        select(OPTIONS[(idx + 1) % OPTIONS.length].value);
       }
       if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
         e.preventDefault();
-        const idx = OPTIONS.findIndex((o) => o.value === value);
-        const prev = OPTIONS[(idx - 1 + OPTIONS.length) % OPTIONS.length];
-        onChange(prev.value);
+        select(OPTIONS[(idx - 1 + OPTIONS.length) % OPTIONS.length].value);
       }
     },
-    [value, onChange],
+    [value, select],
   );
 
   return (
@@ -79,13 +94,16 @@ export function CooldownSelector({ value, onChange }: CooldownSelectorProps) {
           return (
             <button
               key={opt.value}
+              ref={(el) => {
+                optionRefs.current[opt.value] = el;
+              }}
               type="button"
               role="radio"
               aria-checked={selected}
               tabIndex={selected ? 0 : -1}
               onClick={() => onChange(opt.value)}
-              onKeyDown={(e) => handleKey(e, opt.value)}
-              className="conv-card conv-radio-option"
+              onKeyDown={handleKey}
+              className="conv-radio-option"
               style={{
                 display: "flex",
                 alignItems: "flex-start",
