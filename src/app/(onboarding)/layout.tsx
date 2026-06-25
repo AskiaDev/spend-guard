@@ -1,19 +1,7 @@
-import { Schibsted_Grotesk, Hanken_Grotesk } from "next/font/google";
 import { redirect } from "next/navigation";
 import { env } from "@/config/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import "@/features/onboarding/vault/vault.css";
-
-const schibsted = Schibsted_Grotesk({
-  variable: "--font-schibsted",
-  subsets: ["latin"],
-  weight: ["400", "500", "700"],
-});
-const hanken = Hanken_Grotesk({
-  variable: "--font-hanken",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-});
 
 export const dynamic = "force-dynamic";
 
@@ -37,5 +25,5 @@ export default async function OnboardingLayout({ children }: { children: React.R
     redirect("/login");
   }
 
-  return <div className={`vault ${schibsted.variable} ${hanken.variable}`}>{children}</div>;
+  return <div className="vault">{children}</div>;
 }
