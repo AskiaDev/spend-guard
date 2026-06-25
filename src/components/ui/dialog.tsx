@@ -111,8 +111,7 @@ function DialogFooter({
       {children}
       {showCloseButton && (
         <DialogPrimitive.Close asChild>
-          {/* ponytail: "outline" → "secondary"; outline variant not in hand-rolled button until later task */}
-          <Button variant="secondary">Close</Button>
+          <Button variant="outline">Close</Button>
         </DialogPrimitive.Close>
       )}
     </div>
