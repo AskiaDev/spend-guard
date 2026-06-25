@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Schibsted_Grotesk, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
+import { ToastProvider } from "@/providers/toast-provider";
 
 const schibsted = Schibsted_Grotesk({
   variable: "--font-schibsted",
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     >
       <body className="flex min-h-full flex-col bg-background text-foreground">
         {children}
+        <ToastProvider />
       </body>
     </html>
   );
