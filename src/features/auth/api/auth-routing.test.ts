@@ -58,6 +58,10 @@ describe("getAuthRedirect", () => {
     expect(getAuthRedirect("/onboarding", true, false)).toBeNull();
   });
 
+  it("lets a not-yet-onboarded user reach the explore sandbox", () => {
+    expect(getAuthRedirect("/explore", true, false)).toBeNull();
+  });
+
   it("never forces auth callback routes into onboarding", () => {
     expect(getAuthRedirect("/auth/confirm", true, false)).toBeNull();
   });

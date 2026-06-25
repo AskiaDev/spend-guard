@@ -1,5 +1,7 @@
 const PUBLIC_PATHS = new Set(["/login", "/signup"]);
 const ONBOARDING_PATH = "/onboarding";
+const EXPLORE_PATH = "/explore";
+const ONBOARDING_ALLOWED_PATHS = new Set([ONBOARDING_PATH, EXPLORE_PATH]);
 const AWAY_FROM_WHEN_ONBOARDED = new Set(["/login", "/signup", ONBOARDING_PATH]);
 
 function isPublicPath(pathname: string): boolean {
@@ -17,8 +19,8 @@ export function getAuthRedirect(
 
   if (!onboardingCompleted) {
     // Authenticated but setup incomplete: funnel everything to onboarding,
-    // except the onboarding page itself and auth callbacks (avoid loops).
-    if (pathname === ONBOARDING_PATH || pathname.startsWith("/auth/")) {
+    // except allowed onboarding paths and auth callbacks (avoid loops).
+    if (ONBOARDING_ALLOWED_PATHS.has(pathname) || pathname.startsWith("/auth/")) {
       return null;
     }
 
