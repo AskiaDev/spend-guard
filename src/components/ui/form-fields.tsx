@@ -1,46 +1,14 @@
 import * as React from "react";
+
 import { cn } from "@/lib/utils";
 
-export function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) {
-  return (
-    <label
-      className={cn("text-xs font-semibold uppercase tracking-normal text-slate-600", className)}
-      {...props}
-    />
-  );
-}
+export { Input } from "@/components/ui/input";
+export { Label } from "@/components/ui/label";
+export { Textarea } from "@/components/ui/textarea";
 
-export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(
-  ({ className, ...props }, ref) => (
-    <input
-      ref={ref}
-      className={cn(
-        "h-11 w-full rounded-control border border-border bg-surface px-3 text-sm text-foreground shadow-sm outline-none transition placeholder:text-muted/70 focus:border-primary focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-muted",
-        className
-      )}
-      {...props}
-    />
-  )
-);
-
-Input.displayName = "Input";
-
-export const Textarea = React.forwardRef<
-  HTMLTextAreaElement,
-  React.TextareaHTMLAttributes<HTMLTextAreaElement>
->(({ className, ...props }, ref) => (
-  <textarea
-    ref={ref}
-    className={cn(
-      "min-h-24 w-full rounded-control border border-border bg-surface px-3 py-2.5 text-sm text-foreground shadow-sm outline-none transition placeholder:text-muted/70 focus:border-primary focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-muted",
-      className
-    )}
-    {...props}
-  />
-));
-
-Textarea.displayName = "Textarea";
-
+// ponytail: transitional native <Select>. Call sites migrate to Radix <Select> per surface
+// in Phase 2/3 (wizard, voice, settings, goals, expenses, onboarding-setup); delete this
+// export once the last consumer migrates.
 export const Select = React.forwardRef<
   HTMLSelectElement,
   React.SelectHTMLAttributes<HTMLSelectElement>
@@ -48,19 +16,15 @@ export const Select = React.forwardRef<
   <select
     ref={ref}
     className={cn(
-      "h-11 w-full rounded-control border border-border bg-surface px-3 text-sm text-foreground shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-muted",
+      "h-11 w-full rounded-control border border-input bg-secondary px-3 text-sm text-foreground outline-none transition focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
       className
     )}
     {...props}
   />
 ));
-
 Select.displayName = "Select";
 
 export function FieldError({ children }: { children?: React.ReactNode }) {
-  if (!children) {
-    return null;
-  }
-
+  if (!children) return null;
   return <p className="text-xs font-medium text-risk">{children}</p>;
 }
