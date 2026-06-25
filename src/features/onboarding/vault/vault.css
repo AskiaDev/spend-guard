@@ -29,6 +29,15 @@
   outline: 2px solid var(--vault-accent);
   outline-offset: 2px;
 }
+.vault .conv-card:focus-visible {
+  outline: 2px solid var(--vault-accent);
+  outline-offset: 2px;
+}
+.vault .conv-money:focus-within {
+  outline: 2px solid var(--vault-accent);
+  outline-offset: 2px;
+}
 @media (prefers-reduced-motion: reduce) {
   .vault * { animation: none !important; transition: none !important; }
+  .vault .conv-card, .vault .conv-card * { transition: none !important; }
 }
