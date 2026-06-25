@@ -1,54 +1,119 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
+/* Dark "vault" is the default theme - values live under :root. */
 :root {
-  --background: #f6f8fb;
-  --surface: #ffffff;
-  --border: #dfe5ee;
-  --foreground: #172033;
-  --muted: #64748b;
-  --primary: #155eef;
-  --safe: #15803d;
-  --caution: #b45309;
-  --risk: #dc2626;
-  --advisor: #eaf2ff;
+  /* base */
+  --background: #0a0e17;            /* solid fallback; gradient applied on body */
+  --foreground: #eaf0f7;
+  --card: rgba(255, 255, 255, 0.05);
+  --card-foreground: #eaf0f7;
+  --popover: #141d33;              /* opaque for menu/dialog legibility */
+  --popover-foreground: #eaf0f7;
+  --primary: #c6f24e;
+  --primary-foreground: #0a0e17;   /* ink on lime - ~14:1 */
+  --secondary: rgba(255, 255, 255, 0.08);
+  --secondary-foreground: #eaf0f7;
+  --muted: rgba(255, 255, 255, 0.06);
+  --muted-foreground: #9aa6ba;     /* retuned from #8a94a6 for AA on glass */
+  --accent: rgba(198, 242, 78, 0.12); /* subtle lime hover tint */
+  --accent-foreground: #eaf0f7;
+  --destructive: #ff8585;
+  --destructive-foreground: #0a0e17;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.14);
+  --ring: #c6f24e;
+
+  /* finance verdicts - brightened for dark */
+  --safe: #5fd08a;       --safe-foreground: #04210f;
+  --caution: #f0b450;    --caution-foreground: #2a1c03;
+  --risk: #ff8585;       --risk-foreground: #2a0606;
+
+  /* charts */
+  --chart-1: #c6f24e; --chart-2: #7fd93f; --chart-3: #5cc8ff;
+  --chart-4: #f0b450; --chart-5: #ff8585;
+
+  /* shape + elevation */
+  --radius: 0.75rem;
+  --radius-card: 1.375rem;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px rgb(0 0 0 / 0.35);
+  --shadow-elevated: 0 18px 48px rgb(0 0 0 / 0.5);
+
+  /* gradient + display fonts */
+  --vault-gradient: radial-gradient(125% 85% at 28% -10%, #17244e 0%, #0a0e17 58%);
 }
 
 @theme inline {
   --color-background: var(--background);
-  --color-surface: var(--surface);
-  --color-border: var(--border);
   --color-foreground: var(--foreground);
-  --color-muted: var(--muted);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
   --color-safe: var(--safe);
+  --color-safe-foreground: var(--safe-foreground);
   --color-caution: var(--caution);
+  --color-caution-foreground: var(--caution-foreground);
   --color-risk: var(--risk);
-  --color-advisor: var(--advisor);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --radius-control: 0.75rem;
-  --radius-card: 1.25rem;
-  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px rgb(15 23 42 / 0.05);
-  --shadow-elevated: 0 12px 32px rgb(15 23 42 / 0.1);
+  --color-risk-foreground: var(--risk-foreground);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --font-sans: var(--font-hanken);
+  --font-display: var(--font-schibsted);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --radius-control: var(--radius);
+  --radius-card: var(--radius-card);
+  --shadow-card: var(--shadow-card);
+  --shadow-elevated: var(--shadow-elevated);
 }
 
 body {
-  background: var(--background);
+  background: var(--vault-gradient) fixed;
   color: var(--foreground);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  min-height: 100dvh;
 }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
+h1, h2, h3, .font-display {
+  font-family: var(--font-schibsted), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.02em;
 }
+
+/* depth utilities - keep visual hierarchy out of inline styles */
+.glass {
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(12px);
+}
+.glass-elevated {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-elevated);
+  backdrop-filter: blur(16px);
+}
+.accent-glow { box-shadow: 0 0 0 1px rgb(198 242 78 / 0.3), 0 8px 28px rgb(198 242 78 / 0.18); }
+
+button, input, select, textarea { font: inherit; }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  ::before,
-  ::after {
+  *, ::before, ::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
