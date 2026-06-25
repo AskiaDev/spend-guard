@@ -33,6 +33,20 @@ const PROFILE_FIELDS: Path<OnboardingFormValues>[] = [
 
 const PROFILE_FIELD_SET = new Set<string>(PROFILE_FIELDS);
 
+// The canonical `money` schema coerces "" -> 0, so an otherwise-blank profile
+// would slip past the step-0 gate. Require a real (non-zero) monthly income
+// here in the wizard only, leaving the shared financialProfileSchema - and the
+// legacy onboarding flow that depends on it - unchanged.
+const profileGateSchema = financialProfileSchema.superRefine((value, ctx) => {
+  if (value.monthlyIncome <= 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["monthlyIncome"],
+      message: "Enter your monthly income above zero.",
+    });
+  }
+});
+
 const DEFAULT_VALUES: OnboardingFormValues = {
   fullName: "",
   currency: "PHP",
@@ -67,7 +81,7 @@ export function OnboardingWizard() {
   /** Step 0 gate: validate the profile subset, surface field errors, allow/deny advance. */
   function isProfileStepValid(): boolean {
     const values = getValues();
-    const result = financialProfileSchema.safeParse({
+    const result = profileGateSchema.safeParse({
       fullName: values.fullName,
       currency: values.currency,
       payFrequency: values.payFrequency,
