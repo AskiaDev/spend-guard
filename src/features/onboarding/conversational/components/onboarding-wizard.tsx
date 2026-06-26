@@ -138,7 +138,7 @@ function StepFooter({
               type="button"
               onClick={onSkip}
               disabled={saving}
-              className="conv-skip bg-transparent border-none text-muted-foreground cursor-pointer disabled:cursor-not-allowed text-[0.82rem] font-semibold py-[6px] px-0.5 underline underline-offset-[3px]"
+              className="bg-transparent border-none text-muted-foreground cursor-pointer disabled:cursor-not-allowed text-[0.82rem] font-semibold py-[6px] px-0.5 underline underline-offset-[3px] rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               title={step.skipNote}
             >
               Skip for now

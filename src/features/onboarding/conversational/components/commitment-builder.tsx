@@ -27,11 +27,11 @@ function RecurringToggle({
           id={id}
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
-          className="absolute opacity-0 w-full h-full m-0 cursor-pointer z-[1]"
+          className="peer absolute opacity-0 w-full h-full m-0 cursor-pointer z-[1]"
         />
         <span
           aria-hidden="true"
-          className="block w-full h-full rounded-[10px] transition-colors duration-[160ms] relative"
+          className="block w-full h-full rounded-[10px] transition-colors duration-[160ms] relative peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-background"
           style={{ // ponytail: background and border are state-driven (checked prop)
             background: checked
               ? "var(--primary)"
