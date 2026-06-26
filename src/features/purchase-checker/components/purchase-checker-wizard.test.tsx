@@ -24,16 +24,25 @@ function expectInvalidFieldDescribedBy(field: HTMLElement, errorText: RegExp) {
   expect(errorIds).toContain(error?.id);
 }
 
+async function chooseOption(
+  user: ReturnType<typeof userEvent.setup>,
+  field: RegExp,
+  optionName: string
+) {
+  await user.click(screen.getByLabelText(field));
+  await user.click(await screen.findByRole("option", { name: optionName }));
+}
+
 async function completeStepOne(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/product name/i), "iPhone Pro Max 1TB");
   await user.type(screen.getByLabelText(/price/i), "170000");
-  await user.selectOptions(screen.getByLabelText(/category/i), "phone");
+  await chooseOption(user, /category/i, "Phone");
   await user.click(screen.getByRole("button", { name: /continue/i }));
 }
 
 async function completeStepTwo(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/reason for purchase/i), "work and family photos");
-  await user.selectOptions(screen.getByLabelText(/urgency/i), "can_wait");
+  await chooseOption(user, /urgency/i, "Can wait");
   await user.type(screen.getByLabelText(/best alternative/i), "keep current phone");
   await user.click(screen.getByRole("radio", { name: /yes, it still works/i }));
   await user.click(screen.getByRole("radio", { name: /no, this is personal use/i }));
@@ -66,7 +75,7 @@ describe("PurchaseCheckerWizard", () => {
 
     await user.type(screen.getByLabelText(/product name/i), "iPhone Pro Max 1TB");
     await user.type(screen.getByLabelText(/price/i), "0");
-    await user.selectOptions(screen.getByLabelText(/category/i), "phone");
+    await chooseOption(user, /category/i, "Phone");
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
     expect(screen.getByRole("heading", { name: /product details/i })).toBeInTheDocument();
@@ -104,7 +113,7 @@ describe("PurchaseCheckerWizard", () => {
 
     await user.type(productName, "iPhone Pro Max 1TB");
     await user.type(screen.getByLabelText(/price/i), "170000");
-    await user.selectOptions(screen.getByLabelText(/category/i), "phone");
+    await chooseOption(user, /category/i, "Phone");
     fireEvent.keyDown(productName, { code: "Enter", key: "Enter" });
     fireEvent.submit(stepOneForm as HTMLFormElement);
 
@@ -133,7 +142,7 @@ describe("PurchaseCheckerWizard", () => {
 
     await completeStepOne(user);
     await user.type(screen.getByLabelText(/reason for purchase/i), "work and family photos");
-    await user.selectOptions(screen.getByLabelText(/urgency/i), "can_wait");
+    await chooseOption(user, /urgency/i, "Can wait");
     await user.type(screen.getByLabelText(/best alternative/i), "keep current phone");
     await user.click(screen.getByRole("radio", { name: /yes, it still works/i }));
     await user.click(screen.getByRole("radio", { name: /no, this is personal use/i }));
@@ -144,7 +153,7 @@ describe("PurchaseCheckerWizard", () => {
     await user.click(screen.getByRole("button", { name: /back/i }));
 
     expect(screen.getByLabelText(/reason for purchase/i)).toHaveValue("work and family photos");
-    expect(screen.getByLabelText(/urgency/i)).toHaveValue("can_wait");
+    expect(screen.getByLabelText(/urgency/i)).toHaveTextContent("Can wait");
     expect(screen.getByLabelText(/best alternative/i)).toHaveValue("keep current phone");
     expect(screen.getByRole("radio", { name: /yes, it still works/i })).toBeChecked();
     expect(screen.getByRole("radio", { name: /no, this is personal use/i })).toBeChecked();
@@ -353,13 +362,13 @@ describe("PurchaseCheckerWizard", () => {
 
     await user.type(screen.getByLabelText(/product name/i), "Standing desk");
     await user.type(screen.getByLabelText(/price/i), "18000");
-    await user.selectOptions(screen.getByLabelText(/category/i), "home");
+    await chooseOption(user, /category/i, "Home");
     await user.type(screen.getByLabelText(/sale deadline/i), "2026-07-15");
     await user.type(screen.getByLabelText(/location/i), "Makati showroom");
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
     await user.type(screen.getByLabelText(/reason for purchase/i), "reduce back pain at work");
-    await user.selectOptions(screen.getByLabelText(/urgency/i), "need_this_month");
+    await chooseOption(user, /urgency/i, "Need this month");
     await user.type(screen.getByLabelText(/best alternative/i), "use existing table");
     await user.type(screen.getByLabelText(/notes/i), "Ask if the store includes delivery.");
     await user.click(screen.getByRole("radio", { name: /no, it does not work/i }));
@@ -415,6 +424,6 @@ describe("PurchaseCheckerWizard", () => {
     await user.click(screen.getByRole("button", { name: /back/i }));
     expect(screen.getByLabelText(/product name/i)).toHaveValue("iPhone Pro Max 1TB");
     expect(screen.getByLabelText(/price/i)).toHaveValue(170000);
-    expect(screen.getByLabelText(/category/i)).toHaveValue("phone");
+    expect(screen.getByLabelText(/category/i)).toHaveTextContent("Phone");
   });
 });

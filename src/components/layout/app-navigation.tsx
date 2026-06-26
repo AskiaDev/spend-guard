@@ -5,7 +5,6 @@ import {
   FileText,
   House,
   Menu,
-  Mic,
   ReceiptText,
   SearchCheck,
   Settings,
@@ -19,7 +18,6 @@ import { cn } from "@/lib/utils";
 export const primaryNavigation = [
   { href: "/", label: "Dashboard", mobileLabel: "Home", icon: House },
   { href: "/checker", label: "Purchase Checker", mobileLabel: "Checker", icon: SearchCheck },
-  { href: "/voice", label: "Voice Check", mobileLabel: "Voice", icon: Mic },
   { href: "/goals", label: "Goals", mobileLabel: "Goals", icon: Target },
   { href: "/cooldown", label: "Cooldown", mobileLabel: "More", icon: Menu },
 ] as const;

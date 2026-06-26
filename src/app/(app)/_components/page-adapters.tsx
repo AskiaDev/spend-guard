@@ -7,8 +7,8 @@ import { DebtsPanel } from "@/features/debts";
 import { ExpensesPanel } from "@/features/expenses";
 import { GoalsPanel } from "@/features/goals";
 import {
+  CheckerSurface,
   LocalAdvisorGate,
-  PurchaseCheckerWizard,
   PurchaseResult,
 } from "@/features/purchase-checker";
 import { ReportsPanel } from "@/features/reports";
@@ -45,7 +45,10 @@ export function PurchaseCheckerPageContent() {
 
   return (
     <LocalAdvisorGate>
-      <PurchaseCheckerWizard onRunCheck={state.runPurchaseCheck} />
+      <CheckerSurface
+        onRunCheck={state.runPurchaseCheck}
+        onSaveVoiceSession={state.confirmVoiceDraft}
+      />
     </LocalAdvisorGate>
   );
 }

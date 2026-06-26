@@ -3,12 +3,19 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { StepProgress } from "@/components/finance/step-progress";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input, Label, Select, Textarea } from "@/components/ui/form-fields";
-import { cn } from "@/lib/utils";
+import { Input, Label, Textarea } from "@/components/ui/form-fields";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { PaymentMethod, PurchaseInput, PurchaseUrgency } from "@/types/finance";
 import type * as React from "react";
 
@@ -191,6 +198,7 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
   const [draftMessage, setDraftMessage] = useState<string | null>(null);
 
   const {
+    control,
     getValues,
     handleSubmit,
     register,
@@ -359,7 +367,7 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
         <div className="grid gap-4">
           <div>
             <CardTitle>Purchase checker</CardTitle>
-            <p className="mt-1 text-sm text-muted">
+            <p className="mt-1 text-sm text-muted-foreground">
               Answer a few questions, then run a focused affordability check.
             </p>
           </div>
@@ -374,7 +382,7 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
                 <h2 id="purchase-checker-step-one" className="text-lg font-semibold text-foreground">
                   Product details
                 </h2>
-                <p className="mt-1 text-sm text-muted">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Start with the basic purchase facts so the check has a stable input.
                 </p>
               </div>
@@ -408,20 +416,31 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
 
                 <div className="grid gap-2">
                   <Label htmlFor="purchase-category">Category</Label>
-                  <Select
-                    id="purchase-category"
-                    aria-describedby={errors.category ? errorIds.category : undefined}
-                    aria-invalid={errors.category ? "true" : undefined}
-                    {...register("category")}
-                  >
-                    <option value="">Choose a category</option>
-                    <option value="phone">Phone</option>
-                    <option value="electronics">Electronics</option>
-                    <option value="appliance">Appliance</option>
-                    <option value="travel">Travel</option>
-                    <option value="home">Home</option>
-                    <option value="other">Other</option>
-                  </Select>
+                  <Controller
+                    control={control}
+                    name="category"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger
+                          id="purchase-category"
+                          className="w-full"
+                          aria-describedby={errors.category ? errorIds.category : undefined}
+                          aria-invalid={errors.category ? "true" : undefined}
+                          onBlur={field.onBlur}
+                        >
+                          <SelectValue placeholder="Choose a category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="phone">Phone</SelectItem>
+                          <SelectItem value="electronics">Electronics</SelectItem>
+                          <SelectItem value="appliance">Appliance</SelectItem>
+                          <SelectItem value="travel">Travel</SelectItem>
+                          <SelectItem value="home">Home</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                   <FieldErrorText id={errorIds.category}>{errors.category}</FieldErrorText>
                 </div>
               </div>
@@ -462,7 +481,7 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
                 <h2 id="purchase-checker-step-two" className="text-lg font-semibold text-foreground">
                   Motivation
                 </h2>
-                <p className="mt-1 text-sm text-muted">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Capture the why, timing, and fallback before choosing how to pay.
                 </p>
               </div>
@@ -494,12 +513,23 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="purchase-urgency">Urgency</Label>
-                  <Select id="purchase-urgency" {...register("urgency")}>
-                    <option value="need_now">Need now</option>
-                    <option value="need_this_month">Need this month</option>
-                    <option value="can_wait">Can wait</option>
-                    <option value="want">Want</option>
-                  </Select>
+                  <Controller
+                    control={control}
+                    name="urgency"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger id="purchase-urgency" className="w-full" onBlur={field.onBlur}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="need_now">Need now</SelectItem>
+                          <SelectItem value="need_this_month">Need this month</SelectItem>
+                          <SelectItem value="can_wait">Can wait</SelectItem>
+                          <SelectItem value="want">Want</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                 </div>
 
                 <div className="grid gap-2">
@@ -522,23 +552,31 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
                 aria-invalid={errors.currentAlternativeWorks ? "true" : undefined}
                 className="grid gap-3"
               >
-                <legend className="text-xs font-semibold uppercase tracking-normal text-slate-600">
+                <legend className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
                   Current alternative
                 </legend>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <RadioCard
-                    description="The current option can still cover the need."
-                    label="Yes, it still works"
-                    value="yes"
-                    {...register("currentAlternativeWorks")}
-                  />
-                  <RadioCard
-                    description="The current option no longer covers the need."
-                    label="No, it does not work"
-                    value="no"
-                    {...register("currentAlternativeWorks")}
-                  />
-                </div>
+                <Controller
+                  control={control}
+                  name="currentAlternativeWorks"
+                  render={({ field }) => (
+                    <RadioGroup
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      className="grid gap-3 md:grid-cols-2"
+                    >
+                      <RadioCard
+                        description="The current option can still cover the need."
+                        label="Yes, it still works"
+                        value="yes"
+                      />
+                      <RadioCard
+                        description="The current option no longer covers the need."
+                        label="No, it does not work"
+                        value="no"
+                      />
+                    </RadioGroup>
+                  )}
+                />
                 <FieldErrorText id={errorIds.currentAlternativeWorks}>
                   {errors.currentAlternativeWorks}
                 </FieldErrorText>
@@ -551,23 +589,31 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
                 aria-invalid={errors.incomeGeneration ? "true" : undefined}
                 className="grid gap-3"
               >
-                <legend className="text-xs font-semibold uppercase tracking-normal text-slate-600">
+                <legend className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
                   Income generation
                 </legend>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <RadioCard
-                    description="This purchase may directly support earning money."
-                    label="Yes, this can generate income"
-                    value="yes"
-                    {...register("incomeGeneration")}
-                  />
-                  <RadioCard
-                    description="This is mainly for personal use or quality of life."
-                    label="No, this is personal use"
-                    value="no"
-                    {...register("incomeGeneration")}
-                  />
-                </div>
+                <Controller
+                  control={control}
+                  name="incomeGeneration"
+                  render={({ field }) => (
+                    <RadioGroup
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      className="grid gap-3 md:grid-cols-2"
+                    >
+                      <RadioCard
+                        description="This purchase may directly support earning money."
+                        label="Yes, this can generate income"
+                        value="yes"
+                      />
+                      <RadioCard
+                        description="This is mainly for personal use or quality of life."
+                        label="No, this is personal use"
+                        value="no"
+                      />
+                    </RadioGroup>
+                  )}
+                />
                 <FieldErrorText id={errorIds.incomeGeneration}>
                   {errors.incomeGeneration}
                 </FieldErrorText>
@@ -581,12 +627,12 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
                 <h2 id="purchase-checker-step-three" className="text-lg font-semibold text-foreground">
                   Payment
                 </h2>
-                <p className="mt-1 text-sm text-muted">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Choose the payment method and add any recurring payment details.
                 </p>
               </div>
 
-              <div className="grid gap-4 rounded-control border border-primary/15 bg-blue-50/70 p-4 md:grid-cols-[auto_1fr] md:items-center">
+              <div className="grid gap-4 rounded-control border border-primary/15 bg-primary/5 p-4 md:grid-cols-[auto_1fr] md:items-center">
                 <Image
                   src="/illustrations/payment-info.svg"
                   alt="Person entering payment details"
@@ -595,27 +641,36 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
                   loading="eager"
                   className="hidden h-auto w-36 md:block"
                 />
-                <p className="text-sm leading-6 text-muted">
+                <p className="text-sm leading-6 text-muted-foreground">
                   Payment method changes the real monthly risk. Add installment, loan, or
                   buy-now-pay-later amounts before SpendGuard analyzes the purchase.
                 </p>
               </div>
 
               <fieldset className="grid gap-3">
-                <legend className="text-xs font-semibold uppercase tracking-normal text-slate-600">
+                <legend className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
                   Payment method
                 </legend>
-                <div className="grid gap-3 lg:grid-cols-5 md:grid-cols-2">
-                  {paymentOptions.map((option) => (
-                    <RadioCard
-                      key={option.value}
-                      description={option.description}
-                      label={option.label}
-                      value={option.value}
-                      {...register("paymentMethod")}
-                    />
-                  ))}
-                </div>
+                <Controller
+                  control={control}
+                  name="paymentMethod"
+                  render={({ field }) => (
+                    <RadioGroup
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      className="grid gap-3 lg:grid-cols-5 md:grid-cols-2"
+                    >
+                      {paymentOptions.map((option) => (
+                        <RadioCard
+                          key={option.value}
+                          description={option.description}
+                          label={option.label}
+                          value={option.value}
+                        />
+                      ))}
+                    </RadioGroup>
+                  )}
+                />
               </fieldset>
 
               {showPaymentSchedule ? (
@@ -674,7 +729,7 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
 
               {analysisError ? (
                 <p
-                  className="rounded-control border border-risk/30 bg-red-50 px-3 py-2 text-sm font-medium text-risk"
+                  className="rounded-control border border-risk/30 bg-risk/10 px-3 py-2 text-sm font-medium text-risk"
                   role="alert"
                 >
                   {analysisError}
@@ -684,7 +739,7 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
               {draftMessage ? (
                 <p
                   aria-live="polite"
-                  className="rounded-control border border-border bg-slate-50 px-3 py-2 text-sm text-muted"
+                  className="rounded-control border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground"
                   role="status"
                 >
                   {draftMessage}
@@ -758,24 +813,20 @@ function FieldErrorText({ children, id }: { children?: React.ReactNode; id: stri
   );
 }
 
-interface RadioCardProps extends React.InputHTMLAttributes<HTMLInputElement> {
+interface RadioCardProps {
   description: string;
   label: string;
+  value: string;
 }
 
-function RadioCard({ className, description, label, ...props }: RadioCardProps) {
+function RadioCard({ description, label, value }: RadioCardProps) {
   return (
-    <label
-      className={cn(
-        "grid cursor-pointer gap-2 rounded-control border border-border bg-surface p-3 text-sm shadow-sm transition hover:border-primary has-[:checked]:border-primary has-[:checked]:bg-blue-50",
-        className
-      )}
-    >
+    <label className="grid cursor-pointer gap-2 rounded-control border border-input bg-card/40 p-3 text-sm shadow-sm transition hover:border-primary/60 has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5">
       <span className="flex items-center gap-2 font-semibold text-foreground">
-        <input className="size-4 accent-blue-600" type="radio" {...props} />
+        <RadioGroupItem value={value} aria-label={label} />
         {label}
       </span>
-      <span className="text-xs leading-5 text-muted">{description}</span>
+      <span className="text-xs leading-5 text-muted-foreground">{description}</span>
     </label>
   );
 }

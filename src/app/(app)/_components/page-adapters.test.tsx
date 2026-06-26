@@ -6,8 +6,8 @@ import { DebtsPanel } from "@/features/debts";
 import { ExpensesPanel } from "@/features/expenses";
 import { GoalsPanel } from "@/features/goals";
 import {
+  CheckerSurface,
   LocalAdvisorGate,
-  PurchaseCheckerWizard,
   PurchaseResult,
 } from "@/features/purchase-checker";
 import { ReportsPanel } from "@/features/reports";
@@ -52,7 +52,7 @@ vi.mock("@/features/purchase-checker", () => ({
   LocalAdvisorGate: vi.fn(({ children }: { children: React.ReactNode }) => (
     <div data-testid="local-advisor-gate">{children}</div>
   )),
-  PurchaseCheckerWizard: vi.fn(() => <div data-testid="purchase-checker-wizard" />),
+  CheckerSurface: vi.fn(() => <div data-testid="checker-surface" />),
   PurchaseResult: vi.fn(({ check }: { check?: { itemName: string } }) => (
     <div data-testid="purchase-result">{check?.itemName ?? "Example decision"}</div>
   )),
@@ -168,16 +168,17 @@ describe("page adapters", () => {
     expect(props.metrics).toBe(financialState.metrics);
   });
 
-  it("passes the purchase-check mutation to the checker wizard", () => {
+  it("passes the purchase-check mutations to the merged checker surface", () => {
     render(<PurchaseCheckerPageContent />);
 
     expect(screen.getByTestId("local-advisor-gate")).toBeInTheDocument();
-    expect(screen.getByTestId("purchase-checker-wizard")).toBeInTheDocument();
+    expect(screen.getByTestId("checker-surface")).toBeInTheDocument();
     expect(LocalAdvisorGate).toHaveBeenCalledOnce();
-    expect(PurchaseCheckerWizard).toHaveBeenCalledOnce();
+    expect(CheckerSurface).toHaveBeenCalledOnce();
 
-    const props = vi.mocked(PurchaseCheckerWizard).mock.calls[0][0];
+    const props = vi.mocked(CheckerSurface).mock.calls[0][0];
     expect(props.onRunCheck).toBe(financialState.runPurchaseCheck);
+    expect(props.onSaveVoiceSession).toBe(financialState.confirmVoiceDraft);
   });
 
   it("waits for hydration before passing the exact purchase-check mutation to voice", () => {

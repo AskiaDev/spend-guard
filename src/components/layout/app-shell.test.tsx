@@ -40,12 +40,10 @@ describe("AppShell", () => {
     expect(screen.getByRole("img", { name: "SpendGuard" })).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Dashboard" })).toHaveLength(1);
     expect(screen.getAllByRole("link", { name: "Purchase Checker" })).toHaveLength(1);
-    expect(screen.getAllByRole("link", { name: "Voice Check" })).toHaveLength(1);
     expect(screen.getAllByRole("link", { name: "Goals" })).toHaveLength(2);
     expect(screen.getAllByRole("link", { name: "Cooldown" })).toHaveLength(1);
     expect(screen.getAllByRole("link", { name: "Home" })).toHaveLength(1);
     expect(screen.getAllByRole("link", { name: "Checker" })).toHaveLength(1);
-    expect(screen.getAllByRole("link", { name: "Voice" })).toHaveLength(1);
     expect(screen.getAllByRole("link", { name: "More" })).toHaveLength(1);
     expect(screen.getByRole("link", { name: "Expenses" })).toHaveAttribute(
       "href",

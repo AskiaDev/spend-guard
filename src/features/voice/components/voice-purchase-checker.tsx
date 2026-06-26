@@ -5,7 +5,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input, Label, Select, Textarea } from "@/components/ui/form-fields";
+import { Input, Label, Textarea } from "@/components/ui/form-fields";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { purchaseInputSchema } from "@/lib/schemas/finance";
 import { formatCurrency } from "@/lib/utils";
 import { extractPurchaseFromTranscript } from "@/lib/voice/parsers";
@@ -403,13 +410,13 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
                 <h2 id="voice-ready-title" className="text-lg font-semibold text-foreground">
                   Tell us what you want to buy
                 </h2>
-                <p className="mt-1 text-sm text-muted">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Include the price, payment plan, and how soon you need it. You can speak,
                   type, or paste your request.
                 </p>
               </div>
 
-              <p className="flex items-start gap-2 rounded-control border border-border bg-slate-50 px-3 py-2 text-sm text-muted">
+              <p className="flex items-start gap-2 rounded-control border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
                 <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
                 <span>
                   Your transcript may be sent to an AI service to read the purchase details, and
@@ -421,7 +428,7 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
               {captureNotice ? (
                 <p
                   aria-live="polite"
-                  className="rounded-control border border-border bg-slate-50 px-3 py-2 text-sm text-muted"
+                  className="rounded-control border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground"
                   role="status"
                 >
                   {captureNotice}
@@ -465,7 +472,7 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
               </div>
               <div
                 aria-live="polite"
-                className="min-h-24 rounded-control border border-border bg-slate-50 p-3 text-left text-sm text-foreground"
+                className="min-h-24 rounded-control border border-border bg-muted/30 p-3 text-left text-sm text-foreground"
               >
                 {transcript || "Your words will appear here as you speak."}
               </div>
@@ -485,7 +492,7 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
                 >
                   Check the transcript
                 </h2>
-                <p className="mt-1 text-sm text-muted">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Correct anything the microphone missed before extracting purchase details.
                 </p>
               </div>
@@ -508,11 +515,11 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
                 <h2 id="voice-source-title" className="text-lg font-semibold text-foreground">
                   Source transcript
                 </h2>
-                <p className="mt-1 text-sm text-muted">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Keep this source nearby while you review the extracted values.
                 </p>
               </div>
-              <p className="rounded-control border border-border bg-slate-50 p-3 text-sm text-foreground">
+              <p className="rounded-control border border-border bg-muted/30 p-3 text-sm text-foreground">
                 {transcript}
               </p>
             </section>
@@ -533,7 +540,7 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
               <div className="max-w-sm">
                 <Mic aria-hidden="true" className="mx-auto size-8 text-primary" />
                 <p className="mt-3 font-semibold text-foreground">Capture first, decide second</p>
-                <p className="mt-1 text-sm text-muted">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Extracted values appear here for confirmation before SpendGuard runs a check.
                 </p>
               </div>
@@ -620,33 +627,41 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
                   <div className="grid gap-2">
                     <Label htmlFor="voice-payment-method">Payment method</Label>
                     <Select
-                      id="voice-payment-method"
                       value={reviewDraft.paymentMethod}
-                      onChange={(event) =>
-                        updateReviewField("paymentMethod", event.target.value as PaymentMethod)
+                      onValueChange={(value) =>
+                        updateReviewField("paymentMethod", value as PaymentMethod)
                       }
                     >
-                      <option value="cash">Cash</option>
-                      <option value="installment">Installment</option>
-                      <option value="credit_card">Credit card</option>
-                      <option value="loan">Loan</option>
-                      <option value="bnpl">Buy now, pay later</option>
+                      <SelectTrigger id="voice-payment-method" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="installment">Installment</SelectItem>
+                        <SelectItem value="credit_card">Credit card</SelectItem>
+                        <SelectItem value="loan">Loan</SelectItem>
+                        <SelectItem value="bnpl">Buy now, pay later</SelectItem>
+                      </SelectContent>
                     </Select>
                   </div>
 
                   <div className="grid gap-2">
                     <Label htmlFor="voice-urgency">Urgency</Label>
                     <Select
-                      id="voice-urgency"
                       value={reviewDraft.urgency}
-                      onChange={(event) =>
-                        updateReviewField("urgency", event.target.value as PurchaseUrgency)
+                      onValueChange={(value) =>
+                        updateReviewField("urgency", value as PurchaseUrgency)
                       }
                     >
-                      <option value="need_now">Need now</option>
-                      <option value="need_this_month">Need this month</option>
-                      <option value="can_wait">Can wait</option>
-                      <option value="want">Want</option>
+                      <SelectTrigger id="voice-urgency" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="need_now">Need now</SelectItem>
+                        <SelectItem value="need_this_month">Need this month</SelectItem>
+                        <SelectItem value="can_wait">Can wait</SelectItem>
+                        <SelectItem value="want">Want</SelectItem>
+                      </SelectContent>
                     </Select>
                   </div>
 
@@ -671,7 +686,7 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
 
                 {analysisError ? (
                   <p
-                    className="rounded-control border border-risk/30 bg-red-50 px-3 py-2 text-sm font-medium text-risk"
+                    className="rounded-control border border-risk/30 bg-risk/10 px-3 py-2 text-sm font-medium text-risk"
                     role="alert"
                   >
                     {analysisError}
@@ -679,7 +694,7 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
                 ) : null}
               </section>
 
-              <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 -mx-2 flex flex-col-reverse gap-2 rounded-card border border-border bg-surface/95 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-elevated backdrop-blur sm:flex-row sm:justify-end lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
+              <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 -mx-2 flex flex-col-reverse gap-2 rounded-card border border-border bg-card/95 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-elevated backdrop-blur sm:flex-row sm:justify-end lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
                 <Button type="button" variant="secondary" onClick={resetCapture}>
                   <RotateCcw aria-hidden="true" className="size-4" />
                   Record again
@@ -723,8 +738,8 @@ function TranscriptEditor({
 
 function ReviewValue({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-control border border-border bg-slate-50 p-3">
-      <p className="text-xs font-semibold uppercase tracking-normal text-slate-600">{label}</p>
+    <div className="rounded-control border border-border bg-muted/30 p-3">
+      <p className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">{label}</p>
       <p className="mt-1 text-sm font-semibold text-foreground">{value}</p>
     </div>
   );

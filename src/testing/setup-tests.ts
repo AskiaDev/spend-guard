@@ -27,3 +27,11 @@ vi.stubGlobal("localStorage", createStorage());
 Element.prototype.scrollIntoView = vi.fn();
 Element.prototype.hasPointerCapture = vi.fn(() => false);
 Element.prototype.releasePointerCapture = vi.fn();
+
+// Radix RadioGroup (via @radix-ui/react-use-size) reads ResizeObserver, which jsdom omits.
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+vi.stubGlobal("ResizeObserver", ResizeObserverStub);
