@@ -21,7 +21,7 @@ export function MoneyInput({
   return (
     <VaultField label={label} htmlFor={id}>
       <div
-        className="conv-money flex items-center bg-card border border-border rounded-control overflow-hidden"
+        className="flex items-center bg-card border border-border rounded-control overflow-hidden focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-background"
       >
         <span
           aria-hidden="true"

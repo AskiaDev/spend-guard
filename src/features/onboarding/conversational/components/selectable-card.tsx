@@ -21,7 +21,7 @@ export function SelectableCard({
       role="checkbox"
       aria-checked={selected}
       onClick={onToggle}
-      className="conv-card flex items-start gap-3 w-full py-4 px-[18px] rounded-[var(--radius-card)] text-foreground cursor-pointer text-left transition-colors duration-150 outline-none border"
+      className="flex items-start gap-3 w-full py-4 px-[18px] rounded-[var(--radius-card)] text-foreground cursor-pointer text-left transition-colors duration-150 outline-none border focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       style={{ // ponytail: background and border-color are state-driven (selected prop)
         background: selected
           ? "color-mix(in srgb, var(--primary) 8%, var(--card))"

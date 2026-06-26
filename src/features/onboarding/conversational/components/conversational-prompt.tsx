@@ -14,22 +14,22 @@ export function ConversationalPrompt({
   why,
 }: ConversationalPromptProps) {
   return (
-    <div className="conv-prompt flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
       {eyebrow && (
-        <p className="vault-eyebrow m-0">
+        <p className="text-[0.7rem] font-bold tracking-[0.2em] text-primary m-0">
           {eyebrow}
         </p>
       )}
 
       <h2
-        className="vault-display m-0 text-[clamp(1.5rem,4vw,2.25rem)] font-bold leading-[1.15] text-foreground tracking-[-0.02em]"
+        className="font-display m-0 text-[clamp(1.5rem,4vw,2.25rem)] font-bold leading-[1.15] text-foreground tracking-[-0.02em]"
       >
         {headline}
       </h2>
 
       {subtext && (
         <p
-          className="vault-muted m-0 text-base leading-[1.5]"
+          className="text-muted-foreground m-0 text-base leading-[1.5]"
         >
           {subtext}
         </p>

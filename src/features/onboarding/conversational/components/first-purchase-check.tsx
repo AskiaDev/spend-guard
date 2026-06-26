@@ -166,7 +166,7 @@ export function FirstPurchaseCheck({
         <button
           type="button"
           onClick={fillSample}
-          className="conv-chip bg-transparent border border-border rounded-full text-muted-foreground cursor-pointer text-[0.78rem] font-semibold py-[5px] px-[14px]"
+          className="bg-transparent border border-border rounded-full text-muted-foreground cursor-pointer text-[0.78rem] font-semibold py-[5px] px-[14px] outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           Try a sample
         </button>

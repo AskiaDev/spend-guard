@@ -71,7 +71,7 @@ export function CooldownSelector({ value, onChange }: CooldownSelectorProps) {
   return (
     <div className="flex flex-col gap-5">
       {/* Cooldown explanation */}
-      <p className="vault-muted m-0 text-sm leading-[1.55]">
+      <p className="text-muted-foreground m-0 text-sm leading-[1.55]">
         A cooldown is a short pause before a purchase counts as cleared. It gives you a
         moment to check with a clear head - not a block, just breathing room.
       </p>
@@ -96,7 +96,7 @@ export function CooldownSelector({ value, onChange }: CooldownSelectorProps) {
               tabIndex={selected ? 0 : -1}
               onClick={() => onChange(opt.value)}
               onKeyDown={handleKey}
-              className="conv-radio-option flex items-start gap-3 w-full py-4 px-[18px] rounded-[var(--radius-card)] text-foreground cursor-pointer text-left transition-colors duration-150 outline-none border"
+              className="flex items-start gap-3 w-full py-4 px-[18px] rounded-[var(--radius-card)] text-foreground cursor-pointer text-left transition-colors duration-150 outline-none border focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               style={{ // ponytail: background and border-color are state-driven (selected)
                 background: selected
                   ? "color-mix(in srgb, var(--primary) 8%, var(--card))"

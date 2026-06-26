@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { env } from "@/config/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import "@/features/onboarding/vault/vault.css";
 
 export const dynamic = "force-dynamic";
 
@@ -25,5 +24,5 @@ export default async function OnboardingLayout({ children }: { children: React.R
     redirect("/login");
   }
 
-  return <div className="vault">{children}</div>;
+  return <>{children}</>;
 }

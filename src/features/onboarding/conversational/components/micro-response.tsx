@@ -15,7 +15,7 @@ export function MicroResponse({ show, children }: MicroResponseProps) {
 
   if (reduced) {
     return (
-      <p role="status" className="vault-muted text-sm m-0">
+      <p role="status" className="text-muted-foreground text-sm m-0">
         {children}
       </p>
     );
@@ -24,7 +24,7 @@ export function MicroResponse({ show, children }: MicroResponseProps) {
   return (
     <motion.p
       role="status"
-      className="vault-muted text-sm m-0"
+      className="text-muted-foreground text-sm m-0"
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: "easeOut" }}

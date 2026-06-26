@@ -19,7 +19,7 @@ function ProtectionRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-3 border-b border-border">
       <span className="text-[0.85rem] text-muted-foreground">{label}</span>
-      <span className="vault-display text-[0.95rem] text-foreground">
+      <span className="font-display text-[0.95rem] text-foreground">
         {value}
       </span>
     </div>
@@ -65,9 +65,9 @@ export function OnboardingSummary({
       </div>
 
       <div className="flex flex-col gap-[6px] py-5 px-[22px] rounded-[var(--radius-card)] bg-[color-mix(in_srgb,var(--primary)_8%,var(--card))] border border-[color-mix(in_srgb,var(--primary)_35%,var(--border))]">
-        <span className="vault-eyebrow">Safe to spend today</span>
+        <span className="text-[0.7rem] font-bold tracking-[0.2em] text-primary">Safe to spend today</span>
         <span
-          className="vault-display text-[clamp(1.8rem,6vw,2.6rem)] leading-[1.05] text-primary"
+          className="font-display text-[clamp(1.8rem,6vw,2.6rem)] leading-[1.05] text-primary"
         >
           {formatCurrency(safeToSpend, currency)}
         </span>

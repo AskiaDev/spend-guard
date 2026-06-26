@@ -49,7 +49,7 @@ export function BufferStep({
                 aria-pressed={selected}
                 onClick={handlePreset(preset)}
                 className={cn(
-                  "conv-buffer-btn py-[14px] px-3 rounded-[var(--radius-card)] text-[0.9rem] font-semibold font-sans cursor-pointer text-center border",
+                  "py-[14px] px-3 rounded-[var(--radius-card)] text-[0.9rem] font-semibold font-sans cursor-pointer text-center border transition-colors duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                   selected
                     ? "bg-primary/[0.08] border-primary text-primary"
                     : "bg-card border-border text-foreground",

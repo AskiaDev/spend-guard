@@ -46,7 +46,7 @@ export function Stat({ label, value }: { label: string; value: string }) {
       <span className="block text-[0.62rem] tracking-[0.16em] font-bold text-muted-foreground uppercase">
         {label}
       </span>
-      <span className="vault-display block mt-1 text-[1.05rem] text-foreground">
+      <span className="font-display block mt-1 text-[1.05rem] text-foreground">
         {value}
       </span>
     </div>
@@ -84,7 +84,7 @@ export function VerdictReveal({
     >
       <div className="flex flex-col gap-2">
         <span
-          className="vault-eyebrow inline-flex items-center gap-2"
+          className="text-[0.7rem] font-bold tracking-[0.2em] text-primary inline-flex items-center gap-2"
           style={{ // ponytail: color depends on computed accent (verdict.tone)
             color: accent,
           }}
@@ -100,14 +100,14 @@ export function VerdictReveal({
           The verdict
         </span>
         <h2
-          className="vault-display m-0 text-[clamp(1.6rem,5vw,2.4rem)] leading-[1.1]"
+          className="font-display m-0 text-[clamp(1.6rem,5vw,2.4rem)] leading-[1.1]"
           style={{ // ponytail: color depends on computed accent (verdict.tone)
             color: accent,
           }}
         >
           {verdict.word}
         </h2>
-        <p className="vault-muted m-0 text-[0.95rem] leading-[1.5]">
+        <p className="text-muted-foreground m-0 text-[0.95rem] leading-[1.5]">
           {verdict.line}
         </p>
       </div>
@@ -119,7 +119,7 @@ export function VerdictReveal({
       </div>
 
       <div className="flex flex-col gap-2">
-        <span className="vault-eyebrow text-muted-foreground">
+        <span className="text-[0.7rem] font-bold tracking-[0.2em] text-muted-foreground">
           Why SpendGuard says this
         </span>
         <ul className="m-0 pl-[18px] flex flex-col gap-[6px]">
