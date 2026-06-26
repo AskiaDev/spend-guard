@@ -20,7 +20,7 @@ export function PageFrame({
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
           {title}
         </h1>
-        {description ? <p className="mt-2 text-sm leading-6 text-muted">{description}</p> : null}
+        {description ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p> : null}
       </header>
       {children}
     </div>

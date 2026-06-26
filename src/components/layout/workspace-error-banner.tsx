@@ -13,7 +13,7 @@ export function WorkspaceErrorBanner() {
   return (
     <div
       role="alert"
-      className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-control border border-risk/30 bg-red-50 p-4 text-sm text-risk"
+      className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-control border border-risk/30 bg-risk/10 p-4 text-sm text-risk"
     >
       <span>{error}</span>
       <Button type="button" variant="ghost" size="sm" onClick={() => void refresh()}>

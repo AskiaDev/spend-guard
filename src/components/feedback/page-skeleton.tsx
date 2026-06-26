@@ -28,12 +28,12 @@ export function PageSkeleton({
           key={index}
           data-skeleton-card
           aria-hidden="true"
-          className="min-h-48 animate-pulse rounded-card border border-border bg-surface p-5 shadow-card motion-reduce:animate-none"
+          className="min-h-48 animate-pulse rounded-card border border-border bg-card p-5 shadow-card motion-reduce:animate-none"
         >
-          <div className="h-4 w-2/5 rounded-full bg-slate-200" />
-          <div className="mt-6 h-8 w-3/5 rounded-full bg-slate-100" />
-          <div className="mt-8 h-3 w-full rounded-full bg-slate-100" />
-          <div className="mt-3 h-3 w-4/5 rounded-full bg-slate-100" />
+          <div className="h-4 w-2/5 rounded-full bg-muted/40" />
+          <div className="mt-6 h-8 w-3/5 rounded-full bg-muted/20" />
+          <div className="mt-8 h-3 w-full rounded-full bg-muted/20" />
+          <div className="mt-3 h-3 w-4/5 rounded-full bg-muted/20" />
         </div>
       ))}
     </div>

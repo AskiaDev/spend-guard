@@ -20,7 +20,7 @@ export function FinancialDisclaimer({
 }) {
   if (variant === "inline") {
     return (
-      <p className={cn("text-xs leading-5 text-muted", className)}>
+      <p className={cn("text-xs leading-5 text-muted-foreground", className)}>
         <span className="font-semibold text-foreground">Not financial advice.</span>{" "}
         This explanation is educational and based only on the numbers you entered.
       </p>
@@ -31,11 +31,11 @@ export function FinancialDisclaimer({
     <aside
       aria-label="Financial disclaimer"
       className={cn(
-        "mt-8 flex items-start gap-2.5 border-t border-border pt-4 text-xs leading-5 text-muted",
+        "mt-8 flex items-start gap-2.5 border-t border-border pt-4 text-xs leading-5 text-muted-foreground",
         className
       )}
     >
-      <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted" />
+      <ShieldCheck aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
       <p>
         SpendGuard offers educational estimates based on the figures you enter. It is not
         financial, investment, tax, or legal advice. A deterministic rules engine makes every

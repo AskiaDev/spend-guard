@@ -162,7 +162,7 @@ export function SettingsPanel({
             {formErrorMessages.length > 0 ? (
               <div
                 role="alert"
-                className="rounded-control border border-risk/20 bg-red-50 px-3 py-2 text-sm text-risk"
+                className="rounded-control border border-risk/20 bg-risk/10 px-3 py-2 text-sm text-risk"
               >
                 <p className="font-semibold">Check the settings fields.</p>
                 <ul className="mt-1 list-disc space-y-1 pl-4">

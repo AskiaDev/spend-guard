@@ -56,7 +56,7 @@ export function AdvisorExplanation({
   return (
     <div className="grid gap-2">
       {usedModel || isStreaming ? (
-        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted">
+        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           AI explanation
           {isStreaming ? (
             <span className="inline-flex items-center gap-1 text-primary">
@@ -66,7 +66,7 @@ export function AdvisorExplanation({
           ) : null}
         </p>
       ) : null}
-      <p aria-live="polite" className="text-sm leading-6 text-muted">
+      <p aria-live="polite" className="text-sm leading-6 text-muted-foreground">
         {text}
         {isStreaming ? (
           <span aria-hidden="true" className="ml-0.5 inline-block animate-pulse">
@@ -84,13 +84,13 @@ export function LessonBlock({ check }: { check: PurchaseCheck }) {
   const lesson = getEducationalLesson(toDecisionResult(check));
 
   return (
-    <div className="rounded-control border border-border bg-slate-50 p-4">
-      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+    <div className="rounded-control border border-border bg-muted/20 p-4">
+      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         <GraduationCap aria-hidden="true" className="size-3.5" />
         Lesson
       </p>
       <p className="mt-2 text-sm font-semibold text-foreground">{lesson.title}</p>
-      <p className="mt-1 text-sm leading-6 text-muted">{lesson.body}</p>
+      <p className="mt-1 text-sm leading-6 text-muted-foreground">{lesson.body}</p>
     </div>
   );
 }

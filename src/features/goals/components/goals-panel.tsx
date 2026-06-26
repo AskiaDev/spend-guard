@@ -170,7 +170,7 @@ export function GoalsPanel({
       {formMessage ? (
         <p
           role={formMessage.startsWith("We couldn't") ? "alert" : "status"}
-          className="rounded-control border border-border bg-slate-50 px-3 py-2 text-sm text-muted-foreground"
+          className="rounded-control border border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground"
         >
           {formMessage}
         </p>
@@ -207,7 +207,7 @@ export function GoalsPanel({
               {formErrorMessages.length > 0 ? (
                 <div
                   role="alert"
-                  className="rounded-control border border-risk/20 bg-red-50 px-3 py-2 text-sm text-risk"
+                  className="rounded-control border border-risk/20 bg-risk/10 px-3 py-2 text-sm text-risk"
                 >
                   <p className="font-semibold">Check the goal fields.</p>
                   <ul className="mt-1 list-disc space-y-1 pl-4">

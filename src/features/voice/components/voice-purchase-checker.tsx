@@ -619,7 +619,7 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
                     value={reviewDraft.downPayment}
                     onChange={(value) => updateReviewField("downPayment", value)}
                   />
-                  <p className="text-xs text-muted sm:col-span-2">
+                  <p className="text-xs text-muted-foreground sm:col-span-2">
                     Down payment is included in the savings-after-purchase check for financed
                     purchases.
                   </p>

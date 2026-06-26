@@ -52,7 +52,7 @@ export function EmptyState({
         </div>
       ) : null}
       <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-      <p className="mt-2 max-w-md text-sm leading-6 text-muted">{description}</p>
+      <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">{description}</p>
       <div className="mt-5">{action}</div>
     </Card>
   );

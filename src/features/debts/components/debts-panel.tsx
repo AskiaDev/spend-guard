@@ -149,19 +149,19 @@ export function DebtsPanel({
 
   return (
     <div className="grid gap-5">
-      <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-5 shadow-card sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 rounded-card border border-border bg-card p-5 shadow-card sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <div className="grid size-11 place-items-center rounded-control bg-caution/10 text-caution">
             <CreditCard className="size-5" aria-hidden="true" />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-normal text-muted">
+            <p className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
               Payment pressure
             </p>
             <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">
               Debts
             </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
               Track balances, minimum payments, and due dates that reduce safe-to-spend.
             </p>
           </div>
@@ -175,7 +175,7 @@ export function DebtsPanel({
       {message ? (
         <p
           role={message.startsWith("We couldn't") ? "alert" : "status"}
-          className="rounded-control border border-border bg-slate-50 px-3 py-2 text-sm text-muted"
+          className="rounded-control border border-border bg-muted/20 px-3 py-2 text-sm text-muted-foreground"
         >
           {message}
         </p>
@@ -190,7 +190,7 @@ export function DebtsPanel({
                   <h3 id="debt-form-heading" className="text-lg font-semibold text-foreground">
                     {editingId ? "Edit debt" : "New debt"}
                   </h3>
-                  <p className="mt-1 text-sm leading-6 text-muted">
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
                     Minimum payments and due days feed the 30-day debt window.
                   </p>
                 </div>
@@ -208,7 +208,7 @@ export function DebtsPanel({
               {formErrorMessages.length > 0 ? (
                 <div
                   role="alert"
-                  className="rounded-control border border-risk/20 bg-red-50 px-3 py-2 text-sm text-risk"
+                  className="rounded-control border border-risk/20 bg-risk/10 px-3 py-2 text-sm text-risk"
                 >
                   <p className="font-semibold">Check the debt fields.</p>
                   <ul className="mt-1 list-disc space-y-1 pl-4">
@@ -397,7 +397,7 @@ export function DebtsPanel({
       ) : (
         <Card>
           <CardContent>
-            <p className="rounded-control border border-dashed border-border bg-muted/40 p-5 text-sm leading-6 text-muted">
+            <p className="rounded-control border border-dashed border-border bg-muted/40 p-5 text-sm leading-6 text-muted-foreground">
               Add credit cards, loans, BNPL plans, and minimum payments so debt pressure is visible.
             </p>
           </CardContent>
@@ -419,10 +419,10 @@ function SummaryMetric({
   return (
     <Card aria-label={`${label} metric`} className="min-w-0">
       <CardContent className="grid min-h-28 content-between gap-3">
-        <h3 className="text-xs font-semibold uppercase tracking-normal text-muted">{label}</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">{label}</h3>
         <div>
           <p className="truncate text-2xl font-semibold text-foreground">{value}</p>
-          <p className="mt-2 text-xs leading-5 text-muted">{helper}</p>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">{helper}</p>
         </div>
       </CardContent>
     </Card>

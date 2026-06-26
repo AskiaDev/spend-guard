@@ -101,7 +101,7 @@ const recommendedActions: Record<PurchaseDecision, string> = {
 };
 
 const navigationActionClass =
-  "inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-control px-4 text-sm font-semibold text-slate-700 ring-1 ring-border transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-control px-4 text-sm font-semibold text-muted-foreground ring-1 ring-border transition-colors hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 export function PurchaseResult({
   check,
@@ -229,7 +229,7 @@ export function PurchaseResult({
       {isExample ? (
         <div className="rounded-card border border-caution/30 bg-caution/10 px-4 py-3 text-sm text-foreground">
           <p className="font-semibold text-caution">Example decision</p>
-          <p className="mt-1 text-muted">
+          <p className="mt-1 text-muted-foreground">
             Sample only — this is not your financial data. Values are shown in PHP.
           </p>
         </div>
@@ -242,7 +242,7 @@ export function PurchaseResult({
           </CardHeader>
           <CardContent className="grid gap-5">
             <div>
-              <p className="text-sm text-muted">Product</p>
+              <p className="text-sm text-muted-foreground">Product</p>
               <p className="mt-1 text-lg font-semibold text-foreground">{activeCheck.itemName}</p>
               <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">
                 {formatCurrency(activeCheck.amount, displayCurrency)}
@@ -276,8 +276,8 @@ export function PurchaseResult({
               ) : null}
             </dl>
 
-            <div className="rounded-control bg-slate-50 p-4 text-center">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+            <div className="rounded-control bg-muted/20 p-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Decision confidence
               </p>
               <ScoreGauge
@@ -285,7 +285,7 @@ export function PurchaseResult({
                 label="Decision confidence"
                 className="mt-2"
               />
-              <p className="mt-1 text-xs leading-5 text-muted">
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 Presentation confidence for this explanation, not a financial score.
               </p>
             </div>
@@ -300,7 +300,7 @@ export function PurchaseResult({
                 <h2 className="text-2xl font-bold tracking-tight text-foreground">
                   {decisionHeadline(activeCheck.decision)}
                 </h2>
-                <p className="mt-2 max-w-2xl text-base leading-7 text-muted">
+                <p className="mt-2 max-w-2xl text-base leading-7 text-muted-foreground">
                   {decisionExplanations[activeCheck.decision]}
                 </p>
               </div>
@@ -314,12 +314,12 @@ export function PurchaseResult({
             <CardContent>
               <ul className="grid gap-3 sm:grid-cols-2">
                 {impactItems.map((item) => (
-                  <li key={item.label} className="rounded-control border border-border bg-slate-50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                  <li key={item.label} className="rounded-control border border-border bg-muted/20 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       {item.label}
                     </p>
                     <p className="mt-2 text-xl font-bold text-foreground">{item.value}</p>
-                    <p className="mt-1 text-xs leading-5 text-muted">{item.detail}</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.detail}</p>
                   </li>
                 ))}
               </ul>
@@ -334,7 +334,7 @@ export function PurchaseResult({
               <CardContent>
                 <ul className="grid gap-3">
                   {displayedReasons.map((reason, index) => (
-                    <li key={`${index}-${reason}`} className="flex gap-3 text-sm leading-6 text-muted">
+                    <li key={`${index}-${reason}`} className="flex gap-3 text-sm leading-6 text-muted-foreground">
                       <span aria-hidden="true" className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" />
                       <span>{reason}</span>
                     </li>
@@ -349,7 +349,7 @@ export function PurchaseResult({
               </CardHeader>
               <CardContent className="grid gap-5">
                 <AdvisorExplanation key={activeCheck.id} check={activeCheck} live={!isExample} />
-                <div className="rounded-control border border-primary/20 bg-blue-50 p-4">
+                <div className="rounded-control border border-primary/20 bg-primary/10 p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-primary">
                     Recommended action
                   </p>
@@ -364,7 +364,7 @@ export function PurchaseResult({
         </div>
       </div>
 
-      <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 -mx-2 rounded-card border border-border bg-surface/95 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-elevated backdrop-blur lg:bottom-4 lg:mx-0 lg:p-3">
+      <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 -mx-2 rounded-card border border-border bg-card/95 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-elevated backdrop-blur lg:bottom-4 lg:mx-0 lg:p-3">
         {mutationError ? (
           <p role="alert" className="mb-3 rounded-control bg-risk/10 px-3 py-2 text-sm text-risk">
             {mutationError}
@@ -437,7 +437,7 @@ export function PurchaseResult({
 function SummaryRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4">
-      <dt className="text-muted">{label}</dt>
+      <dt className="text-muted-foreground">{label}</dt>
       <dd className="text-right font-medium text-foreground">{children}</dd>
     </div>
   );

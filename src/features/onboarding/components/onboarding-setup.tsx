@@ -199,7 +199,7 @@ export function OnboardingSetup({ snapshot, isHydrated, onSave }: OnboardingSetu
         </div>
         <div>
           <CardTitle>Financial Profile</CardTitle>
-          <p className="mt-1 text-sm text-muted">
+          <p className="mt-1 text-sm text-muted-foreground">
             Six local steps build the deterministic profile used by purchase checks.
           </p>
         </div>
@@ -248,7 +248,7 @@ export function OnboardingSetup({ snapshot, isHydrated, onSave }: OnboardingSetu
                 ) : null}
               </section>
 
-              <div className="hidden rounded-card border border-border bg-surface p-4 shadow-card xl:block">
+              <div className="hidden rounded-card border border-border bg-card p-4 shadow-card xl:block">
                 <Image
                   src="/illustrations/setup.svg"
                   alt="Person setting up a financial profile"
@@ -257,7 +257,7 @@ export function OnboardingSetup({ snapshot, isHydrated, onSave }: OnboardingSetu
                   loading="eager"
                   className="h-auto w-full"
                 />
-                <p className="mt-3 text-sm leading-6 text-muted">
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">
                   Your setup stays local and feeds the deterministic SpendGuard rules.
                 </p>
               </div>
@@ -310,7 +310,7 @@ function StepList({ activeStep, variant }: { activeStep: number; variant: "deskt
             className={
               index === activeStep
                 ? "inline-flex rounded-control bg-primary px-3 py-2 text-sm font-semibold text-white"
-                : "inline-flex rounded-control bg-surface px-3 py-2 text-sm font-semibold text-muted ring-1 ring-border"
+                : "inline-flex rounded-control bg-card px-3 py-2 text-sm font-semibold text-muted-foreground ring-1 ring-border"
             }
           >
             {step.label}
@@ -382,7 +382,7 @@ function SavingsStep({
 }) {
   return (
     <div className="grid gap-5">
-      <div className="rounded-control border border-primary/20 bg-blue-50 p-4 text-sm text-muted">
+      <div className="rounded-control border border-primary/20 bg-primary/10 p-4 text-sm text-foreground">
         <p className="font-semibold text-primary">Recommended emergency target</p>
         <p className="mt-1">
           Aim for at least three months of core expenses before flexible purchases.
@@ -406,7 +406,7 @@ function SavingsStep({
           error={errors.emergencyFundTarget?.message}
         />
       </div>
-      <p className="text-xs text-muted">
+      <p className="text-xs text-muted-foreground">
         Savings are stored in {currency}; SpendGuard never sends these values to a server.
       </p>
     </div>
@@ -446,7 +446,7 @@ function ExpensesStep({
           error={errors.foodTransportExpense?.message}
         />
       </div>
-      <p className="rounded-control border border-border bg-surface p-3 text-sm font-semibold text-foreground">
+      <p className="rounded-control border border-border bg-card p-3 text-sm font-semibold text-foreground">
         Expense category sum: {formatCurrency(expenseTotal, currency)}
       </p>
     </div>
@@ -500,7 +500,7 @@ function GoalsStep({
       {options.map((option) => (
         <label
           key={option.name}
-          className="flex items-center gap-3 rounded-control border border-border bg-surface p-3 text-sm font-semibold text-foreground"
+          className="flex items-center gap-3 rounded-control border border-border bg-card p-3 text-sm font-semibold text-foreground"
         >
           <input type="checkbox" className="size-4 accent-primary" {...register(option.name)} />
           {option.label}
@@ -538,8 +538,8 @@ function ReviewStep({
 
 function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-control border border-border bg-surface p-3">
-      <span className="text-muted">{label}</span>
+    <div className="flex items-center justify-between gap-4 rounded-control border border-border bg-card p-3">
+      <span className="text-muted-foreground">{label}</span>
       <span className="font-semibold text-foreground">{value}</span>
     </div>
   );
