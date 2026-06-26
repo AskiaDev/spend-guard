@@ -6,6 +6,10 @@ import { financialSnapshotFixture } from "@/test/fixtures/financial-snapshot";
 import type { Debt } from "@/types/finance";
 import { DebtsPanel } from "./debts-panel";
 
+vi.mock("goey-toast", () => ({ gooeyToast: { success: vi.fn(), error: vi.fn() } }));
+
+import { gooeyToast } from "goey-toast";
+
 const debts = financialSnapshotFixture.debts;
 
 function renderDebtsPanel({
@@ -99,8 +103,10 @@ describe("DebtsPanel", () => {
     renderDebtsPanel({ onDeleteDebt });
 
     await user.click(screen.getByRole("button", { name: "Delete Credit card" }));
+    await user.click(screen.getByRole("button", { name: "Remove" }));
 
     expect(onDeleteDebt).toHaveBeenCalledWith("debt_card");
+    expect(gooeyToast.success).toHaveBeenCalledWith("Debt removed");
   });
 
   it("blocks invalid debt input with accessible errors", async () => {

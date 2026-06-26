@@ -1,8 +1,20 @@
 "use client";
 
 import { CalendarDays, CreditCard, Pencil, Plus, Trash2, X } from "lucide-react";
+import { gooeyToast } from "goey-toast";
 import { useState, type FormEvent } from "react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -127,7 +139,7 @@ export function DebtsPanel({
 
     try {
       await onDeleteDebt(debt.id);
-      setMessage("Debt deleted.");
+      gooeyToast.success("Debt removed");
     } catch {
       setMessage("We couldn't delete this debt. Please try again.");
     } finally {
@@ -309,7 +321,7 @@ export function DebtsPanel({
             <article
               key={debt.id}
               aria-label={`${debt.label} debt`}
-              className="grid gap-4 rounded-card border border-border bg-surface p-5 shadow-card"
+              className="glass grid gap-4 rounded-card p-5"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
@@ -321,7 +333,7 @@ export function DebtsPanel({
                       <Badge variant="caution">{Math.round(debt.interestRate * 100)}% APR</Badge>
                     ) : null}
                   </div>
-                  <p className="mt-2 text-sm text-muted">
+                  <p className="mt-2 text-sm text-muted-foreground">
                     {formatCurrency(debt.outstandingBalance, currency)} balance
                   </p>
                 </div>
@@ -335,17 +347,37 @@ export function DebtsPanel({
                   >
                     <Pencil className="size-4" aria-hidden="true" />
                   </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Delete ${debt.label}`}
-                    disabled={pendingAction === `delete-${debt.id}`}
-                    isLoading={pendingAction === `delete-${debt.id}`}
-                    onClick={() => void deleteDebt(debt)}
-                  >
-                    <Trash2 className="size-4" aria-hidden="true" />
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Delete ${debt.label}`}
+                        disabled={pendingAction === `delete-${debt.id}`}
+                        isLoading={pendingAction === `delete-${debt.id}`}
+                      >
+                        <Trash2 className="size-4" aria-hidden="true" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent size="sm">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Remove debt?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently remove {debt.label} from your tracked debts.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          variant="destructive"
+                          onClick={() => void deleteDebt(debt)}
+                        >
+                          Remove
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
               <dl className="grid gap-3 text-sm sm:grid-cols-2">
@@ -400,7 +432,7 @@ function SummaryMetric({
 function DebtFact({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="rounded-control border border-border bg-muted/30 p-3">
-      <dt className="text-xs font-semibold uppercase tracking-normal text-muted">{label}</dt>
+      <dt className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">{label}</dt>
       <dd className="mt-1 font-medium text-foreground">{children}</dd>
     </div>
   );
