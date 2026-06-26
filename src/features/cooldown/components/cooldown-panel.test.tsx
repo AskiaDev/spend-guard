@@ -2,6 +2,8 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("goey-toast", () => ({ gooeyToast: { success: vi.fn(), error: vi.fn() } }));
+
 import type { CooldownItem, FinancialSnapshot } from "@/types/finance";
 import { CooldownPanel } from "./cooldown-panel";
 
@@ -94,10 +96,15 @@ describe("CooldownPanel", () => {
     const tabs = within(tablist).getAllByRole("tab");
     expect(tabs.map((tab) => tab.textContent)).toEqual(["All", "Waiting", "Wishlist"]);
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
-    expect(tabs[0]).toHaveAttribute("tabIndex", "0");
+    // Radix roving tabindex: the tablist container is the tab-order entry (tabIndex=0);
+    // individual triggers all start at -1 and are navigated via arrow keys.
+    // The arrow-key test below verifies that after navigation the focused tab gets tabIndex=0.
+    expect(tablist).toHaveAttribute("tabIndex", "0");
+    expect(tabs[0]).toHaveAttribute("tabIndex", "-1");
     expect(tabs[1]).toHaveAttribute("tabIndex", "-1");
 
-    expect(screen.getByLabelText("Sort cooldown items")).toHaveValue("recheck");
+    // Radix Select trigger shows selected option text, not a form value
+    expect(screen.getByLabelText("Sort cooldown items")).toHaveTextContent("Recheck date");
 
     const examples = screen.getByRole("region", { name: "Example items" });
     expect(within(examples).getByText("Example items")).toBeVisible();
@@ -190,7 +197,8 @@ describe("CooldownPanel", () => {
     expect(
       screen.queryByRole("article", { name: "Laptop cooldown item" })
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Sort cooldown items")).toHaveValue("recheck");
+    // Radix Select trigger shows selected option text, not a form value
+    expect(screen.getByLabelText("Sort cooldown items")).toHaveTextContent("Recheck date");
   });
 
   it("links tabs to a tabpanel and supports arrow-key navigation", async () => {

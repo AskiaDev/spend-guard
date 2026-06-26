@@ -1,5 +1,6 @@
 "use client";
 
+import { gooeyToast } from "goey-toast";
 import {
   Minus,
   MoreHorizontal,
@@ -11,12 +12,21 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
-import type { ComponentType, KeyboardEvent, ReactNode } from "react";
-import { useMemo, useRef, useState } from "react";
+import type { ComponentType, ReactNode } from "react";
+import { useMemo, useState } from "react";
 
 import { StatusBadge } from "@/components/finance/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { exampleOnlyPurchaseReferences } from "@/features/reference-data";
 import { getCooldownDays } from "@/lib/calculations/cooldown";
 import {
@@ -69,7 +79,7 @@ const trendPresentation: Record<
   unknown: {
     label: "Today's check",
     surface: "border-border bg-muted/30",
-    icon: "text-muted",
+    icon: "text-muted-foreground",
     Icon: Sparkles,
   },
 };
@@ -101,113 +111,82 @@ export function CooldownPanel({
 }) {
   const [activeTab, setActiveTab] = useState<CooldownTab>("all");
   const [sortMode, setSortMode] = useState<SortMode>("recheck");
-  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const visibleItems = useMemo(
     () => sortCooldownItems(filterCooldownItems(items, activeTab), sortMode),
     [activeTab, items, sortMode]
   );
   const activeTabId = getTabId(activeTab);
 
-  function selectTab(tab: CooldownTab, focusIndex?: number) {
-    setActiveTab(tab);
-
-    if (focusIndex !== undefined) {
-      tabRefs.current[focusIndex]?.focus();
-    }
-  }
-
-  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
-    const lastIndex = tabs.length - 1;
-    let nextIndex: number | null = null;
-
-    if (event.key === "ArrowRight") {
-      nextIndex = index === lastIndex ? 0 : index + 1;
-    }
-
-    if (event.key === "ArrowLeft") {
-      nextIndex = index === 0 ? lastIndex : index - 1;
-    }
-
-    if (event.key === "Home") {
-      nextIndex = 0;
-    }
-
-    if (event.key === "End") {
-      nextIndex = lastIndex;
-    }
-
-    if (nextIndex !== null) {
-      event.preventDefault();
-      selectTab(tabs[nextIndex].id, nextIndex);
-    }
-  }
-
   return (
     <div className="grid gap-5">
-      <div className="grid gap-4 rounded-card border border-border bg-surface p-5 shadow-card">
-        <div className="flex items-start gap-3">
-          <div className="grid size-11 place-items-center rounded-control bg-caution/10 text-caution">
-            <TimerReset className="size-5" aria-hidden="true" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-normal text-muted">
-              Cooldown list
-            </p>
-            <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">
-              Paused purchases
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-              Recheck a paused want to see if your money moved in its favor, or turn it into a goal.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <div
-            role="tablist"
-            aria-label="Cooldown views"
-            className="flex gap-2 overflow-x-auto pb-1"
-          >
-            {tabs.map((tab, index) => (
-              <button
-                key={tab.id}
-                id={getTabId(tab.id)}
-                ref={(element) => {
-                  tabRefs.current[index] = element;
-                }}
-                type="button"
-                role="tab"
-                aria-selected={activeTab === tab.id}
-                aria-controls={itemsPanelId}
-                tabIndex={activeTab === tab.id ? 0 : -1}
-                className={cn(
-                  "h-10 shrink-0 rounded-control px-4 text-sm font-semibold ring-1 ring-border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                  activeTab === tab.id
-                    ? "bg-primary text-white ring-primary"
-                    : "bg-surface text-foreground hover:bg-slate-50"
-                )}
-                onClick={() => selectTab(tab.id)}
-                onKeyDown={(event) => handleTabKeyDown(event, index)}
-              >
-                {tab.label}
-              </button>
-            ))}
+      {/* ponytail: Tabs wraps the header card; TabsContent unused — panel is a single shared div below */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as CooldownTab)}>
+        <div className="grid gap-4 rounded-card border border-border bg-card glass p-5 shadow-card">
+          <div className="flex items-start gap-3">
+            <div className="grid size-11 place-items-center rounded-control bg-caution/10 text-caution">
+              <TimerReset className="size-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                Cooldown list
+              </p>
+              <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">
+                Paused purchases
+              </h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+                Recheck a paused want to see if your money moved in its favor, or turn it into a
+                goal.
+              </p>
+            </div>
           </div>
 
-          <label className="grid gap-1 text-xs font-semibold uppercase tracking-normal text-muted">
-            Sort cooldown items
-            <select
-              value={sortMode}
-              className="h-11 rounded-control border border-border bg-surface px-3 text-sm font-medium normal-case tracking-normal text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-              onChange={(event) => setSortMode(event.target.value as SortMode)}
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+            <TabsList
+              aria-label="Cooldown views"
+              className="flex h-auto w-auto gap-2 overflow-x-auto rounded-none bg-transparent p-0 pb-1"
             >
-              <option value="recheck">Recheck date</option>
-              <option value="amount-desc">Amount high to low</option>
-              <option value="amount-asc">Amount low to high</option>
-            </select>
-          </label>
+              {tabs.map((tab) => (
+                <TabsTrigger
+                  key={tab.id}
+                  value={tab.id}
+                  id={getTabId(tab.id)}
+                  aria-controls={itemsPanelId}
+                  className={cn(
+                    "h-10 flex-none shrink-0 rounded-control px-4 text-sm font-semibold ring-1 ring-border transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                    "data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:ring-primary data-[state=active]:shadow-none",
+                    "data-[state=inactive]:bg-card data-[state=inactive]:text-foreground data-[state=inactive]:hover:bg-muted/20"
+                  )}
+                >
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            <div className="grid gap-1">
+              <Label
+                htmlFor="sort-select"
+                className="text-xs font-semibold uppercase tracking-normal text-muted-foreground"
+              >
+                Sort cooldown items
+              </Label>
+              <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
+                <SelectTrigger
+                  id="sort-select"
+                  className="h-11 rounded-control border-border bg-card text-sm font-medium text-foreground"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="recheck">Recheck date</SelectItem>
+                  <SelectItem value="amount-desc">Amount high to low</SelectItem>
+                  <SelectItem value="amount-asc">Amount low to high</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
-      </div>
+      </Tabs>
 
       <div
         id={itemsPanelId}
@@ -233,7 +212,7 @@ export function CooldownPanel({
             {visibleItems.length === 0 ? (
               <Card className="lg:col-span-2">
                 <CardContent>
-                  <p className="rounded-control border border-dashed border-border bg-muted/40 p-5 text-sm leading-6 text-muted">
+                  <p className="rounded-control border border-dashed border-border bg-muted/40 p-5 text-sm leading-6 text-muted-foreground">
                     No cooldown items match this view yet.
                   </p>
                 </CardContent>
@@ -253,7 +232,7 @@ function ExampleItems({ currency }: { currency: CurrencyCode }) {
         <p id="example-items-heading" className="font-semibold text-caution">
           Example items
         </p>
-        <p className="mt-1 text-muted">
+        <p className="mt-1 text-muted-foreground">
           Sample only — these are not your saved cooldown items.
         </p>
       </div>
@@ -273,7 +252,7 @@ function ExampleItems({ currency }: { currency: CurrencyCode }) {
               </div>
               <StatusBadge decision={example.decision} />
             </div>
-            <p className="text-sm leading-6 text-muted">
+            <p className="text-sm leading-6 text-muted-foreground">
               Reference card only. Run a purchase check to create a real cooldown item.
             </p>
           </article>
@@ -307,6 +286,7 @@ function CooldownItemCard({
     try {
       await onConvertToGoal(item);
       setIsConverted(true);
+      gooeyToast.success(`${item.itemName} added to goals`);
     } finally {
       setIsConverting(false);
     }
@@ -315,11 +295,11 @@ function CooldownItemCard({
   return (
     <article
       aria-label={`${item.itemName} cooldown item`}
-      className="grid gap-5 rounded-card border border-border bg-surface p-5 shadow-card"
+      className="grid gap-5 rounded-card border border-border bg-card glass p-5 shadow-card"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-normal text-muted">
+          <p className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
             Cooldown item
           </p>
           <h3 className="mt-1 text-lg font-semibold tracking-tight text-foreground">
@@ -389,7 +369,10 @@ function CooldownItemCard({
           variant="ghost"
           size="icon"
           aria-label={`Remove ${item.itemName}`}
-          onClick={() => void onRemove(item.id)}
+          onClick={async () => {
+            await onRemove(item.id);
+            gooeyToast.success(`${item.itemName} removed`);
+          }}
         >
           <Trash2 className="size-4" aria-hidden="true" />
         </Button>
@@ -426,7 +409,7 @@ function RecheckResult({
       </div>
 
       {delta === null ? (
-        <p className="text-sm leading-6 text-muted">
+        <p className="text-sm leading-6 text-muted-foreground">
           No saved result from when you added this, so only today&apos;s check is shown.
         </p>
       ) : (
@@ -440,7 +423,7 @@ function RecheckResult({
       )}
 
       {recheck.current.reasons.length > 0 ? (
-        <ul className="grid gap-1.5 text-sm leading-5 text-muted">
+        <ul className="grid gap-1.5 text-sm leading-5 text-muted-foreground">
           {recheck.current.reasons.map((reason, index) => (
             <li key={index} className="flex gap-2">
               <span aria-hidden="true">•</span>
@@ -460,7 +443,9 @@ function getTabId(tab: CooldownTab) {
 function CooldownFact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="rounded-control border border-border bg-muted/30 p-3">
-      <dt className="text-xs font-semibold uppercase tracking-normal text-muted">{label}</dt>
+      <dt className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+        {label}
+      </dt>
       <dd className="mt-1 font-medium text-foreground">{children}</dd>
     </div>
   );
