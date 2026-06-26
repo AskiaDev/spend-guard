@@ -3,13 +3,20 @@
 import { ArrowLeft, ArrowRight, CheckCircle2, ShieldCheck } from "lucide-react";
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
 import { InlineNotice } from "@/components/feedback/inline-notice";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FieldError, Input, Label, Select } from "@/components/ui/form-fields";
+import { FieldError, Input, Label } from "@/components/ui/form-fields";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { createId, formatCurrency } from "@/lib/utils";
 import {
   PAY_FREQUENCIES,
@@ -228,7 +235,7 @@ export function OnboardingSetup({ snapshot, isHydrated, onSave }: OnboardingSetu
                 </div>
 
                 {activeStep === 0 ? (
-                  <IncomeStep register={register} errors={errors} />
+                  <IncomeStep register={register} errors={errors} control={control} />
                 ) : null}
                 {activeStep === 1 ? (
                   <SavingsStep register={register} errors={errors} currency={currency} />
@@ -324,9 +331,11 @@ function StepList({ activeStep, variant }: { activeStep: number; variant: "deskt
 function IncomeStep({
   register,
   errors,
+  control,
 }: {
   register: ReturnType<typeof useForm<OnboardingFormValues>>["register"];
   errors: ReturnType<typeof useForm<OnboardingFormValues>>["formState"]["errors"];
+  control: ReturnType<typeof useForm<OnboardingFormValues>>["control"];
 }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -337,23 +346,45 @@ function IncomeStep({
       </div>
       <div className="grid gap-2">
         <Label htmlFor="currency">Currency</Label>
-        <Select id="currency" {...register("currency")}>
-          <option value="PHP">PHP</option>
-          <option value="USD">USD</option>
-          <option value="EUR">EUR</option>
-          <option value="JPY">JPY</option>
-          <option value="SGD">SGD</option>
-        </Select>
+        <Controller
+          control={control}
+          name="currency"
+          render={({ field }) => (
+            <Select value={field.value} onValueChange={field.onChange}>
+              <SelectTrigger id="currency" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PHP">PHP</SelectItem>
+                <SelectItem value="USD">USD</SelectItem>
+                <SelectItem value="EUR">EUR</SelectItem>
+                <SelectItem value="JPY">JPY</SelectItem>
+                <SelectItem value="SGD">SGD</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        />
       </div>
       <div className="grid gap-2">
         <Label htmlFor="pay-frequency">Pay frequency</Label>
-        <Select id="pay-frequency" {...register("payFrequency")}>
-          {PAY_FREQUENCIES.map((frequency) => (
-            <option key={frequency} value={frequency}>
-              {PAY_FREQUENCY_LABELS[frequency]}
-            </option>
-          ))}
-        </Select>
+        <Controller
+          control={control}
+          name="payFrequency"
+          render={({ field }) => (
+            <Select value={field.value} onValueChange={field.onChange}>
+              <SelectTrigger id="pay-frequency" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAY_FREQUENCIES.map((frequency) => (
+                  <SelectItem key={frequency} value={frequency}>
+                    {PAY_FREQUENCY_LABELS[frequency]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
       </div>
       <NumberField
         id="monthly-income"

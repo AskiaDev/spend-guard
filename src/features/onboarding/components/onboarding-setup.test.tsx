@@ -39,7 +39,9 @@ describe("OnboardingSetup", () => {
 
     await user.clear(screen.getByLabelText("Full name"));
     await user.type(screen.getByLabelText("Full name"), "Askia");
-    await user.selectOptions(screen.getByLabelText("Pay frequency"), "biweekly");
+    // Radix Select: click trigger to open, then click the option
+    await user.click(screen.getByLabelText("Pay frequency"));
+    await user.click(await screen.findByRole("option", { name: "Every 2 weeks" }));
     await user.clear(screen.getByLabelText("Estimated variable expenses"));
     await user.type(screen.getByLabelText("Estimated variable expenses"), "12000");
 
@@ -58,7 +60,7 @@ describe("OnboardingSetup", () => {
 
     expect(screen.getByLabelText("Monthly income")).toHaveValue(90000);
     expect(screen.getByLabelText("Full name")).toHaveValue("Askia");
-    expect(screen.getByLabelText("Pay frequency")).toHaveValue("biweekly");
+    expect(screen.getByLabelText("Pay frequency")).toHaveTextContent("Every 2 weeks");
     expect(screen.getByLabelText("Estimated variable expenses")).toHaveValue(12000);
   });
 
@@ -112,7 +114,9 @@ describe("OnboardingSetup", () => {
 
     await user.clear(screen.getByLabelText("Full name"));
     await user.type(screen.getByLabelText("Full name"), "Askia Manjares");
-    await user.selectOptions(screen.getByLabelText("Pay frequency"), "weekly");
+    // Radix Select: click trigger to open, then click the option
+    await user.click(screen.getByLabelText("Pay frequency"));
+    await user.click(await screen.findByRole("option", { name: "Weekly" }));
     await user.clear(screen.getByLabelText("Estimated variable expenses"));
     await user.type(screen.getByLabelText("Estimated variable expenses"), "15000");
     await user.clear(screen.getByLabelText("Monthly income"));
