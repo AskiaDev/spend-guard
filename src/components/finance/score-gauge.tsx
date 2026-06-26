@@ -19,6 +19,8 @@ const gaugePath = "M 10 60 A 50 50 0 0 1 110 60";
 export function ScoreGauge({ score, label, className }: ScoreGaugeProps) {
   const boundedScore = clampScore(score);
   const displayScore = Math.round(boundedScore);
+  // ponytail: gaugeOffset is data-driven (100 - score); cannot be a Tailwind class
+  const gaugeOffset = 100 - boundedScore;
 
   return (
     <div
@@ -42,7 +44,7 @@ export function ScoreGauge({ score, label, className }: ScoreGaugeProps) {
           strokeWidth="10"
           strokeLinecap="round"
           pathLength="100"
-          className="text-slate-100"
+          className="text-border"
         />
         <path
           d={gaugePath}
@@ -52,7 +54,7 @@ export function ScoreGauge({ score, label, className }: ScoreGaugeProps) {
           strokeLinecap="round"
           pathLength="100"
           strokeDasharray="100"
-          strokeDashoffset={100 - boundedScore}
+          strokeDashoffset={gaugeOffset}
           className="text-primary transition-[stroke-dashoffset] motion-reduce:transition-none"
         />
       </svg>

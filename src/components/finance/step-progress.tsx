@@ -39,7 +39,7 @@ export function StepProgress({ steps, currentStep, className }: StepProgressProp
                 "grid size-8 shrink-0 place-items-center rounded-full border text-sm font-semibold",
                 isCompleted && "border-safe bg-safe text-white",
                 isCurrent && "border-primary bg-primary text-white",
-                !isCompleted && !isCurrent && "border-border bg-surface text-muted"
+                !isCompleted && !isCurrent && "border-border bg-card/50 text-muted-foreground"
               )}
             >
               {isCompleted ? (

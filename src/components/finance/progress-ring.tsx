@@ -47,6 +47,7 @@ export function ProgressRing({
   const normalizedSize = normalizeSize(size);
   const normalizedStrokeWidth = normalizeStrokeWidth(strokeWidth, normalizedSize);
   const radius = (normalizedSize - normalizedStrokeWidth) / 2;
+  // ponytail: circumference + dashOffset are data-driven SVG geometry; cannot be a Tailwind class
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - boundedValue / 100);
   const displayValue = Math.round(boundedValue);
@@ -59,6 +60,7 @@ export function ProgressRing({
       aria-valuemax={100}
       aria-valuenow={displayValue}
       className={cn("relative inline-grid shrink-0 place-items-center", className)}
+      // ponytail: size is a prop-driven pixel value; cannot be a Tailwind class
       style={{ width: normalizedSize, height: normalizedSize }}
     >
       <svg
@@ -74,7 +76,7 @@ export function ProgressRing({
           fill="none"
           stroke="currentColor"
           strokeWidth={normalizedStrokeWidth}
-          className="text-slate-100"
+          className="text-border"
         />
         <circle
           cx={normalizedSize / 2}

@@ -22,6 +22,7 @@ import { InlineNotice } from "@/components/feedback/inline-notice";
 import { ProgressRing } from "@/components/finance/progress-ring";
 import { ScoreGauge } from "@/components/finance/score-gauge";
 import { StatusBadge } from "@/components/finance/status-badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   describeHealthStatus,
@@ -160,7 +161,7 @@ export function DashboardOverview({
         <CardContent className="grid gap-4">
           {upcomingDebts.length > 0 ? (
             <>
-              <p className="text-sm text-muted">
+              <p className="text-sm text-muted-foreground">
                 <span className="font-semibold text-foreground">
                   {formatCurrency(upcomingDebtTotal, currency)}
                 </span>{" "}
@@ -175,7 +176,7 @@ export function DashboardOverview({
                   >
                     <div className="min-w-0">
                       <p className="font-semibold text-foreground">{debt.label}</p>
-                      <p className="mt-1 flex items-center gap-2 text-xs text-muted">
+                      <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                         <CalendarDays aria-hidden="true" className="size-3.5" />
                         Due {formatShortDate(nextDueDate)} · {formatDueWindow(daysUntilDue)}
                       </p>
@@ -188,7 +189,7 @@ export function DashboardOverview({
               </ul>
             </>
           ) : (
-            <p className="text-sm leading-6 text-muted">
+            <p className="text-sm leading-6 text-muted-foreground">
               No debt payments are due in the next 30 days. Debts you add with a due date will show
               up here.
             </p>
@@ -251,7 +252,7 @@ export function DashboardOverview({
                   }}
                   className="min-h-52"
                 />
-                <div className="rounded-control border border-dashed border-border bg-muted/40 p-4 text-xs leading-5 text-muted">
+                <div className="rounded-control border border-dashed border-border bg-muted/40 p-4 text-xs leading-5 text-muted-foreground">
                   <p className="font-semibold uppercase tracking-normal text-foreground">
                     Example-only empty content
                   </p>
@@ -277,7 +278,7 @@ export function DashboardOverview({
             <h2 id="advisor-insight-heading" className="text-xl font-semibold text-foreground">
               {advisor.title}
             </h2>
-            <p className="max-w-3xl text-sm leading-6 text-muted">
+            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
               {advisor.body} You currently have{" "}
               {formatCurrency(metrics.monthlyFreeCashFlow, currency)} in monthly free cash flow
               after committed expenses, debt payments, and goal funding.
@@ -323,13 +324,13 @@ function HealthStatusBanner({ status }: { status: HealthStatus }) {
       aria-label="Financial health status"
       className={cn("flex items-start gap-4 rounded-card border px-5 py-4", className)}
     >
-      <div className="grid size-11 shrink-0 place-items-center rounded-control bg-surface/70">
+      <div className="grid size-11 shrink-0 place-items-center rounded-control bg-card/50">
         <Icon aria-hidden="true" className="size-5" />
       </div>
       <div className="min-w-0">
         <p className="text-xs font-semibold uppercase tracking-normal">Financial health</p>
         <p className="text-lg font-semibold text-foreground">Your finances are {status}</p>
-        <p className="mt-0.5 text-sm leading-5 text-muted">{describeHealthStatus(status)}</p>
+        <p className="mt-0.5 text-sm leading-5 text-muted-foreground">{describeHealthStatus(status)}</p>
       </div>
     </div>
   );
@@ -357,13 +358,7 @@ function ActionLink({
   className?: string;
 }) {
   return (
-    <Link
-      href={href}
-      className={cn(
-        "inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-control bg-surface px-4 text-sm font-semibold text-foreground ring-1 ring-border transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        className
-      )}
-    >
+    <Link href={href} className={cn(buttonVariants({ variant: "secondary" }), className)}>
       {children}
     </Link>
   );
@@ -388,7 +383,7 @@ function KpiCard({
     safe: "bg-safe/10 text-safe",
     caution: "bg-caution/10 text-caution",
     risk: "bg-risk/10 text-risk",
-    neutral: "bg-slate-100 text-slate-700",
+    neutral: "bg-secondary text-muted-foreground",
   }[tone];
 
   return (
@@ -401,9 +396,9 @@ function KpiCard({
           {aside}
         </div>
         <div className="min-w-0">
-          <h3 className="text-xs font-semibold uppercase tracking-normal text-muted">{label}</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">{label}</h3>
           <p className="mt-1 truncate text-2xl font-semibold text-foreground">{value}</p>
-          <p className="mt-2 text-xs leading-5 text-muted">{helper}</p>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">{helper}</p>
         </div>
       </CardContent>
     </Card>
@@ -421,17 +416,17 @@ function GoalRow({ goal, currency }: { goal: Goal; currency: CurrencyCode }) {
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h3 className="font-semibold text-foreground">{goal.label}</h3>
-            <p className="mt-1 text-sm text-muted">
+            <p className="mt-1 text-sm text-muted-foreground">
               {formatCurrency(goal.savedAmount, currency)} of{" "}
               {formatCurrency(goal.targetAmount, currency)}
             </p>
           </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase text-slate-700">
+          <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase text-muted-foreground">
             {formatPriority(goal.priority)}
           </span>
         </div>
-        <p className="mt-3 text-sm leading-6 text-muted">{helper}</p>
-        <p className="mt-2 flex items-center gap-2 text-xs text-muted">
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">{helper}</p>
+        <p className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
           <CalendarDays aria-hidden="true" className="size-3.5" />
           {formatCurrency(goal.monthlyContribution, currency)} monthly contribution
           {goal.targetDate ? ` · Target ${formatShortDate(goal.targetDate)}` : ""}
@@ -462,17 +457,17 @@ function RecentCheckRow({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="font-semibold text-foreground">{check.itemName}</h3>
-          <p className="mt-1 text-xs text-muted">
+          <p className="mt-1 text-xs text-muted-foreground">
             {reference.vendorStyle} · {reference.category}
           </p>
         </div>
         <StatusBadge decision={check.decision} />
       </div>
-      <div className="grid gap-2 text-muted sm:grid-cols-2">
+      <div className="grid gap-2 text-muted-foreground sm:grid-cols-2">
         <p>{formatCurrency(check.amount, currency)}</p>
         <p className="sm:text-right">Checked {formatShortDate(check.createdAt)}</p>
       </div>
-      <p className="text-xs leading-5 text-muted">{check.reasons[0] ?? check.advisorText}</p>
+      <p className="text-xs leading-5 text-muted-foreground">{check.reasons[0] ?? check.advisorText}</p>
     </article>
   );
 }
