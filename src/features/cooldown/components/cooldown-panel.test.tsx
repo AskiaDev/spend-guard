@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("goey-toast", () => ({ gooeyToast: { success: vi.fn(), error: vi.fn() } }));
 
+import { gooeyToast } from "goey-toast";
+
 import type { CooldownItem, FinancialSnapshot } from "@/types/finance";
 import { CooldownPanel } from "./cooldown-panel";
 
@@ -183,6 +185,7 @@ describe("CooldownPanel", () => {
     expect(onConvertToGoal).toHaveBeenCalledWith(phoneItem);
     expect(within(phone).getByText(/added to your goals/i)).toBeVisible();
     expect(convert).toBeDisabled();
+    expect(gooeyToast.success).toHaveBeenCalledWith("Phone added to goals");
   });
 
   it("updates tab selection and filters wishlist items without losing sort controls", async () => {
@@ -274,5 +277,28 @@ describe("CooldownPanel", () => {
 
     expect(onRemove).toHaveBeenCalledOnce();
     expect(onRemove).toHaveBeenCalledWith("cooldown_laptop");
+    expect(gooeyToast.success).toHaveBeenCalledWith("Laptop removed");
+  });
+
+  it("reorders items when a different sort option is selected via the Radix Select", async () => {
+    const user = userEvent.setup();
+    renderPanel(cooldownItems);
+
+    // Default sort is recheck date: Laptop (Jun 27) before Espresso (Jul 5)
+    const articlesBefore = screen
+      .getAllByRole("article")
+      .map((el) => el.getAttribute("aria-label"));
+    expect(articlesBefore[0]).toBe("Laptop cooldown item");
+    expect(articlesBefore[1]).toBe("Espresso machine cooldown item");
+
+    // Switch to amount low to high: Espresso (32 000) before Laptop (45 000)
+    await user.click(screen.getByLabelText("Sort cooldown items"));
+    await user.click(await screen.findByRole("option", { name: "Amount low to high" }));
+
+    const articlesAfter = screen
+      .getAllByRole("article")
+      .map((el) => el.getAttribute("aria-label"));
+    expect(articlesAfter[0]).toBe("Espresso machine cooldown item");
+    expect(articlesAfter[1]).toBe("Laptop cooldown item");
   });
 });
