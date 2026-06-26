@@ -22,3 +22,8 @@ const createStorage = (): Storage => {
 };
 
 vi.stubGlobal("localStorage", createStorage());
+
+// Radix UI jsdom polyfills (Select, etc.)
+Element.prototype.scrollIntoView = vi.fn();
+Element.prototype.hasPointerCapture = vi.fn(() => false);
+Element.prototype.releasePointerCapture = vi.fn();

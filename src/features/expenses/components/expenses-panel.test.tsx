@@ -6,6 +6,10 @@ import { financialSnapshotFixture } from "@/test/fixtures/financial-snapshot";
 import type { Expense } from "@/types/finance";
 import { ExpensesPanel } from "./expenses-panel";
 
+vi.mock("goey-toast", () => ({ gooeyToast: { success: vi.fn(), error: vi.fn() } }));
+
+import { gooeyToast } from "goey-toast";
+
 const expenses = financialSnapshotFixture.expenses;
 
 function renderExpensesPanel({
@@ -60,7 +64,8 @@ describe("ExpensesPanel", () => {
     await user.type(screen.getByLabelText("Amount"), "1200");
     await user.clear(screen.getByLabelText("Due day"));
     await user.type(screen.getByLabelText("Due day"), "10");
-    await user.selectOptions(screen.getByLabelText("Recurring"), "false");
+    await user.click(screen.getByLabelText("Recurring"));
+    await user.click(await screen.findByRole("option", { name: "One-time" }));
     await user.click(screen.getByRole("button", { name: "Create Expense" }));
 
     expect(onCreateExpense).toHaveBeenCalledWith({
@@ -95,8 +100,10 @@ describe("ExpensesPanel", () => {
     renderExpensesPanel({ onDeleteExpense });
 
     await user.click(screen.getByRole("button", { name: "Delete Rent" }));
+    await user.click(screen.getByRole("button", { name: "Remove" }));
 
     expect(onDeleteExpense).toHaveBeenCalledWith("expense_rent");
+    expect(gooeyToast.success).toHaveBeenCalledWith("Expense removed");
   });
 
   it("blocks invalid expense input with accessible errors", async () => {

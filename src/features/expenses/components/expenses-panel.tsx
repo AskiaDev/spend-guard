@@ -1,12 +1,31 @@
 "use client";
 
 import { CalendarDays, Pencil, Plus, ReceiptText, Trash2, X } from "lucide-react";
+import { gooeyToast } from "goey-toast";
 import { useState, type FormEvent } from "react";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { FieldError, Input, Label, Select } from "@/components/ui/form-fields";
+import { FieldError, Input, Label } from "@/components/ui/form-fields";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { formatCurrency } from "@/lib/utils";
 import type { CurrencyCode, Expense } from "@/types/finance";
 
@@ -124,7 +143,7 @@ export function ExpensesPanel({
 
     try {
       await onDeleteExpense(expense.id);
-      setMessage("Expense deleted.");
+      gooeyToast.success("Expense removed");
     } catch {
       setMessage("We couldn't delete this expense. Please try again.");
     } finally {
@@ -243,16 +262,20 @@ export function ExpensesPanel({
                   <FieldError>{formErrors.dueDay}</FieldError>
                 </div>
                 <div className="grid gap-2 md:max-w-xs">
-                  <Label htmlFor="expense-recurring">Recurring</Label>
+                  <Label htmlFor="recurring">Recurring</Label>
                   <Select
-                    id="expense-recurring"
                     value={formValues.isRecurring}
-                    onChange={(event) =>
-                      updateField("isRecurring", event.target.value as "true" | "false")
+                    onValueChange={(value) =>
+                      updateField("isRecurring", value as "true" | "false")
                     }
                   >
-                    <option value="true">Recurring</option>
-                    <option value="false">One-time</option>
+                    <SelectTrigger id="recurring">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Recurring</SelectItem>
+                      <SelectItem value="false">One-time</SelectItem>
+                    </SelectContent>
                   </Select>
                 </div>
               </div>
@@ -295,7 +318,7 @@ export function ExpensesPanel({
             <article
               key={expense.id}
               aria-label={`${expense.label} expense`}
-              className="grid gap-4 rounded-card border border-border bg-surface p-5 shadow-card"
+              className="glass grid gap-4 rounded-card p-5"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
@@ -307,7 +330,7 @@ export function ExpensesPanel({
                       {expense.isRecurring ? "Recurring" : "One-time"}
                     </Badge>
                   </div>
-                  <p className="mt-2 text-sm text-muted">
+                  <p className="mt-2 text-sm text-muted-foreground">
                     {formatCurrency(expense.amount, currency)} monthly estimate
                   </p>
                 </div>
@@ -321,20 +344,40 @@ export function ExpensesPanel({
                   >
                     <Pencil className="size-4" aria-hidden="true" />
                   </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Delete ${expense.label}`}
-                    disabled={pendingAction === `delete-${expense.id}`}
-                    isLoading={pendingAction === `delete-${expense.id}`}
-                    onClick={() => void deleteExpense(expense)}
-                  >
-                    <Trash2 className="size-4" aria-hidden="true" />
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Delete ${expense.label}`}
+                        disabled={pendingAction === `delete-${expense.id}`}
+                        isLoading={pendingAction === `delete-${expense.id}`}
+                      >
+                        <Trash2 className="size-4" aria-hidden="true" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent size="sm">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Remove expense?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently remove {expense.label} from your tracked expenses.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          variant="destructive"
+                          onClick={() => void deleteExpense(expense)}
+                        >
+                          Remove
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
-              <p className="flex items-center gap-2 text-sm text-muted">
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <CalendarDays className="size-4" aria-hidden="true" />
                 Due every month on day {expense.dueDay}
               </p>
