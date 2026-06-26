@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 
+import { Label } from "@/components/ui/label";
+
 export function VaultField({
   label,
   error,
@@ -12,14 +14,12 @@ export function VaultField({
   children: ReactNode;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <label htmlFor={htmlFor} className="vault-eyebrow">
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={htmlFor} className="text-[0.7rem] font-bold tracking-[0.2em] text-primary">
         {label}
-      </label>
+      </Label>
       {children}
-      {error ? (
-        <span style={{ color: "var(--vault-danger)", fontSize: "0.72rem", fontWeight: 500 }}>{error}</span>
-      ) : null}
+      {error ? <span className="text-xs font-medium text-risk">{error}</span> : null}
     </div>
   );
 }

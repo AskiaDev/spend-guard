@@ -8,9 +8,9 @@ import { SAMPLE_SNAPSHOT } from "../lib/sample-snapshot";
 import { ConversationalPrompt } from "./conversational-prompt";
 import { MoneyInput } from "./money-input";
 import { VerdictReveal } from "./verdict-reveal";
-import { VaultButton } from "../../vault/components/primitives/vault-button";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { VaultField } from "../../vault/components/primitives/vault-field";
-import { VaultInput } from "../../vault/components/primitives/vault-input";
 
 // ---- Sample data banner --------------------------------------------------------
 
@@ -98,7 +98,7 @@ export function ExploreSandbox() {
   }, []);
 
   const ctaButton = (
-    <VaultButton onClick={handleSetupReal}>Set up my real guardrail</VaultButton>
+    <Button onClick={handleSetupReal}>Set up my real guardrail</Button>
   );
 
   if (result) {
@@ -119,9 +119,9 @@ export function ExploreSandbox() {
         />
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {ctaButton}
-          <VaultButton variant="ghost" onClick={handleReset}>
+          <Button variant="ghost" className="text-muted-foreground" onClick={handleReset}>
             Try another item
-          </VaultButton>
+          </Button>
         </div>
       </div>
     );
@@ -139,7 +139,7 @@ export function ExploreSandbox() {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <VaultField label="What is it?" htmlFor="sandbox-item">
-          <VaultInput
+          <Input
             id="sandbox-item"
             value={itemName}
             onChange={(e) => setItemName(e.target.value)}
@@ -158,12 +158,12 @@ export function ExploreSandbox() {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <VaultButton onClick={handleCheck} disabled={!canCheck}>
+        <Button onClick={handleCheck} disabled={!canCheck}>
           Check if I can buy this
-        </VaultButton>
-        <VaultButton variant="ghost" onClick={handleSetupReal}>
+        </Button>
+        <Button variant="ghost" className="text-muted-foreground" onClick={handleSetupReal}>
           Set up my real guardrail
-        </VaultButton>
+        </Button>
       </div>
     </div>
   );

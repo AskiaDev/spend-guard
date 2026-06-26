@@ -1,6 +1,6 @@
 "use client";
 
-import { VaultButton } from "@/features/onboarding/vault/components/primitives/vault-button";
+import { Button } from "@/components/ui/button";
 import { ConversationalPrompt } from "../conversational-prompt";
 
 interface WelcomeStepProps {
@@ -18,12 +18,10 @@ export function WelcomeStep({ onStart, onExplore }: WelcomeStepProps) {
       />
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        <VaultButton variant="primary" onClick={onStart}>
-          Set up my guardrail
-        </VaultButton>
-        <VaultButton variant="ghost" onClick={onExplore}>
+        <Button onClick={onStart}>Set up my guardrail</Button>
+        <Button variant="ghost" className="text-muted-foreground" onClick={onExplore}>
           I just want to explore
-        </VaultButton>
+        </Button>
       </div>
     </div>
   );

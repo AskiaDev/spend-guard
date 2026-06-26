@@ -3,10 +3,10 @@
 import { useCallback } from "react";
 import { Controller, useFieldArray, type Control } from "react-hook-form";
 import { type OnboardingFormValues, emptyGoalRow } from "../lib/onboarding-form";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { EmptyState } from "../../vault/components/primitives/empty-state";
 import { RepeatableRow } from "../../vault/components/primitives/repeatable-row";
-import { VaultButton } from "../../vault/components/primitives/vault-button";
-import { VaultInput } from "../../vault/components/primitives/vault-input";
 
 // ---- Shared styles -----------------------------------------------------------
 
@@ -52,7 +52,7 @@ function GoalRowCard({
             control={control}
             name={`goals.${index}.label`}
             render={({ field }) => (
-              <VaultInput
+              <Input
                 id={`conv-goal-${index}-label`}
                 placeholder="e.g. Emergency fund, holiday, new laptop"
                 aria-label="Goal name"
@@ -70,7 +70,7 @@ function GoalRowCard({
               control={control}
               name={`goals.${index}.targetAmount`}
               render={({ field }) => (
-                <VaultInput
+                <Input
                   id={`conv-goal-${index}-target`}
                   inputMode="decimal"
                   placeholder="0.00"
@@ -86,7 +86,7 @@ function GoalRowCard({
               control={control}
               name={`goals.${index}.savedAmount`}
               render={({ field }) => (
-                <VaultInput
+                <Input
                   id={`conv-goal-${index}-saved`}
                   inputMode="decimal"
                   placeholder="0.00"
@@ -107,7 +107,7 @@ function GoalRowCard({
               control={control}
               name={`goals.${index}.monthlyContribution`}
               render={({ field }) => (
-                <VaultInput
+                <Input
                   id={`conv-goal-${index}-monthly`}
                   inputMode="decimal"
                   placeholder="0.00"
@@ -126,7 +126,7 @@ function GoalRowCard({
               control={control}
               name={`goals.${index}.targetDate`}
               render={({ field }) => (
-                <VaultInput
+                <Input
                   type="date"
                   id={`conv-goal-${index}-date`}
                   aria-label="Target date (optional)"
@@ -190,9 +190,9 @@ export function GoalBuilder({
               onRemove={() => remove(index)}
             />
           ))}
-          <VaultButton variant="ghost" onClick={handleAppend}>
+          <Button variant="ghost" className="text-muted-foreground" onClick={handleAppend}>
             + Add another goal
-          </VaultButton>
+          </Button>
         </div>
       )}
     </div>

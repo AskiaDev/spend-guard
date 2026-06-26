@@ -3,7 +3,13 @@
 import { Controller, useWatch, type Control } from "react-hook-form";
 import type { OnboardingFormValues } from "../../lib/onboarding-form";
 import { VaultField } from "../../../vault/components/primitives/vault-field";
-import { VaultSelect } from "../../../vault/components/primitives/vault-select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { ConversationalPrompt } from "../conversational-prompt";
 import { MoneyInput } from "../money-input";
 
@@ -48,12 +54,18 @@ export function IncomeStep({ control }: { control: Control<OnboardingFormValues>
             name="currency"
             control={control}
             render={({ field }) => (
-              <VaultSelect
-                id="currency"
-                value={field.value}
-                onChange={field.onChange}
-                options={CURRENCY_OPTIONS}
-              />
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger id="currency" className="w-full">
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  {CURRENCY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           />
         </VaultField>

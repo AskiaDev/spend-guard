@@ -1,6 +1,6 @@
 "use client";
 
-import { VaultButton } from "@/features/onboarding/vault/components/primitives/vault-button";
+import { Button } from "@/components/ui/button";
 import { ConversationalPrompt } from "../conversational-prompt";
 
 interface SetupIntroStepProps {
@@ -58,9 +58,7 @@ export function SetupIntroStep({ onContinue }: SetupIntroStepProps) {
         ))}
       </div>
 
-      <VaultButton variant="primary" onClick={onContinue}>
-        {"Got it, let's go"}
-      </VaultButton>
+      <Button onClick={onContinue}>{"Got it, let's go"}</Button>
     </div>
   );
 }

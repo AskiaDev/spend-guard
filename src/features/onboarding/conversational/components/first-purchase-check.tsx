@@ -9,9 +9,9 @@ import { buildSnapshotFromValues, type OnboardingFormValues } from "../lib/onboa
 import { ConversationalPrompt } from "./conversational-prompt";
 import { MoneyInput } from "./money-input";
 import { VerdictReveal } from "./verdict-reveal";
-import { VaultButton } from "../../vault/components/primitives/vault-button";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { VaultField } from "../../vault/components/primitives/vault-field";
-import { VaultInput } from "../../vault/components/primitives/vault-input";
 
 const SAMPLE = { itemName: "Wireless headphones", amount: "8000", category: "Electronics" } as const;
 
@@ -111,7 +111,7 @@ export function FirstPurchaseCheck({
         {saveError ? (
           <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--vault-muted)" }}>{saveError}</p>
         ) : null}
-        <VaultButton onClick={onDone}>See your guardrail</VaultButton>
+        <Button onClick={onDone}>See your guardrail</Button>
       </div>
     );
   }
@@ -126,7 +126,7 @@ export function FirstPurchaseCheck({
 
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         <VaultField label="What is it?" htmlFor="conv-check-item">
-          <VaultInput
+          <Input
             id="conv-check-item"
             value={itemName}
             onChange={(e) => setItemName(e.target.value)}
@@ -144,7 +144,7 @@ export function FirstPurchaseCheck({
         />
 
         <VaultField label="Category (optional)" htmlFor="conv-check-category">
-          <VaultInput
+          <Input
             id="conv-check-category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -153,7 +153,7 @@ export function FirstPurchaseCheck({
         </VaultField>
 
         <VaultField label="Note (optional)" htmlFor="conv-check-note">
-          <VaultInput
+          <Input
             id="conv-check-note"
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -204,12 +204,12 @@ export function FirstPurchaseCheck({
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <VaultButton onClick={handleCheck} disabled={!canCheck}>
+        <Button onClick={handleCheck} disabled={!canCheck}>
           {checking ? "Checking..." : "Check if I can buy this"}
-        </VaultButton>
-        <VaultButton variant="ghost" onClick={onSkip}>
+        </Button>
+        <Button variant="ghost" className="text-muted-foreground" onClick={onSkip}>
           Skip for now
-        </VaultButton>
+        </Button>
       </div>
     </div>
   );

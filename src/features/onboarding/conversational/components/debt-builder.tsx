@@ -3,10 +3,10 @@
 import { useCallback } from "react";
 import { Controller, useFieldArray, type Control } from "react-hook-form";
 import { type OnboardingFormValues, emptyDebtRow } from "../lib/onboarding-form";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { EmptyState } from "../../vault/components/primitives/empty-state";
 import { RepeatableRow } from "../../vault/components/primitives/repeatable-row";
-import { VaultButton } from "../../vault/components/primitives/vault-button";
-import { VaultInput } from "../../vault/components/primitives/vault-input";
 
 // ---- Shared styles -----------------------------------------------------------
 
@@ -52,7 +52,7 @@ function DebtRowCard({
             control={control}
             name={`debts.${index}.label`}
             render={({ field }) => (
-              <VaultInput
+              <Input
                 id={`conv-debt-${index}-label`}
                 placeholder="e.g. Credit card"
                 aria-label="Debt label"
@@ -70,7 +70,7 @@ function DebtRowCard({
               control={control}
               name={`debts.${index}.outstandingBalance`}
               render={({ field }) => (
-                <VaultInput
+                <Input
                   id={`conv-debt-${index}-balance`}
                   inputMode="decimal"
                   placeholder="0.00"
@@ -86,7 +86,7 @@ function DebtRowCard({
               control={control}
               name={`debts.${index}.minimumPayment`}
               render={({ field }) => (
-                <VaultInput
+                <Input
                   id={`conv-debt-${index}-minpay`}
                   inputMode="decimal"
                   placeholder="0.00"
@@ -105,7 +105,7 @@ function DebtRowCard({
             control={control}
             name={`debts.${index}.dueDay`}
             render={({ field }) => (
-              <VaultInput
+              <Input
                 id={`conv-debt-${index}-dueDay`}
                 inputMode="numeric"
                 placeholder="1"
@@ -171,9 +171,9 @@ export function DebtBuilder({
               onRemove={() => remove(index)}
             />
           ))}
-          <VaultButton variant="ghost" onClick={handleAppend}>
+          <Button variant="ghost" className="text-muted-foreground" onClick={handleAppend}>
             + Add another debt
-          </VaultButton>
+          </Button>
         </div>
       )}
     </div>

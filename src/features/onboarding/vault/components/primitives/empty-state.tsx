@@ -1,5 +1,5 @@
 "use client";
-import { VaultButton } from "./vault-button";
+import { Button } from "@/components/ui/button";
 
 export function EmptyState({
   title,
@@ -13,40 +13,10 @@ export function EmptyState({
   onAdd: () => void;
 }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 12,
-        padding: "36px 24px",
-        border: "1px dashed var(--vault-border)",
-        borderRadius: "var(--vault-radius-card)",
-        textAlign: "center",
-      }}
-    >
-      <p
-        style={{
-          color: "var(--vault-text)",
-          fontSize: "1rem",
-          fontWeight: 600,
-          margin: 0,
-        }}
-      >
-        {title}
-      </p>
-      <p
-        style={{
-          color: "var(--vault-muted)",
-          fontSize: "0.82rem",
-          margin: 0,
-          maxWidth: 260,
-        }}
-      >
-        {hint}
-      </p>
-      <VaultButton onClick={onAdd}>{actionLabel}</VaultButton>
+    <div className="flex flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-dashed border-border px-6 py-9 text-center">
+      <p className="text-base font-semibold text-foreground">{title}</p>
+      <p className="max-w-[260px] text-[0.82rem] text-muted-foreground">{hint}</p>
+      <Button onClick={onAdd}>{actionLabel}</Button>
     </div>
   );
 }

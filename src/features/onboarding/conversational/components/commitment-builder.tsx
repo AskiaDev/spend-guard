@@ -3,10 +3,10 @@
 import { useCallback } from "react";
 import { Controller, useFieldArray, useWatch, type Control } from "react-hook-form";
 import { type OnboardingFormValues, emptyExpenseRow } from "../lib/onboarding-form";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { EmptyState } from "../../vault/components/primitives/empty-state";
 import { RepeatableRow } from "../../vault/components/primitives/repeatable-row";
-import { VaultButton } from "../../vault/components/primitives/vault-button";
-import { VaultInput } from "../../vault/components/primitives/vault-input";
 
 // ---- Shared styles -----------------------------------------------------------
 
@@ -127,7 +127,7 @@ function ExpenseRowCard({
             control={control}
             name={`expenses.${index}.label`}
             render={({ field }) => (
-              <VaultInput
+              <Input
                 id={`conv-exp-${index}-label`}
                 placeholder="e.g. Rent"
                 aria-label="Expense label"
@@ -145,7 +145,7 @@ function ExpenseRowCard({
               control={control}
               name={`expenses.${index}.amount`}
               render={({ field }) => (
-                <VaultInput
+                <Input
                   id={`conv-exp-${index}-amount`}
                   inputMode="decimal"
                   placeholder="0.00"
@@ -161,7 +161,7 @@ function ExpenseRowCard({
               control={control}
               name={`expenses.${index}.dueDay`}
               render={({ field }) => (
-                <VaultInput
+                <Input
                   id={`conv-exp-${index}-dueDay`}
                   inputMode="numeric"
                   placeholder="1"
@@ -249,9 +249,9 @@ export function CommitmentBuilder({
               onRemove={() => remove(index)}
             />
           ))}
-          <VaultButton variant="ghost" onClick={handleAppend}>
+          <Button variant="ghost" className="text-muted-foreground" onClick={handleAppend}>
             + Add another expense
-          </VaultButton>
+          </Button>
         </div>
       )}
     </div>

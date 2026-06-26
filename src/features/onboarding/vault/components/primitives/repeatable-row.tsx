@@ -9,33 +9,13 @@ export function RepeatableRow({
   children: ReactNode;
 }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        background: "var(--vault-surface)",
-        border: "1px solid var(--vault-border)",
-        borderRadius: "var(--vault-radius-ctl)",
-        padding: "10px 14px",
-      }}
-    >
-      <div style={{ flex: 1 }}>{children}</div>
+    <div className="flex items-center gap-2.5 rounded-control border border-border bg-secondary px-3.5 py-2.5">
+      <div className="flex-1">{children}</div>
       <button
         type="button"
         onClick={onRemove}
         aria-label="Remove row"
-        style={{
-          background: "transparent",
-          border: "none",
-          color: "var(--vault-muted)",
-          cursor: "pointer",
-          fontSize: "1.1rem",
-          lineHeight: 1,
-          padding: "2px 6px",
-          borderRadius: "var(--vault-radius-ctl)",
-          flexShrink: 0,
-        }}
+        className="shrink-0 cursor-pointer rounded-control px-1.5 py-0.5 text-[1.1rem] leading-none text-muted-foreground"
       >
         ×
       </button>

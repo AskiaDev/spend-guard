@@ -7,7 +7,7 @@ import { formatCurrency } from "@/lib/utils";
 import type { CooldownPreference } from "@/types/finance";
 import { buildSnapshotFromValues, type OnboardingFormValues } from "../lib/onboarding-form";
 import { ConversationalPrompt } from "./conversational-prompt";
-import { VaultButton } from "../../vault/components/primitives/vault-button";
+import { Button } from "@/components/ui/button";
 
 const COOLDOWN_LABEL: Record<CooldownPreference, string> = {
   light: "Light pause",
@@ -105,7 +105,7 @@ export function OnboardingSummary({
         </span>
       </div>
 
-      <VaultButton onClick={onEnterApp}>Enter SpendGuard</VaultButton>
+      <Button onClick={onEnterApp}>Enter SpendGuard</Button>
     </div>
   );
 }

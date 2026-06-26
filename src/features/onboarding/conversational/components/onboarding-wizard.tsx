@@ -8,7 +8,7 @@ import { ArrowLeft } from "lucide-react";
 import { saveFinancialProfileAction } from "@/features/financial-profile/api/save-financial-profile";
 import { OnboardingShell } from "../../vault/components/onboarding-shell";
 import { GuardianHeroPlayer } from "../../vault/components/guardian-hero-player";
-import { VaultButton } from "../../vault/components/primitives/vault-button";
+import { Button } from "@/components/ui/button";
 
 import {
   ONBOARDING_STEPS,
@@ -89,12 +89,10 @@ function GoBackButton({
   disabled: boolean;
 }) {
   return (
-    <VaultButton variant="ghost" onClick={onBack} disabled={disabled}>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-        <ArrowLeft size={15} aria-hidden="true" />
-        Go Back
-      </span>
-    </VaultButton>
+    <Button variant="ghost" className="text-muted-foreground" onClick={onBack} disabled={disabled}>
+      <ArrowLeft size={15} aria-hidden="true" />
+      Go Back
+    </Button>
   );
 }
 
@@ -174,9 +172,9 @@ function StepFooter({
           ) : null}
         </div>
 
-        <VaultButton onClick={onContinue} disabled={!canContinue || saving}>
+        <Button onClick={onContinue} disabled={!canContinue || saving}>
           {saving ? "Building your guardrail..." : "Continue"}
-        </VaultButton>
+        </Button>
       </div>
 
       {step.skippable && step.skipNote ? (
