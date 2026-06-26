@@ -33,198 +33,90 @@ export function OnboardingShell({
   const currentLabel = labels[step - 1];
 
   return (
-    <div className="vault">
-      <div
-        className="vault-shell-grid"
-        style={{
-          display: "grid",
-        }}
-      >
-        {/* LEFT STAGE - brand + hero */}
-        <div
-          className="vault-shell-left"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            position: "relative",
-            overflow: "hidden",
-            background: "linear-gradient(160deg, var(--vault-deep) 0%, var(--vault-ink) 70%)",
-          }}
-        >
-          {/* Brand mark */}
-          <div
-            style={{
-              padding: "28px 32px",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              flexShrink: 0,
-            }}
-          >
-            <span
-              style={{
-                color: "var(--vault-accent)",
-                fontSize: "1rem",
-                lineHeight: 1,
-              }}
-            >
-              ◆
-            </span>
-            <span
-              className="vault-display"
-              style={{
-                fontWeight: 700,
-                fontSize: "0.95rem",
-                letterSpacing: "-0.01em",
-                color: "var(--vault-text)",
-              }}
-            >
-              SpendGuard
-            </span>
-          </div>
-
-          {/* Hero slot - centered, fills remaining space */}
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "0 32px",
-            }}
-          >
-            {hero}
-          </div>
-
-          {/* Value prop line */}
-          <div
-            style={{
-              padding: "24px 32px 32px",
-              flexShrink: 0,
-            }}
-          >
-            <p
-              style={{
-                fontSize: "0.78rem",
-                color: "var(--vault-muted)",
-                lineHeight: 1.5,
-                margin: 0,
-                letterSpacing: "0.01em",
-              }}
-            >
-              Local-first checks. Your money stays yours.
-            </p>
-          </div>
+    // ponytail: #17244e has no shadcn token (lives only inside --vault-gradient). Hardcoded here. Promote to globals if ever reused.
+    <div className="grid grid-cols-1 md:grid-cols-[42%_58%] min-h-[100dvh]">
+      {/* LEFT STAGE - brand + hero */}
+      <div className="flex flex-col relative overflow-hidden border-b border-border md:border-b-0 md:border-r min-h-[220px] md:min-h-[100dvh] bg-[linear-gradient(160deg,#17244e_0%,var(--background)_70%)]">
+        {/* Brand mark */}
+        <div className="flex items-center gap-2 shrink-0 py-7 px-8">
+          <span className="text-primary text-base leading-none">◆</span>
+          <span className="font-[family-name:var(--font-schibsted)] font-bold text-[0.95rem] tracking-[-0.01em] text-foreground">
+            SpendGuard
+          </span>
         </div>
 
-        {/* RIGHT COLUMN - stepper + form + footer */}
-        <div
-          className="vault-shell-right"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            minHeight: 0,
-          }}
-        >
-          {/* Progress indicator: caller-supplied slot, or the default stepper + eyebrow */}
-          {progress ? (
-            <div style={{ flexShrink: 0, marginBottom: "28px" }}>{progress}</div>
-          ) : (
-            <>
-              <div style={{ flexShrink: 0, marginBottom: "28px" }}>
-                <VaultStepper step={step} labels={labels} />
-              </div>
-              <div style={{ flexShrink: 0, marginBottom: "20px" }}>
-                <span className="vault-eyebrow">
-                  STEP {step} / {total} - {currentLabel}
-                </span>
-              </div>
-            </>
-          )}
+        {/* Hero slot - centered, fills remaining space */}
+        <div className="flex-1 flex items-center justify-center px-8">
+          {hero}
+        </div>
 
-          {/* Step body - animated on step change. The vault wizard uses
-              mode="wait" (one panel at a time). The conversational flow (which
-              supplies its own `progress`) uses sync mode so the incoming step
-              mounts immediately, avoiding the one-frame empty gap of wait mode.
-              The container is a single-cell grid and both motion.div children
-              occupy that same cell (gridArea "1 / 1"), so the exiting and
-              entering steps overlap and cross-fade with zero layout shift
-              instead of stacking vertically. In wait mode only one child is ever
-              mounted, so it simply fills the single cell - harmless. */}
-          <div
-            style={{
-              flex: 1,
-              display: "grid",
-              gridTemplateColumns: "minmax(0, 1fr)",
-              minHeight: 0,
-            }}
-          >
-            <AnimatePresence mode={progress ? "sync" : "wait"} initial={false}>
-              <motion.div
-                key={step}
-                initial={{
-                  opacity: 0,
-                  x: prefersReducedMotion ? 0 : 12,
-                }}
-                animate={{
-                  opacity: 1,
-                  x: 0,
-                }}
-                exit={{
-                  opacity: 0,
-                  x: prefersReducedMotion ? 0 : -12,
-                }}
-                transition={{
-                  duration: 0.22,
-                  ease: [0.4, 0, 0.2, 1],
-                }}
-                style={{
-                  gridArea: "1 / 1",
-                  display: "flex",
-                  flexDirection: "column",
-                  minWidth: 0,
-                }}
-              >
-                {children}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-
-          {/* Footer / nav buttons */}
-          <div style={{ flexShrink: 0, paddingTop: "24px" }}>
-            {footer}
-          </div>
+        {/* Value prop line */}
+        <div className="shrink-0 pt-6 px-8 pb-8">
+          <p className="text-[0.78rem] text-muted-foreground leading-normal m-0 tracking-[0.01em]">
+            Local-first checks. Your money stays yours.
+          </p>
         </div>
       </div>
 
-      <style>{`
-        .vault-shell-grid {
-          grid-template-columns: 1fr;
-          min-height: 100dvh;
-        }
-        .vault-shell-left {
-          border-right: none;
-          border-bottom: 1px solid var(--vault-border);
-          min-height: 220px;
-        }
-        .vault-shell-right {
-          padding: 24px 20px 28px;
-        }
-        @media (min-width: 768px) {
-          .vault-shell-grid {
-            grid-template-columns: 42% 58%;
-          }
-          .vault-shell-left {
-            border-right: 1px solid var(--vault-border);
-            border-bottom: none;
-            min-height: 100dvh;
-          }
-          .vault-shell-right {
-            padding: 28px 40px 32px;
-            min-height: 100dvh;
-          }
-        }
-      `}</style>
+      {/* RIGHT COLUMN - stepper + form + footer */}
+      <div className="flex flex-col min-h-0 pt-6 px-5 pb-7 md:pt-7 md:px-10 md:pb-8 md:min-h-[100dvh]">
+        {/* Progress indicator: caller-supplied slot, or the default stepper + eyebrow */}
+        {progress ? (
+          <div className="shrink-0 mb-7">{progress}</div>
+        ) : (
+          <>
+            <div className="shrink-0 mb-7">
+              <VaultStepper step={step} labels={labels} />
+            </div>
+            <div className="shrink-0 mb-5">
+              <span className="text-[0.7rem] font-bold tracking-[0.2em] text-primary">
+                STEP {step} / {total} - {currentLabel}
+              </span>
+            </div>
+          </>
+        )}
+
+        {/* Step body - animated on step change. The vault wizard uses
+            mode="wait" (one panel at a time). The conversational flow (which
+            supplies its own `progress`) uses sync mode so the incoming step
+            mounts immediately, avoiding the one-frame empty gap of wait mode.
+            The container is a single-cell grid and both motion.div children
+            occupy that same cell (gridArea "1 / 1"), so the exiting and
+            entering steps overlap and cross-fade with zero layout shift
+            instead of stacking vertically. In wait mode only one child is ever
+            mounted, so it simply fills the single cell - harmless. */}
+        <div className="flex-1 grid grid-cols-[minmax(0,1fr)] min-h-0">
+          <AnimatePresence mode={progress ? "sync" : "wait"} initial={false}>
+            <motion.div
+              key={step}
+              initial={{
+                opacity: 0,
+                x: prefersReducedMotion ? 0 : 12,
+              }}
+              animate={{
+                opacity: 1,
+                x: 0,
+              }}
+              exit={{
+                opacity: 0,
+                x: prefersReducedMotion ? 0 : -12,
+              }}
+              transition={{
+                duration: 0.22,
+                ease: [0.4, 0, 0.2, 1],
+              }}
+              className="[grid-area:1/1] flex flex-col min-w-0"
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Footer / nav buttons */}
+        <div className="shrink-0 pt-6">
+          {footer}
+        </div>
+      </div>
     </div>
   );
 }

@@ -9,7 +9,7 @@ export function GuardianShieldStatic({ locked = false }: GuardianShieldStaticPro
       width={180}
       height={180}
       aria-hidden="true"
-      style={{ filter: "drop-shadow(0 0 18px rgba(198,242,78,0.5))" }}
+      className="drop-shadow-[0_0_18px_rgba(198,242,78,0.5)]"
     >
       <path
         d="M50 8 L83 20 V50 C83 71 68 86 50 93 C32 86 17 71 17 50 V20 Z"

@@ -10,58 +10,32 @@ export function VaultStepper({ step, labels }: VaultStepperProps) {
   const progress = total > 0 ? (step / total) * 100 : 0;
 
   return (
-    <div style={{ width: "100%" }}>
+    <div className="w-full">
       {/* Progress bar track */}
-      <div
-        style={{
-          height: "2px",
-          background: "var(--vault-border)",
-          borderRadius: "1px",
-          overflow: "hidden",
-          marginBottom: "12px",
-        }}
-      >
+      <div className="h-[2px] bg-border rounded-[1px] overflow-hidden mb-3">
         <div
-          style={{
-            height: "100%",
-            width: "100%",
-            background: "var(--vault-accent)",
-            borderRadius: "1px",
-            transformOrigin: "left center",
-            transform: `scaleX(${progress / 100})`,
-            transition: "transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
-          }}
+          className="h-full w-full bg-primary rounded-[1px] origin-left transition-transform duration-[400ms]"
+          // ponytail: width is computed from progress ratio - keep inline
+          style={{ transform: `scaleX(${progress / 100})` }}
         />
       </div>
 
       {/* Step labels */}
-      <div
-        style={{
-          display: "flex",
-          gap: "4px",
-        }}
-      >
+      <div className="flex gap-1">
         {labels.map((label, index) => {
           const isActive = index + 1 === step;
           const isDone = index + 1 < step;
           return (
             <div
               key={index}
+              className="flex-1 text-[0.65rem] tracking-[0.12em] font-bold uppercase whitespace-nowrap overflow-hidden text-ellipsis transition-colors duration-300"
+              // ponytail: color is state-driven (active/done/upcoming) - keep inline; uses new tokens
               style={{
-                flex: 1,
-                fontSize: "0.65rem",
-                letterSpacing: "0.12em",
-                fontWeight: 700,
-                textTransform: "uppercase",
                 color: isActive
-                  ? "var(--vault-accent)"
+                  ? "var(--primary)"
                   : isDone
-                    ? "var(--vault-muted)"
-                    : "var(--vault-border)",
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                transition: "color 0.3s ease",
+                    ? "var(--muted-foreground)"
+                    : "var(--border)",
               }}
             >
               {label}
