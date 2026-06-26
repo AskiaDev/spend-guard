@@ -106,10 +106,10 @@ export function FirstPurchaseCheck({
 
   if (result) {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      <div className="flex flex-col gap-[22px]">
         <VerdictReveal result={result} purchase={{ itemName, amount: price, urgency: "want", paymentMethod: "cash" }} currency={values.currency} />
         {saveError ? (
-          <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--vault-muted)" }}>{saveError}</p>
+          <p className="m-0 text-[0.78rem] text-muted-foreground">{saveError}</p>
         ) : null}
         <Button onClick={onDone}>See your guardrail</Button>
       </div>
@@ -117,14 +117,14 @@ export function FirstPurchaseCheck({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+    <div className="flex flex-col gap-[22px]">
       <ConversationalPrompt
         eyebrow="One real check"
         headline="What are you thinking of buying?"
         subtext="Add the item and price. SpendGuard will check the numbers before you decide - this is exactly how it works every day."
       />
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="flex flex-col gap-4">
         <VaultField label="What is it?" htmlFor="conv-check-item">
           <Input
             id="conv-check-item"
@@ -162,48 +162,24 @@ export function FirstPurchaseCheck({
         </VaultField>
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
+      <div className="flex flex-wrap gap-[10px] items-center">
         <button
           type="button"
           onClick={fillSample}
-          className="conv-chip"
-          style={{
-            background: "transparent",
-            border: "1px solid var(--vault-border)",
-            borderRadius: 999,
-            color: "var(--vault-muted)",
-            cursor: "pointer",
-            fontSize: "0.78rem",
-            fontWeight: 600,
-            padding: "5px 14px",
-          }}
+          className="conv-chip bg-transparent border border-border rounded-full text-muted-foreground cursor-pointer text-[0.78rem] font-semibold py-[5px] px-[14px]"
         >
           Try a sample
         </button>
         <span
           aria-disabled="true"
           title="Voice input is coming soon"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            background: "transparent",
-            border: "1px dashed var(--vault-border)",
-            borderRadius: 999,
-            color: "var(--vault-muted)",
-            fontSize: "0.78rem",
-            fontWeight: 600,
-            padding: "5px 14px",
-            opacity: 0.55,
-            cursor: "not-allowed",
-            userSelect: "none",
-          }}
+          className="inline-flex items-center gap-[6px] bg-transparent border border-dashed border-border rounded-full text-muted-foreground text-[0.78rem] font-semibold py-[5px] px-[14px] opacity-[0.55] cursor-not-allowed select-none"
         >
           Voice (coming soon)
         </span>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="flex flex-col gap-[10px]">
         <Button onClick={handleCheck} disabled={!canCheck}>
           {checking ? "Checking..." : "Check if I can buy this"}
         </Button>

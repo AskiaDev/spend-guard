@@ -21,52 +21,30 @@ export function SelectableCard({
       role="checkbox"
       aria-checked={selected}
       onClick={onToggle}
-      className="conv-card"
-      style={{
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 12,
-        width: "100%",
-        padding: "16px 18px",
-        borderRadius: "var(--vault-radius-card)",
+      className="conv-card flex items-start gap-3 w-full py-4 px-[18px] rounded-[var(--radius-card)] text-foreground cursor-pointer text-left transition-colors duration-150 outline-none border"
+      style={{ // ponytail: background and border-color are state-driven (selected prop)
         background: selected
-          ? "color-mix(in srgb, var(--vault-accent) 8%, var(--vault-surface))"
-          : "var(--vault-surface)",
-        border: selected
-          ? "1px solid var(--vault-accent)"
-          : "1px solid var(--vault-border)",
-        color: "var(--vault-text)",
-        cursor: "pointer",
-        textAlign: "left",
-        transition: "background 0.15s ease, border-color 0.15s ease",
-        outline: "none",
+          ? "color-mix(in srgb, var(--primary) 8%, var(--card))"
+          : "var(--card)",
+        borderColor: selected ? "var(--primary)" : "var(--border)",
       }}
     >
       {icon ? (
-        <span style={{ flexShrink: 0, marginTop: 1 }} aria-hidden="true">
+        <span className="shrink-0 mt-px" aria-hidden="true">
           {icon}
         </span>
       ) : null}
-      <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      <span className="flex flex-col gap-[3px]">
         <span
-          style={{
-            fontFamily: "var(--font-hanken), ui-sans-serif, system-ui, sans-serif",
-            fontSize: "0.9rem",
-            fontWeight: 600,
-            color: selected ? "var(--vault-accent)" : "var(--vault-text)",
-            transition: "color 0.15s ease",
+          className="text-[0.9rem] font-semibold transition-colors duration-150 [font-family:var(--font-hanken),ui-sans-serif,system-ui,sans-serif]"
+          style={{ // ponytail: color is state-driven (selected prop)
+            color: selected ? "var(--primary)" : "var(--foreground)",
           }}
         >
           {label}
         </span>
         {description ? (
-          <span
-            style={{
-              fontSize: "0.78rem",
-              color: "var(--vault-muted)",
-              lineHeight: 1.4,
-            }}
-          >
+          <span className="text-[0.78rem] text-muted-foreground leading-[1.4]">
             {description}
           </span>
         ) : null}

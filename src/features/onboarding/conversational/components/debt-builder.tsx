@@ -8,29 +8,6 @@ import { Input } from "@/components/ui/input";
 import { EmptyState } from "../../vault/components/primitives/empty-state";
 import { RepeatableRow } from "../../vault/components/primitives/repeatable-row";
 
-// ---- Shared styles -----------------------------------------------------------
-
-const inlineLabel: React.CSSProperties = {
-  fontSize: "0.68rem",
-  letterSpacing: "0.16em",
-  fontWeight: 700,
-  color: "var(--vault-accent)",
-  display: "block",
-  marginBottom: 4,
-};
-
-const chipStyle: React.CSSProperties = {
-  background: "transparent",
-  border: "1px solid var(--vault-border)",
-  borderRadius: 999,
-  color: "var(--vault-muted)",
-  cursor: "pointer",
-  fontSize: "0.78rem",
-  fontWeight: 600,
-  padding: "5px 14px",
-  lineHeight: 1.4,
-};
-
 // ---- Debt row ----------------------------------------------------------------
 
 function DebtRowCard({
@@ -44,10 +21,15 @@ function DebtRowCard({
 }) {
   return (
     <RepeatableRow onRemove={onRemove}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div className="flex flex-col gap-[14px]">
         {/* Label */}
         <div>
-          <label htmlFor={`conv-debt-${index}-label`} style={inlineLabel}>Label</label>
+          <label
+            htmlFor={`conv-debt-${index}-label`}
+            className="text-[0.68rem] tracking-[0.16em] font-bold text-primary block mb-1"
+          >
+            Label
+          </label>
           <Controller
             control={control}
             name={`debts.${index}.label`}
@@ -63,9 +45,14 @@ function DebtRowCard({
         </div>
 
         {/* Balance + Min payment */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 12px" }}>
+        <div className="grid grid-cols-2 gap-y-[10px] gap-x-3">
           <div>
-            <label htmlFor={`conv-debt-${index}-balance`} style={inlineLabel}>Balance (PHP)</label>
+            <label
+              htmlFor={`conv-debt-${index}-balance`}
+              className="text-[0.68rem] tracking-[0.16em] font-bold text-primary block mb-1"
+            >
+              Balance (PHP)
+            </label>
             <Controller
               control={control}
               name={`debts.${index}.outstandingBalance`}
@@ -81,7 +68,12 @@ function DebtRowCard({
             />
           </div>
           <div>
-            <label htmlFor={`conv-debt-${index}-minpay`} style={inlineLabel}>Min payment</label>
+            <label
+              htmlFor={`conv-debt-${index}-minpay`}
+              className="text-[0.68rem] tracking-[0.16em] font-bold text-primary block mb-1"
+            >
+              Min payment
+            </label>
             <Controller
               control={control}
               name={`debts.${index}.minimumPayment`}
@@ -99,8 +91,13 @@ function DebtRowCard({
         </div>
 
         {/* Due day */}
-        <div style={{ maxWidth: 120 }}>
-          <label htmlFor={`conv-debt-${index}-dueDay`} style={inlineLabel}>Due day</label>
+        <div className="max-w-[120px]">
+          <label
+            htmlFor={`conv-debt-${index}-dueDay`}
+            className="text-[0.68rem] tracking-[0.16em] font-bold text-primary block mb-1"
+          >
+            Due day
+          </label>
           <Controller
             control={control}
             name={`debts.${index}.dueDay`}
@@ -141,12 +138,17 @@ export function DebtBuilder({
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <div className="flex flex-col gap-5">
       {/* Example chips */}
       {examples.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }} aria-label="Example debts">
+        <div className="flex flex-wrap gap-2" aria-label="Example debts">
           {examples.map((ex) => (
-            <button key={ex} type="button" style={chipStyle} onClick={() => handleChip(ex)}>
+            <button
+              key={ex}
+              type="button"
+              className="bg-transparent border border-border rounded-full text-muted-foreground cursor-pointer text-[0.78rem] font-semibold py-[5px] px-[14px] leading-[1.4]"
+              onClick={() => handleChip(ex)}
+            >
               {ex}
             </button>
           ))}
@@ -162,7 +164,7 @@ export function DebtBuilder({
           onAdd={handleAppend}
         />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="flex flex-col gap-[14px]">
           {fields.map((field, index) => (
             <DebtRowCard
               key={field.id}

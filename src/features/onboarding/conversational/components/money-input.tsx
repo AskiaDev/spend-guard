@@ -21,28 +21,11 @@ export function MoneyInput({
   return (
     <VaultField label={label} htmlFor={id}>
       <div
-        className="conv-money"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          background: "var(--vault-surface)",
-          border: "1px solid var(--vault-border)",
-          borderRadius: "var(--vault-radius-ctl)",
-          overflow: "hidden",
-        }}
+        className="conv-money flex items-center bg-card border border-border rounded-control overflow-hidden"
       >
         <span
           aria-hidden="true"
-          style={{
-            padding: "10px 12px",
-            fontSize: "0.7rem",
-            letterSpacing: "0.2em",
-            fontWeight: 700,
-            color: "var(--vault-accent)",
-            borderRight: "1px solid var(--vault-border)",
-            flexShrink: 0,
-            userSelect: "none",
-          }}
+          className="py-[10px] px-3 text-[0.7rem] tracking-[0.2em] font-bold text-primary border-r border-border shrink-0 select-none"
         >
           {currency}
         </span>
@@ -52,17 +35,7 @@ export function MoneyInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           autoFocus={autoFocus}
-          style={{
-            flex: 1,
-            background: "transparent",
-            border: "none",
-            color: "var(--vault-text)",
-            fontSize: "13px",
-            padding: "10px 13px",
-            outline: "none",
-            width: "100%",
-            boxSizing: "border-box",
-          }}
+          className="flex-1 bg-transparent border-none text-foreground text-[13px] py-[10px] px-[13px] outline-none w-full box-border"
         />
       </div>
     </VaultField>

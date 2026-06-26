@@ -59,17 +59,6 @@ const FIRST_CHECK_INDEX = getStepIndex("first-check");
 const SUMMARY_INDEX = getStepIndex("summary");
 const COOLDOWN_INDEX = getStepIndex("cooldown");
 
-const dangerBannerStyle: React.CSSProperties = {
-  background: "color-mix(in srgb, var(--vault-danger) 14%, transparent)",
-  border: "1px solid color-mix(in srgb, var(--vault-danger) 45%, transparent)",
-  borderRadius: "var(--vault-radius-ctl)",
-  color: "var(--vault-danger)",
-  fontSize: "0.8rem",
-  fontWeight: 500,
-  lineHeight: 1.45,
-  padding: "10px 14px",
-};
-
 // ---- Footer (isolated so a money keystroke never re-renders the wizard/hero) --
 //
 // Only `income` and `savings` are required (isStepComplete). For those we
@@ -131,41 +120,26 @@ function StepFooter({
     : true;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <div className="flex flex-col gap-[14px]">
       {error ? (
-        <div role="alert" style={dangerBannerStyle}>
+        <div
+          role="alert"
+          className="bg-destructive/14 border border-destructive/45 rounded-control text-destructive text-[0.8rem] font-medium leading-[1.45] py-[10px] px-[14px]"
+        >
           {error}
         </div>
       ) : null}
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-[10px]">
           <GoBackButton onBack={onBack} disabled={saving} />
           {step.skippable ? (
             <button
               type="button"
               onClick={onSkip}
               disabled={saving}
-              className="conv-skip"
+              className="conv-skip bg-transparent border-none text-muted-foreground cursor-pointer disabled:cursor-not-allowed text-[0.82rem] font-semibold py-[6px] px-0.5 underline underline-offset-[3px]"
               title={step.skipNote}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "var(--vault-muted)",
-                cursor: saving ? "not-allowed" : "pointer",
-                fontSize: "0.82rem",
-                fontWeight: 600,
-                padding: "6px 2px",
-                textDecoration: "underline",
-                textUnderlineOffset: 3,
-              }}
             >
               Skip for now
             </button>
@@ -178,15 +152,7 @@ function StepFooter({
       </div>
 
       {step.skippable && step.skipNote ? (
-        <p
-          style={{
-            margin: 0,
-            fontSize: "0.72rem",
-            color: "var(--vault-muted)",
-            opacity: 0.75,
-            lineHeight: 1.4,
-          }}
-        >
+        <p className="m-0 text-[0.72rem] text-muted-foreground opacity-75 leading-[1.4]">
           {step.skipNote}
         </p>
       ) : null}
@@ -422,7 +388,7 @@ export default function OnboardingWizard() {
         ) : null
       }
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div className="flex flex-col gap-5">
         <StepBody
           step={step}
           control={control}

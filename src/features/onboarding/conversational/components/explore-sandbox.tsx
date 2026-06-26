@@ -19,34 +19,13 @@ function SampleBanner() {
     <div
       role="note"
       aria-label="Sample data notice"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "10px 14px",
-        borderRadius: "var(--vault-radius-ctl)",
-        background: "color-mix(in srgb, var(--vault-accent) 6%, var(--vault-surface))",
-        border: "1px solid color-mix(in srgb, var(--vault-accent) 20%, var(--vault-border))",
-      }}
+      className="flex items-center gap-[10px] py-[10px] px-[14px] rounded-control bg-[color-mix(in_srgb,var(--primary)_6%,var(--card))] border border-[color-mix(in_srgb,var(--primary)_20%,var(--border))]"
     >
       <span
         aria-hidden="true"
-        style={{
-          flexShrink: 0,
-          width: 6,
-          height: 6,
-          borderRadius: "50%",
-          background: "var(--vault-accent)",
-        }}
+        className="shrink-0 w-1.5 h-1.5 rounded-full bg-primary"
       />
-      <p
-        style={{
-          margin: 0,
-          fontSize: "0.78rem",
-          color: "var(--vault-muted)",
-          lineHeight: 1.45,
-        }}
-      >
+      <p className="m-0 text-[0.78rem] text-muted-foreground leading-[1.45]">
         This is sample data. The numbers are realistic but not yours - set up your real profile to
         get an accurate check.
       </p>
@@ -110,14 +89,14 @@ export function ExploreSandbox() {
     };
 
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+      <div className="flex flex-col gap-[22px]">
         <SampleBanner />
         <VerdictReveal
           result={result}
           purchase={purchase}
           currency={SAMPLE_SNAPSHOT.profile.currency}
         />
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="flex flex-col gap-[10px]">
           {ctaButton}
           <Button variant="ghost" className="text-muted-foreground" onClick={handleReset}>
             Try another item
@@ -128,7 +107,7 @@ export function ExploreSandbox() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+    <div className="flex flex-col gap-[22px]">
       <SampleBanner />
 
       <ConversationalPrompt
@@ -137,7 +116,7 @@ export function ExploreSandbox() {
         subtext="Enter any item and price. SpendGuard will run a real check against sample finances - no account needed."
       />
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="flex flex-col gap-4">
         <VaultField label="What is it?" htmlFor="sandbox-item">
           <Input
             id="sandbox-item"
@@ -157,7 +136,7 @@ export function ExploreSandbox() {
         />
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div className="flex flex-col gap-[10px]">
         <Button onClick={handleCheck} disabled={!canCheck}>
           Check if I can buy this
         </Button>

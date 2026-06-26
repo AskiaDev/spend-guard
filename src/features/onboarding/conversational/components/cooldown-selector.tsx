@@ -69,16 +69,9 @@ export function CooldownSelector({ value, onChange }: CooldownSelectorProps) {
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <div className="flex flex-col gap-5">
       {/* Cooldown explanation */}
-      <p
-        className="vault-muted"
-        style={{
-          margin: 0,
-          fontSize: "0.875rem",
-          lineHeight: 1.55,
-        }}
-      >
+      <p className="vault-muted m-0 text-sm leading-[1.55]">
         A cooldown is a short pause before a purchase counts as cleared. It gives you a
         moment to check with a clear head - not a block, just breathing room.
       </p>
@@ -87,7 +80,7 @@ export function CooldownSelector({ value, onChange }: CooldownSelectorProps) {
       <div
         role="radiogroup"
         aria-label="Cooldown intensity"
-        style={{ display: "flex", flexDirection: "column", gap: 10 }}
+        className="flex flex-col gap-[10px]"
       >
         {OPTIONS.map((opt) => {
           const selected = value === opt.value;
@@ -103,62 +96,35 @@ export function CooldownSelector({ value, onChange }: CooldownSelectorProps) {
               tabIndex={selected ? 0 : -1}
               onClick={() => onChange(opt.value)}
               onKeyDown={handleKey}
-              className="conv-radio-option"
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 12,
-                width: "100%",
-                padding: "16px 18px",
-                borderRadius: "var(--vault-radius-card)",
+              className="conv-radio-option flex items-start gap-3 w-full py-4 px-[18px] rounded-[var(--radius-card)] text-foreground cursor-pointer text-left transition-colors duration-150 outline-none border"
+              style={{ // ponytail: background and border-color are state-driven (selected)
                 background: selected
-                  ? "color-mix(in srgb, var(--vault-accent) 8%, var(--vault-surface))"
-                  : "var(--vault-surface)",
-                border: selected
-                  ? "1px solid var(--vault-accent)"
-                  : "1px solid var(--vault-border)",
-                color: "var(--vault-text)",
-                cursor: "pointer",
-                textAlign: "left",
-                transition: "background 0.15s ease, border-color 0.15s ease",
-                outline: "none",
+                  ? "color-mix(in srgb, var(--primary) 8%, var(--card))"
+                  : "var(--card)",
+                borderColor: selected ? "var(--primary)" : "var(--border)",
               }}
             >
               {/* Radio dot indicator */}
               <span
                 aria-hidden="true"
-                style={{
-                  flexShrink: 0,
-                  marginTop: 3,
-                  width: 16,
-                  height: 16,
-                  borderRadius: "50%",
+                className="shrink-0 mt-[3px] w-4 h-4 rounded-full transition-[border] duration-150"
+                style={{ // ponytail: border and background are state-driven (selected); ink (#0a0e17) has no shadcn token yet
                   border: selected
-                    ? "5px solid var(--vault-accent)"
-                    : "2px solid var(--vault-border)",
-                  background: selected ? "var(--vault-ink)" : "transparent",
-                  transition: "border 0.15s ease",
+                    ? "5px solid var(--primary)"
+                    : "2px solid var(--border)",
+                  background: selected ? "#0a0e17" : "transparent",
                 }}
               />
-              <span style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+              <span className="flex flex-col gap-[3px]">
                 <span
-                  style={{
-                    fontFamily: "var(--font-hanken), ui-sans-serif, system-ui, sans-serif",
-                    fontSize: "0.9rem",
-                    fontWeight: 600,
-                    color: selected ? "var(--vault-accent)" : "var(--vault-text)",
-                    transition: "color 0.15s ease",
+                  className="text-[0.9rem] font-semibold transition-colors duration-150 [font-family:var(--font-hanken),ui-sans-serif,system-ui,sans-serif]"
+                  style={{ // ponytail: color is state-driven (selected)
+                    color: selected ? "var(--primary)" : "var(--foreground)",
                   }}
                 >
                   {opt.label}
                 </span>
-                <span
-                  style={{
-                    fontSize: "0.78rem",
-                    color: "var(--vault-muted)",
-                    lineHeight: 1.4,
-                  }}
-                >
+                <span className="text-[0.78rem] text-muted-foreground leading-[1.4]">
                   {opt.description}
                 </span>
               </span>

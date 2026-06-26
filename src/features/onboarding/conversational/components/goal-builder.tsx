@@ -8,29 +8,6 @@ import { Input } from "@/components/ui/input";
 import { EmptyState } from "../../vault/components/primitives/empty-state";
 import { RepeatableRow } from "../../vault/components/primitives/repeatable-row";
 
-// ---- Shared styles -----------------------------------------------------------
-
-const inlineLabel: React.CSSProperties = {
-  fontSize: "0.68rem",
-  letterSpacing: "0.16em",
-  fontWeight: 700,
-  color: "var(--vault-accent)",
-  display: "block",
-  marginBottom: 4,
-};
-
-const chipStyle: React.CSSProperties = {
-  background: "transparent",
-  border: "1px solid var(--vault-border)",
-  borderRadius: 999,
-  color: "var(--vault-muted)",
-  cursor: "pointer",
-  fontSize: "0.78rem",
-  fontWeight: 600,
-  padding: "5px 14px",
-  lineHeight: 1.4,
-};
-
 // ---- Goal row ----------------------------------------------------------------
 
 function GoalRowCard({
@@ -44,10 +21,15 @@ function GoalRowCard({
 }) {
   return (
     <RepeatableRow onRemove={onRemove}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div className="flex flex-col gap-[14px]">
         {/* Label */}
         <div>
-          <label htmlFor={`conv-goal-${index}-label`} style={inlineLabel}>Goal name</label>
+          <label
+            htmlFor={`conv-goal-${index}-label`}
+            className="text-[0.68rem] tracking-[0.16em] font-bold text-primary block mb-1"
+          >
+            Goal name
+          </label>
           <Controller
             control={control}
             name={`goals.${index}.label`}
@@ -63,9 +45,14 @@ function GoalRowCard({
         </div>
 
         {/* Target + Saved */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 12px" }}>
+        <div className="grid grid-cols-2 gap-y-[10px] gap-x-3">
           <div>
-            <label htmlFor={`conv-goal-${index}-target`} style={inlineLabel}>Target (PHP)</label>
+            <label
+              htmlFor={`conv-goal-${index}-target`}
+              className="text-[0.68rem] tracking-[0.16em] font-bold text-primary block mb-1"
+            >
+              Target (PHP)
+            </label>
             <Controller
               control={control}
               name={`goals.${index}.targetAmount`}
@@ -81,7 +68,12 @@ function GoalRowCard({
             />
           </div>
           <div>
-            <label htmlFor={`conv-goal-${index}-saved`} style={inlineLabel}>Saved so far</label>
+            <label
+              htmlFor={`conv-goal-${index}-saved`}
+              className="text-[0.68rem] tracking-[0.16em] font-bold text-primary block mb-1"
+            >
+              Saved so far
+            </label>
             <Controller
               control={control}
               name={`goals.${index}.savedAmount`}
@@ -98,9 +90,12 @@ function GoalRowCard({
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 12px" }}>
+        <div className="grid grid-cols-2 gap-y-[10px] gap-x-3">
           <div>
-            <label htmlFor={`conv-goal-${index}-monthly`} style={inlineLabel}>
+            <label
+              htmlFor={`conv-goal-${index}-monthly`}
+              className="text-[0.68rem] tracking-[0.16em] font-bold text-primary block mb-1"
+            >
               Monthly contribution
             </label>
             <Controller
@@ -119,7 +114,10 @@ function GoalRowCard({
           </div>
 
           <div>
-            <label htmlFor={`conv-goal-${index}-date`} style={inlineLabel}>
+            <label
+              htmlFor={`conv-goal-${index}-date`}
+              className="text-[0.68rem] tracking-[0.16em] font-bold text-primary block mb-1"
+            >
               Target date (optional)
             </label>
             <Controller
@@ -160,12 +158,17 @@ export function GoalBuilder({
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <div className="flex flex-col gap-5">
       {/* Example chips */}
       {examples.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }} aria-label="Example goals">
+        <div className="flex flex-wrap gap-2" aria-label="Example goals">
           {examples.map((ex) => (
-            <button key={ex} type="button" style={chipStyle} onClick={() => handleChip(ex)}>
+            <button
+              key={ex}
+              type="button"
+              className="bg-transparent border border-border rounded-full text-muted-foreground cursor-pointer text-[0.78rem] font-semibold py-[5px] px-[14px] leading-[1.4]"
+              onClick={() => handleChip(ex)}
+            >
               {ex}
             </button>
           ))}
@@ -181,7 +184,7 @@ export function GoalBuilder({
           onAdd={handleAppend}
         />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="flex flex-col gap-[14px]">
           {fields.map((field, index) => (
             <GoalRowCard
               key={field.id}

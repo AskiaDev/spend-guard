@@ -17,18 +17,9 @@ const COOLDOWN_LABEL: Record<CooldownPreference, string> = {
 
 function ProtectionRow({ label, value }: { label: string; value: string }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "baseline",
-        justifyContent: "space-between",
-        gap: 16,
-        padding: "12px 0",
-        borderBottom: "1px solid var(--vault-border)",
-      }}
-    >
-      <span style={{ fontSize: "0.85rem", color: "var(--vault-muted)" }}>{label}</span>
-      <span className="vault-display" style={{ fontSize: "0.95rem", color: "var(--vault-text)" }}>
+    <div className="flex items-baseline justify-between gap-4 py-3 border-b border-border">
+      <span className="text-[0.85rem] text-muted-foreground">{label}</span>
+      <span className="vault-display text-[0.95rem] text-foreground">
         {value}
       </span>
     </div>
@@ -58,23 +49,14 @@ export function OnboardingSummary({
   const currency = values.currency;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+    <div className="flex flex-col gap-6">
       <ConversationalPrompt
         eyebrow="You're ready"
         headline="Your spending guardrail is ready."
         subtext="SpendGuard will now protect your bills, emergency buffer, debt payments, and savings goals before calculating what is safe to spend."
       />
 
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          padding: "4px 18px 18px",
-          borderRadius: "var(--vault-radius-card)",
-          background: "var(--vault-surface)",
-          border: "1px solid var(--vault-border)",
-        }}
-      >
+      <div className="flex flex-col pt-1 pb-[18px] px-[18px] rounded-[var(--radius-card)] bg-card border border-border">
         <ProtectionRow label="Protected emergency buffer" value={formatCurrency(protectedBuffer, currency)} />
         <ProtectionRow label="Bills protected each month" value={formatCurrency(totalBills, currency)} />
         <ProtectionRow label="Debt payments considered" value={formatCurrency(debtsConsidered, currency)} />
@@ -82,25 +64,14 @@ export function OnboardingSummary({
         <ProtectionRow label="Cooldown mode" value={COOLDOWN_LABEL[values.cooldownPreference]} />
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 6,
-          padding: "20px 22px",
-          borderRadius: "var(--vault-radius-card)",
-          background: "color-mix(in srgb, var(--vault-accent) 8%, var(--vault-surface))",
-          border: "1px solid color-mix(in srgb, var(--vault-accent) 35%, var(--vault-border))",
-        }}
-      >
+      <div className="flex flex-col gap-[6px] py-5 px-[22px] rounded-[var(--radius-card)] bg-[color-mix(in_srgb,var(--primary)_8%,var(--card))] border border-[color-mix(in_srgb,var(--primary)_35%,var(--border))]">
         <span className="vault-eyebrow">Safe to spend today</span>
         <span
-          className="vault-display"
-          style={{ fontSize: "clamp(1.8rem, 6vw, 2.6rem)", lineHeight: 1.05, color: "var(--vault-accent)" }}
+          className="vault-display text-[clamp(1.8rem,6vw,2.6rem)] leading-[1.05] text-primary"
         >
           {formatCurrency(safeToSpend, currency)}
         </span>
-        <span style={{ fontSize: "0.8rem", color: "var(--vault-muted)", lineHeight: 1.45 }}>
+        <span className="text-[0.8rem] text-muted-foreground leading-[1.45]">
           This is what is left after everything above is protected. It updates as your numbers change.
         </span>
       </div>

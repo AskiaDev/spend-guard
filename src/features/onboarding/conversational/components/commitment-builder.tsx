@@ -8,29 +8,6 @@ import { Input } from "@/components/ui/input";
 import { EmptyState } from "../../vault/components/primitives/empty-state";
 import { RepeatableRow } from "../../vault/components/primitives/repeatable-row";
 
-// ---- Shared styles -----------------------------------------------------------
-
-const inlineLabel: React.CSSProperties = {
-  fontSize: "0.68rem",
-  letterSpacing: "0.16em",
-  fontWeight: 700,
-  color: "var(--vault-accent)",
-  display: "block",
-  marginBottom: 4,
-};
-
-const chipStyle: React.CSSProperties = {
-  background: "transparent",
-  border: "1px solid var(--vault-border)",
-  borderRadius: 999,
-  color: "var(--vault-muted)",
-  cursor: "pointer",
-  fontSize: "0.78rem",
-  fontWeight: 600,
-  padding: "5px 14px",
-  lineHeight: 1.4,
-};
-
 // ---- Recurring toggle --------------------------------------------------------
 
 function RecurringToggle({
@@ -43,60 +20,37 @@ function RecurringToggle({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 4 }}>
-      <div style={{ position: "relative", width: 36, height: 20, flexShrink: 0 }}>
+    <div className="flex items-center gap-2 pt-1">
+      <div className="relative w-9 h-5 shrink-0">
         <input
           type="checkbox"
           id={id}
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
-          style={{
-            position: "absolute",
-            opacity: 0,
-            width: "100%",
-            height: "100%",
-            margin: 0,
-            cursor: "pointer",
-            zIndex: 1,
-          }}
+          className="absolute opacity-0 w-full h-full m-0 cursor-pointer z-[1]"
         />
         <span
           aria-hidden="true"
-          style={{
-            display: "block",
-            width: "100%",
-            height: "100%",
-            borderRadius: 10,
+          className="block w-full h-full rounded-[10px] transition-colors duration-[160ms] relative"
+          style={{ // ponytail: background and border are state-driven (checked prop)
             background: checked
-              ? "var(--vault-accent)"
-              : "color-mix(in srgb, var(--vault-accent) 12%, transparent)",
-            border: checked ? "none" : "1px solid var(--vault-border)",
-            transition: "background 0.16s ease",
-            position: "relative",
+              ? "var(--primary)"
+              : "color-mix(in srgb, var(--primary) 12%, transparent)",
+            border: checked ? "none" : "1px solid var(--border)",
           }}
         >
           <span
-            style={{
-              position: "absolute",
-              top: 3,
+            className="absolute top-[3px] w-3.5 h-3.5 rounded-full transition-[left,background] duration-[160ms]"
+            style={{ // ponytail: left and background are state-driven (checked prop); ink (#0a0e17) has no shadcn token yet
               left: checked ? 18 : 3,
-              width: 14,
-              height: 14,
-              borderRadius: "50%",
-              background: checked ? "var(--vault-ink)" : "var(--vault-muted)",
-              transition: "left 0.16s ease, background 0.16s ease",
+              background: checked ? "#0a0e17" : "var(--muted-foreground)",
             }}
           />
         </span>
       </div>
       <label
         htmlFor={id}
-        style={{
-          fontSize: "0.78rem",
-          color: "var(--vault-muted)",
-          cursor: "pointer",
-          userSelect: "none",
-        }}
+        className="text-[0.78rem] text-muted-foreground cursor-pointer select-none"
       >
         Recurring
       </label>
@@ -119,10 +73,15 @@ function ExpenseRowCard({
 
   return (
     <RepeatableRow onRemove={onRemove}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div className="flex flex-col gap-[14px]">
         {/* Label */}
         <div>
-          <label htmlFor={`conv-exp-${index}-label`} style={inlineLabel}>Label</label>
+          <label
+            htmlFor={`conv-exp-${index}-label`}
+            className="text-[0.68rem] tracking-[0.16em] font-bold text-primary block mb-1"
+          >
+            Label
+          </label>
           <Controller
             control={control}
             name={`expenses.${index}.label`}
@@ -138,9 +97,14 @@ function ExpenseRowCard({
         </div>
 
         {/* Amount + Due day */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 90px", gap: "10px 12px" }}>
+        <div className="grid grid-cols-[1fr_90px] gap-y-[10px] gap-x-3">
           <div>
-            <label htmlFor={`conv-exp-${index}-amount`} style={inlineLabel}>Amount (PHP)</label>
+            <label
+              htmlFor={`conv-exp-${index}-amount`}
+              className="text-[0.68rem] tracking-[0.16em] font-bold text-primary block mb-1"
+            >
+              Amount (PHP)
+            </label>
             <Controller
               control={control}
               name={`expenses.${index}.amount`}
@@ -156,7 +120,12 @@ function ExpenseRowCard({
             />
           </div>
           <div>
-            <label htmlFor={`conv-exp-${index}-dueDay`} style={inlineLabel}>Due day</label>
+            <label
+              htmlFor={`conv-exp-${index}-dueDay`}
+              className="text-[0.68rem] tracking-[0.16em] font-bold text-primary block mb-1"
+            >
+              Due day
+            </label>
             <Controller
               control={control}
               name={`expenses.${index}.dueDay`}
@@ -211,18 +180,18 @@ export function CommitmentBuilder({
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+    <div className="flex flex-col gap-5">
       {/* Example chips */}
       {examples.length > 0 && (
         <div
-          style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
+          className="flex flex-wrap gap-2"
           aria-label="Example commitments"
         >
           {examples.map((ex) => (
             <button
               key={ex}
               type="button"
-              style={chipStyle}
+              className="bg-transparent border border-border rounded-full text-muted-foreground cursor-pointer text-[0.78rem] font-semibold py-[5px] px-[14px] leading-[1.4]"
               onClick={() => handleChip(ex)}
             >
               {ex}
@@ -240,7 +209,7 @@ export function CommitmentBuilder({
           onAdd={handleAppend}
         />
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div className="flex flex-col gap-[14px]">
           {fields.map((field, index) => (
             <ExpenseRowCard
               key={field.id}

@@ -19,23 +19,12 @@ export function ProgressPath({ current, total }: ProgressPathProps) {
       aria-valuemin={1}
       aria-valuemax={total}
       aria-valuenow={current}
-      style={{
-        width: "100%",
-        height: "3px",
-        background: "var(--vault-border)",
-        borderRadius: "999px",
-        overflow: "hidden",
-      }}
+      className="w-full h-[3px] bg-border rounded-full overflow-hidden"
     >
       <div
-        style={{
-          height: "100%",
-          width: "100%",
-          background: "linear-gradient(90deg, var(--vault-accent-2), var(--vault-accent))",
-          borderRadius: "999px",
-          transformOrigin: "left center",
+        className="h-full w-full bg-[linear-gradient(90deg,var(--chart-2),var(--primary))] rounded-full origin-left transition-transform duration-[450ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
+        style={{ // ponytail: scaleX depends on ratio computed from current/total props
           transform: `scaleX(${ratio})`,
-          transition: "transform 0.45s cubic-bezier(0.4, 0, 0.2, 1)",
         }}
       />
     </div>

@@ -42,32 +42,11 @@ export const VERDICT: Record<
 
 export function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div
-      style={{
-        flex: "1 1 120px",
-        minWidth: 110,
-        padding: "12px 14px",
-        borderRadius: "var(--vault-radius-ctl)",
-        background: "color-mix(in srgb, var(--vault-accent) 5%, transparent)",
-        border: "1px solid var(--vault-border)",
-      }}
-    >
-      <span
-        style={{
-          display: "block",
-          fontSize: "0.62rem",
-          letterSpacing: "0.16em",
-          fontWeight: 700,
-          color: "var(--vault-muted)",
-          textTransform: "uppercase",
-        }}
-      >
+    <div className="flex-[1_1_120px] min-w-[110px] py-3 px-[14px] rounded-control bg-primary/5 border border-border">
+      <span className="block text-[0.62rem] tracking-[0.16em] font-bold text-muted-foreground uppercase">
         {label}
       </span>
-      <span
-        className="vault-display"
-        style={{ display: "block", marginTop: 4, fontSize: "1.05rem", color: "var(--vault-text)" }}
-      >
+      <span className="vault-display block mt-1 text-[1.05rem] text-foreground">
         {value}
       </span>
     </div>
@@ -87,7 +66,8 @@ export function VerdictReveal({
 }) {
   const reduced = useReducedMotion();
   const verdict = VERDICT[result.decision];
-  const accent = verdict.tone === "go" ? "var(--vault-accent)" : "var(--vault-danger)";
+  // ponytail: accent is data-driven (verdict.tone) — used in computed style props below
+  const accent = verdict.tone === "go" ? "var(--primary)" : "var(--destructive)";
 
   return (
     <motion.div
@@ -96,27 +76,23 @@ export function VerdictReveal({
       initial={reduced ? false : { opacity: 0, y: 12, scale: 0.985 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 18,
-        padding: "22px 22px 24px",
-        borderRadius: "var(--vault-radius-card)",
-        background: `color-mix(in srgb, ${accent} 8%, var(--vault-surface))`,
-        border: `1px solid color-mix(in srgb, ${accent} 35%, var(--vault-border))`,
+      className="flex flex-col gap-[18px] pt-[22px] pb-6 px-[22px] rounded-[var(--radius-card)]"
+      style={{ // ponytail: background and border depend on computed accent (verdict.tone)
+        background: `color-mix(in srgb, ${accent} 8%, var(--card))`,
+        border: `1px solid color-mix(in srgb, ${accent} 35%, var(--border))`,
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="flex flex-col gap-2">
         <span
-          className="vault-eyebrow"
-          style={{ display: "inline-flex", alignItems: "center", gap: 8, color: accent }}
+          className="vault-eyebrow inline-flex items-center gap-2"
+          style={{ // ponytail: color depends on computed accent (verdict.tone)
+            color: accent,
+          }}
         >
           <span
             aria-hidden="true"
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
+            className="w-2 h-2 rounded-full"
+            style={{ // ponytail: background and boxShadow depend on computed accent (verdict.tone)
               background: accent,
               boxShadow: `0 0 0 4px color-mix(in srgb, ${accent} 22%, transparent)`,
             }}
@@ -124,37 +100,33 @@ export function VerdictReveal({
           The verdict
         </span>
         <h2
-          className="vault-display"
-          style={{ margin: 0, fontSize: "clamp(1.6rem, 5vw, 2.4rem)", lineHeight: 1.1, color: accent }}
+          className="vault-display m-0 text-[clamp(1.6rem,5vw,2.4rem)] leading-[1.1]"
+          style={{ // ponytail: color depends on computed accent (verdict.tone)
+            color: accent,
+          }}
         >
           {verdict.word}
         </h2>
-        <p className="vault-muted" style={{ margin: 0, fontSize: "0.95rem", lineHeight: 1.5 }}>
+        <p className="vault-muted m-0 text-[0.95rem] leading-[1.5]">
           {verdict.line}
         </p>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 10,
-        }}
-      >
+      <div className="flex flex-wrap gap-[10px]">
         <Stat label="This purchase" value={formatCurrency(purchase.amount, currency)} />
         <Stat label="Safe to spend" value={formatCurrency(result.safeToSpend, currency)} />
         <Stat label="Suggested pause" value={`${result.cooldownDays}-day cooldown`} />
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <span className="vault-eyebrow" style={{ color: "var(--vault-muted)" }}>
+      <div className="flex flex-col gap-2">
+        <span className="vault-eyebrow text-muted-foreground">
           Why SpendGuard says this
         </span>
-        <ul style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 }}>
+        <ul className="m-0 pl-[18px] flex flex-col gap-[6px]">
           {result.reasons.map((reason) => (
             <li
               key={reason}
-              style={{ fontSize: "0.85rem", color: "var(--vault-text)", lineHeight: 1.45 }}
+              className="text-[0.85rem] text-foreground leading-[1.45]"
             >
               {reason}
             </li>
