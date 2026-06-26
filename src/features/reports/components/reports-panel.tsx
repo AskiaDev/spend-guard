@@ -65,7 +65,7 @@ export function ReportsPanel({
             <h2 id="no-report-heading" className="text-2xl font-semibold text-foreground">
               No weekly report yet
             </h2>
-            <p className="text-sm leading-6 text-muted">
+            <p className="text-sm leading-6 text-muted-foreground">
               Generate a local weekly report from saved purchase checks and the rule-based
               financial snapshot. Nothing leaves this browser.
             </p>
@@ -116,7 +116,7 @@ export function ReportsPanel({
             <h2 id="weekly-report-heading" className="text-2xl font-semibold text-foreground">
               {weekRange}
             </h2>
-            <p className="max-w-3xl text-sm leading-6 text-muted">{latestReport.summary}</p>
+            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{latestReport.summary}</p>
           </div>
           <Image
             src="/illustrations/progress-overview.svg"
@@ -136,7 +136,7 @@ export function ReportsPanel({
         <Card aria-labelledby="health-score-heading">
           <CardContent className="grid min-h-64 place-items-center gap-3 text-center">
             <div>
-              <p id="health-score-heading" className="text-xs font-semibold uppercase tracking-normal text-muted">
+              <p id="health-score-heading" className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
                 Weekly health
               </p>
               <p className="mt-2 text-3xl font-bold text-foreground">
@@ -185,14 +185,14 @@ export function ReportsPanel({
             <p id="coach-tip-heading" className="text-xs font-semibold uppercase tracking-normal text-primary">
               Coach Tip
             </p>
-            <p className="text-sm leading-6 text-muted">
+            <p className="text-sm leading-6 text-muted-foreground">
               Keep using purchase checks before credit-card or installment decisions. The safest
               habit is checking the monthly payment against free cash flow before you commit.
             </p>
-            <p className="text-xs font-semibold uppercase tracking-normal text-muted">
+            <p className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
               Educational Tip
             </p>
-            <p className="text-sm leading-6 text-muted">
+            <p className="text-sm leading-6 text-muted-foreground">
               A safe-to-spend number is not spare cash. It is the amount left after protecting bills,
               debt payments, emergency savings, and active goals.
             </p>
@@ -215,7 +215,7 @@ export function ReportsPanel({
                   <h3 className="text-sm font-semibold text-foreground">
                     {formatWeekRange(report.weekStart)}
                   </h3>
-                  <p className="mt-1 text-sm leading-6 text-muted">{report.summary}</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">{report.summary}</p>
                 </div>
                 <p className="text-sm font-semibold text-foreground sm:text-right">
                   {report.healthScore}/100
@@ -228,7 +228,7 @@ export function ReportsPanel({
 
       <div
         data-testid="mobile-report-cta"
-        className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 rounded-card border border-border bg-surface/95 p-3 shadow-elevated backdrop-blur lg:static lg:p-0 lg:shadow-none lg:border-0 lg:bg-transparent"
+        className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 rounded-card border border-border bg-background/95 p-3 shadow-elevated backdrop-blur lg:static lg:p-0 lg:shadow-none lg:border-0 lg:bg-transparent"
       >
         <Link
           href="/checker"
@@ -252,9 +252,9 @@ function MetricCard({ label, value, detail }: { label: string; value: string; de
           <Sparkles aria-hidden="true" className="size-5" />
         </div>
         <div>
-          <h3 className="text-xs font-semibold uppercase tracking-normal text-muted">{label}</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">{label}</h3>
           <p className="mt-2 text-3xl font-bold text-foreground">{value}</p>
-          <p className="mt-3 text-sm leading-6 text-muted">{detail}</p>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">{detail}</p>
         </div>
       </CardContent>
     </Card>
@@ -265,7 +265,7 @@ function InsightCard({ label, detail }: { label: string; detail: string }) {
   return (
     <article className="rounded-control border border-border bg-muted/30 p-4">
       <h3 className="text-sm font-semibold text-foreground">{label}</h3>
-      <p className="mt-2 text-sm leading-6 text-muted">{detail}</p>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">{detail}</p>
     </article>
   );
 }
