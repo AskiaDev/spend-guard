@@ -9,7 +9,7 @@ export function VariableSpendStep({ control }: { control: Control<OnboardingForm
   const currency = useWatch({ control, name: "currency" }) ?? "PHP";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+    <div className="flex flex-col gap-7">
       <ConversationalPrompt
         eyebrow="Variable spending"
         headline="What do you typically spend on day-to-day?"

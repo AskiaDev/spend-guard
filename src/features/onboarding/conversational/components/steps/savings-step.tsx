@@ -9,7 +9,7 @@ export function SavingsStep({ control }: { control: Control<OnboardingFormValues
   const currency = useWatch({ control, name: "currency" }) ?? "PHP";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+    <div className="flex flex-col gap-7">
       <ConversationalPrompt
         eyebrow="Savings"
         headline="How much do you have saved right now?"

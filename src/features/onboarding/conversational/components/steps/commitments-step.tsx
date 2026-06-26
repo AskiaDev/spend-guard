@@ -20,7 +20,7 @@ interface CommitmentsStepProps {
 
 export function CommitmentsStep({ control }: CommitmentsStepProps) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+    <div className="flex flex-col gap-7">
       <ConversationalPrompt
         eyebrow="Fixed expenses"
         headline="What money is already spoken for?"

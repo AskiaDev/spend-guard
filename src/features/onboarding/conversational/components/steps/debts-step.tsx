@@ -13,7 +13,7 @@ interface DebtsStepProps {
 
 export function DebtsStep({ control }: DebtsStepProps) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+    <div className="flex flex-col gap-7">
       <ConversationalPrompt
         eyebrow="Debt payments"
         headline="Any regular payments toward what you owe?"

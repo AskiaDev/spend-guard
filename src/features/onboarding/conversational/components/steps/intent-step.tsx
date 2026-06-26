@@ -31,20 +31,14 @@ export function IntentStep({ value, onChange }: IntentStepProps) {
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+    <div className="flex flex-col gap-6">
       <ConversationalPrompt
         eyebrow="Goals"
         headline="What do you want SpendGuard to help with?"
         subtext="Pick as many as feel right. This helps us set the right tone."
       />
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-          gap: 12,
-        }}
-      >
+      <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(240px,1fr))]">
         {INTENT_OPTIONS.map((opt) => (
           <SelectableCard
             key={opt.id}

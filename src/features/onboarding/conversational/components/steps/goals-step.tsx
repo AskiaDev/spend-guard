@@ -18,7 +18,7 @@ interface GoalsStepProps {
 
 export function GoalsStep({ control }: GoalsStepProps) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+    <div className="flex flex-col gap-7">
       <ConversationalPrompt
         eyebrow="Savings goals"
         headline="What are you saving toward?"

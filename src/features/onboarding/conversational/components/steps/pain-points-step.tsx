@@ -31,20 +31,14 @@ export function PainPointsStep({ value, onChange }: PainPointsStepProps) {
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+    <div className="flex flex-col gap-6">
       <ConversationalPrompt
         eyebrow="Habits"
         headline="What tends to trip you up with spending?"
         subtext="No judgment here - these patterns are common. Knowing them helps SpendGuard protect you better."
       />
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-          gap: 12,
-        }}
-      >
+      <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(240px,1fr))]">
         {PAIN_POINT_OPTIONS.map((opt) => (
           <SelectableCard
             key={opt.id}

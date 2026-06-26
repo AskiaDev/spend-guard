@@ -25,7 +25,7 @@ export function IncomeStep({ control }: { control: Control<OnboardingFormValues>
   const currency = useWatch({ control, name: "currency" }) ?? "PHP";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+    <div className="flex flex-col gap-7">
       <ConversationalPrompt
         eyebrow="Income"
         headline="What comes in each month?"
@@ -33,7 +33,7 @@ export function IncomeStep({ control }: { control: Control<OnboardingFormValues>
         why="SpendGuard uses this to calculate what is safely available after your commitments are covered."
       />
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div className="flex flex-col gap-5">
         <Controller
           name="monthlyIncome"
           control={control}

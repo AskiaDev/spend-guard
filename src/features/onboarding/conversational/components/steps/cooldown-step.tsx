@@ -11,7 +11,7 @@ interface CooldownStepProps {
 
 export function CooldownStep({ value, onChange }: CooldownStepProps) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+    <div className="flex flex-col gap-7">
       <ConversationalPrompt
         eyebrow="Purchase cooldown"
         headline="How firm do you want your pause to be?"

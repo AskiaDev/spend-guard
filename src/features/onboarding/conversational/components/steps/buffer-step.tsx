@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import { cn } from "@/lib/utils";
 import { ConversationalPrompt } from "../conversational-prompt";
 import { MoneyInput } from "../money-input";
 
@@ -29,7 +30,7 @@ export function BufferStep({
     value !== "" && !BUFFER_PRESETS.includes(value);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+    <div className="flex flex-col gap-7">
       <ConversationalPrompt
         eyebrow="Emergency buffer"
         headline="How much should stay protected, no matter what?"
@@ -37,14 +38,8 @@ export function BufferStep({
         why="A buffer means a surprise expense does not force you into a difficult decision."
       />
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-            gap: 10,
-          }}
-        >
+      <div className="flex flex-col gap-4">
+        <div className="grid gap-2.5 [grid-template-columns:repeat(auto-fill,minmax(120px,1fr))]">
           {BUFFER_PRESETS.map((preset) => {
             const selected = value === preset;
             return (
@@ -53,23 +48,12 @@ export function BufferStep({
                 type="button"
                 aria-pressed={selected}
                 onClick={handlePreset(preset)}
-                className="conv-buffer-btn"
-                style={{
-                  padding: "14px 12px",
-                  borderRadius: "var(--vault-radius-card)",
-                  background: selected
-                    ? "color-mix(in srgb, var(--vault-accent) 8%, var(--vault-surface))"
-                    : "var(--vault-surface)",
-                  border: selected
-                    ? "1px solid var(--vault-accent)"
-                    : "1px solid var(--vault-border)",
-                  color: selected ? "var(--vault-accent)" : "var(--vault-text)",
-                  fontSize: "0.9rem",
-                  fontWeight: 600,
-                  fontFamily: "var(--font-hanken), ui-sans-serif, system-ui, sans-serif",
-                  cursor: "pointer",
-                  textAlign: "center",
-                }}
+                className={cn(
+                  "conv-buffer-btn py-[14px] px-3 rounded-[var(--radius-card)] text-[0.9rem] font-semibold font-sans cursor-pointer text-center border",
+                  selected
+                    ? "bg-primary/[0.08] border-primary text-primary"
+                    : "bg-card border-border text-foreground",
+                )}
               >
                 {PRESET_LABELS[preset]}
               </button>
@@ -78,10 +62,9 @@ export function BufferStep({
         </div>
 
         <div
-          style={{
-            opacity: isCustom || value === "" ? 1 : 0.6,
-            transition: "opacity 0.15s ease",
-          }}
+          className="transition-opacity duration-150 ease-in-out"
+          // ponytail: opacity is data-driven (custom vs preset selected)
+          style={{ opacity: isCustom || value === "" ? 1 : 0.6 }}
         >
           <MoneyInput
             id="emergencyBuffer"
