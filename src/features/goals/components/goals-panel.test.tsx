@@ -2,6 +2,10 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("goey-toast", () => ({ gooeyToast: { success: vi.fn(), error: vi.fn() } }));
+
+import { gooeyToast } from "goey-toast";
+
 import { financialSnapshotFixture as defaultSnapshot } from "@/test/fixtures/financial-snapshot";
 import type { FinancialSnapshot, Goal } from "@/types/finance";
 import { GoalsPanel } from "./goals-panel";
@@ -105,7 +109,8 @@ describe("GoalsPanel", () => {
     await user.type(screen.getByLabelText("Saved so far"), "10000");
     await user.type(screen.getByLabelText("Monthly contribution"), "8000");
     await user.type(screen.getByLabelText("Target date"), "2026-12-15");
-    await user.selectOptions(screen.getByLabelText("Priority"), "high");
+    await user.click(screen.getByLabelText("Priority"));
+    await user.click(await screen.findByRole("option", { name: "High priority" }));
     await user.click(screen.getByRole("button", { name: "Create Goal" }));
 
     expect(onCreateGoal).toHaveBeenCalledWith({
@@ -167,7 +172,7 @@ describe("GoalsPanel", () => {
     expect(within(headphonesGoal).getByText("₱2,308 / payday")).toBeVisible();
   });
 
-  it("keeps goal delete controls accessible and calls the delete mutation", async () => {
+  it("keeps goal delete controls accessible, confirms in a dialog, and calls the delete mutation", async () => {
     const user = userEvent.setup();
     const onDeleteGoal = vi.fn().mockResolvedValue(undefined);
 
@@ -176,9 +181,11 @@ describe("GoalsPanel", () => {
     expect(screen.getByRole("button", { name: "Delete Emergency buffer" })).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Delete Noise-cancelling headphones" }));
+    await user.click(screen.getByRole("button", { name: "Remove" }));
 
     expect(onDeleteGoal).toHaveBeenCalledOnce();
     expect(onDeleteGoal).toHaveBeenCalledWith("goal_headphones");
+    expect(gooeyToast.success).toHaveBeenCalledWith("Goal removed");
   });
 
   it("formats date-only target dates as local calendar dates", () => {

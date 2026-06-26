@@ -2,12 +2,31 @@
 
 import { AlertTriangle, CalendarDays, CheckCircle2, Lightbulb, Plus, Target, Trash2, X } from "lucide-react";
 import { useState, type FormEvent, type ReactNode } from "react";
+import { gooeyToast } from "goey-toast";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { FieldError, Input, Label, Select } from "@/components/ui/form-fields";
+import { FieldError, Input, Label } from "@/components/ui/form-fields";
 import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { advisorInsight, referenceGoals } from "@/features/reference-data";
 import { formatCurrency } from "@/lib/utils";
 import type { CurrencyCode, FinancialSnapshot, Goal, PayFrequency } from "@/types/finance";
@@ -105,6 +124,7 @@ export function GoalsPanel({
 
     try {
       await onDeleteGoal(id);
+      gooeyToast.success("Goal removed");
     } catch {
       setFormMessage("We couldn't delete this goal. Please try again.");
     } finally {
@@ -114,19 +134,19 @@ export function GoalsPanel({
 
   return (
     <div className="grid gap-5">
-      <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-5 shadow-card sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 rounded-card border border-border bg-card p-5 shadow-card sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <div className="grid size-11 place-items-center rounded-control bg-safe/10 text-safe">
             <Target className="size-5" aria-hidden="true" />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-normal text-muted">
+            <p className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
               Goal funding
             </p>
             <h2 className="mt-1 text-xl font-semibold tracking-tight text-foreground">
               Savings goals
             </h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
               Keep target dates, monthly contributions, and tradeoffs visible before turning a want
               into a purchase.
             </p>
@@ -150,7 +170,7 @@ export function GoalsPanel({
       {formMessage ? (
         <p
           role={formMessage.startsWith("We couldn't") ? "alert" : "status"}
-          className="rounded-control border border-border bg-slate-50 px-3 py-2 text-sm text-muted"
+          className="rounded-control border border-border bg-slate-50 px-3 py-2 text-sm text-muted-foreground"
         >
           {formMessage}
         </p>
@@ -165,7 +185,7 @@ export function GoalsPanel({
                   <h3 id="new-goal-heading" className="text-lg font-semibold text-foreground">
                     New savings goal
                   </h3>
-                  <p className="mt-1 text-sm leading-6 text-muted">
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
                     Set a target, then check the monthly and payday funding pressure.
                   </p>
                 </div>
@@ -213,15 +233,19 @@ export function GoalsPanel({
                 <div className="grid gap-2">
                   <Label htmlFor="goal-priority">Priority</Label>
                   <Select
-                    id="goal-priority"
                     value={formValues.priority}
-                    onChange={(event) =>
-                      updateField("priority", event.target.value as Goal["priority"])
+                    onValueChange={(value) =>
+                      updateField("priority", value as Goal["priority"])
                     }
                   >
-                    <option value="high">High priority</option>
-                    <option value="medium">Medium priority</option>
-                    <option value="low">Low priority</option>
+                    <SelectTrigger id="goal-priority">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="high">High priority</SelectItem>
+                      <SelectItem value="medium">Medium priority</SelectItem>
+                      <SelectItem value="low">Low priority</SelectItem>
+                    </SelectContent>
                   </Select>
                 </div>
               </div>
@@ -342,7 +366,7 @@ export function GoalsPanel({
       ) : (
         <Card>
           <CardContent>
-            <p className="rounded-control border border-dashed border-border bg-muted/40 p-5 text-sm leading-6 text-muted">
+            <p className="rounded-control border border-dashed border-border bg-muted/40 p-5 text-sm leading-6 text-muted-foreground">
               Purchase decisions can be converted into goals. Add a savings target before taking on
               flexible wants.
             </p>
@@ -362,7 +386,7 @@ export function GoalsPanel({
             >
               Advisor tip
             </p>
-            <p className="text-sm leading-6 text-muted">
+            <p className="text-sm leading-6 text-muted-foreground">
               Fund the most important goal before flexible wants. {advisorInsight.body}
             </p>
           </div>
@@ -384,10 +408,10 @@ function SummaryMetric({
   return (
     <Card aria-label={`${label} metric`} className="min-w-0">
       <CardContent className="grid min-h-32 content-between gap-3">
-        <h3 className="text-xs font-semibold uppercase tracking-normal text-muted">{label}</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">{label}</h3>
         <div>
           <p className="truncate text-2xl font-semibold text-foreground">{value}</p>
-          <p className="mt-2 text-xs leading-5 text-muted">{helper}</p>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">{helper}</p>
         </div>
       </CardContent>
     </Card>
@@ -418,7 +442,7 @@ function GoalCard({
   return (
     <article
       aria-label={`${goal.label} goal`}
-      className="grid gap-5 rounded-card border border-border bg-surface p-5 shadow-card"
+      className="glass grid gap-5 rounded-card p-5"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -426,22 +450,42 @@ function GoalCard({
             <h3 className="text-lg font-semibold tracking-tight text-foreground">{goal.label}</h3>
             {goal.priority === "high" ? <Badge variant="safe">Most important</Badge> : null}
           </div>
-          <p className="mt-2 text-sm text-muted">
+          <p className="mt-2 text-sm text-muted-foreground-foreground">
             {formatCurrency(goal.savedAmount, currency)} of{" "}
             {formatCurrency(goal.targetAmount, currency)}
           </p>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={`Delete ${goal.label}`}
-          disabled={isDeleting}
-          isLoading={isDeleting}
-          onClick={() => void onDeleteGoal(goal.id)}
-        >
-          <Trash2 className="size-4" aria-hidden="true" />
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={`Delete ${goal.label}`}
+              disabled={isDeleting}
+              isLoading={isDeleting}
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent size="sm">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remove goal?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently remove {goal.label} from your tracked goals.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                onClick={() => void onDeleteGoal(goal.id)}
+              >
+                Remove
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       <div className="grid gap-2">
@@ -452,7 +496,7 @@ function GoalCard({
         <Progress value={progress} label={`${goal.label} progress`} />
       </div>
 
-      <p className="text-sm leading-6 text-muted">{helper}</p>
+      <p className="text-sm leading-6 text-muted-foreground">{helper}</p>
 
       <dl className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
         <GoalFact label="Monthly contribution">
@@ -478,7 +522,7 @@ function GoalCard({
         </GoalFact>
       </dl>
 
-      <p className="flex items-center gap-2 text-xs text-muted">
+      <p className="flex items-center gap-2 text-xs text-muted-foreground">
         <CalendarDays aria-hidden="true" className="size-3.5" />
         {plan.isRealistic
           ? "Goal funding fits inside current free cash flow."
@@ -491,7 +535,7 @@ function GoalCard({
 function GoalFact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="rounded-control border border-border bg-muted/30 p-3">
-      <dt className="text-xs font-semibold uppercase tracking-normal text-muted">{label}</dt>
+      <dt className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">{label}</dt>
       <dd className="mt-1 font-medium text-foreground">{children}</dd>
     </div>
   );
