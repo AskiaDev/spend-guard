@@ -57,7 +57,7 @@ export function AuthStatus(props: AuthStatusProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Sign out?</AlertDialogTitle>
             <AlertDialogDescription>
-              You'll need to sign in again to access your account.
+              You&apos;ll need to sign in again to access your account.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
