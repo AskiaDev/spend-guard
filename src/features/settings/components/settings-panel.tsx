@@ -119,7 +119,7 @@ export function SettingsPanel({
 
   return (
     <div className="grid gap-5">
-      <div className="flex flex-col gap-4 rounded-card border border-border bg-surface p-5 shadow-card sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 rounded-card border border-border bg-card glass p-5 shadow-card sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <div className="grid size-11 place-items-center rounded-control bg-safe/10 text-safe">
             <ShieldCheck className="size-5" aria-hidden="true" />
