@@ -450,7 +450,7 @@ function GoalCard({
             <h3 className="text-lg font-semibold tracking-tight text-foreground">{goal.label}</h3>
             {goal.priority === "high" ? <Badge variant="safe">Most important</Badge> : null}
           </div>
-          <p className="mt-2 text-sm text-muted-foreground-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
             {formatCurrency(goal.savedAmount, currency)} of{" "}
             {formatCurrency(goal.targetAmount, currency)}
           </p>
@@ -491,7 +491,7 @@ function GoalCard({
       <div className="grid gap-2">
         <div className="flex items-center justify-between gap-3 text-sm">
           <span className="font-medium text-foreground">{progressLabel}</span>
-          <span className="text-muted">{formatPriority(goal.priority)}</span>
+          <span className="text-muted-foreground">{formatPriority(goal.priority)}</span>
         </div>
         <Progress value={progress} label={`${goal.label} progress`} />
       </div>
