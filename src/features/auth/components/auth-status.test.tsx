@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { AuthStatus } from "./auth-status";
 
 describe("AuthStatus", () => {
-  it("shows the authenticated account and submits sign out", async () => {
+  it("shows the authenticated account and submits sign out via confirm dialog", async () => {
     const user = userEvent.setup();
     const signOutAction = vi.fn(async () => undefined);
     render(
@@ -26,8 +26,13 @@ describe("AuthStatus", () => {
     const signOutItem = await screen.findByRole("menuitem", { name: /sign out/i });
     expect(signOutItem).toBeInTheDocument();
 
-    // Click sign out and assert the action fires
+    // Click "Sign out" menu item - opens the AlertDialog, does NOT call signOutAction yet
     await user.click(signOutItem);
+    expect(signOutAction).not.toHaveBeenCalled();
+
+    // Confirm in the AlertDialog
+    const confirmButton = await screen.findByRole("button", { name: /sign out/i });
+    await user.click(confirmButton);
     await waitFor(() => expect(signOutAction).toHaveBeenCalledOnce());
   });
 });

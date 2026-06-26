@@ -23,11 +23,11 @@ export function AuthForm({
   const [state, formAction, pending] = useActionState(action, initialAuthActionState);
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f7f8f4] p-4">
-      <Card className="w-full max-w-md">
+    <main className="grid min-h-screen place-items-center p-4">
+      <Card className="glass-elevated w-full max-w-md">
         <CardHeader>
-          <CardTitle>{isLogin ? "Sign in" : "Create account"}</CardTitle>
-          <p className="mt-1 text-sm text-zinc-600">
+          <CardTitle className="font-display">{isLogin ? "Sign in" : "Create account"}</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">
             Supabase Auth keeps remote data scoped to your account.
           </p>
         </CardHeader>
@@ -42,17 +42,17 @@ export function AuthForm({
               <Input id="password" name="password" type="password" minLength={8} required />
             </div>
             {notice ? (
-              <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              <p role="alert" className="rounded-md border border-risk/30 bg-risk/10 p-3 text-sm text-risk">
                 {notice}
               </p>
             ) : null}
             {state.status === "error" ? (
-              <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              <p role="alert" className="rounded-md border border-risk/30 bg-risk/10 p-3 text-sm text-risk">
                 {state.message}
               </p>
             ) : null}
             {state.status === "check_email" ? (
-              <p role="status" className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+              <p role="status" className="rounded-md border border-safe/30 bg-safe/10 p-3 text-sm text-safe">
                 {state.message}
               </p>
             ) : null}
@@ -60,9 +60,9 @@ export function AuthForm({
               {pending ? "Working..." : isLogin ? "Sign in" : "Sign up"}
             </Button>
           </form>
-          <p className="mt-4 text-sm text-zinc-600">
+          <p className="mt-4 text-sm text-muted-foreground">
             {isLogin ? "No account yet?" : "Already have an account?"}{" "}
-            <Link className="font-semibold text-emerald-700" href={isLogin ? "/signup" : "/login"}>
+            <Link className="font-semibold text-primary" href={isLogin ? "/signup" : "/login"}>
               {isLogin ? "Sign up" : "Sign in"}
             </Link>
           </p>
