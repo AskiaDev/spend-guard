@@ -13,7 +13,6 @@ import {
 } from "@/features/purchase-checker";
 import { ReportsPanel } from "@/features/reports";
 import { SettingsPanel } from "@/features/settings";
-import { VoicePurchaseChecker } from "@/features/voice";
 import { useFinancialStateContext } from "@/providers/financial-state-provider";
 
 function HydrationNotice() {
@@ -50,21 +49,6 @@ export function PurchaseCheckerPageContent() {
         onSaveVoiceSession={state.confirmVoiceDraft}
       />
     </LocalAdvisorGate>
-  );
-}
-
-export function VoicePageContent() {
-  const state = useFinancialStateContext();
-
-  if (!state.isHydrated) {
-    return <HydrationNotice />;
-  }
-
-  return (
-    <VoicePurchaseChecker
-      onRunCheck={state.runPurchaseCheck}
-      onSaveVoiceSession={state.confirmVoiceDraft}
-    />
   );
 }
 

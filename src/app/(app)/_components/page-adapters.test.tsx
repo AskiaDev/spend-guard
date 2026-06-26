@@ -12,7 +12,6 @@ import {
 } from "@/features/purchase-checker";
 import { ReportsPanel } from "@/features/reports";
 import { SettingsPanel } from "@/features/settings";
-import { VoicePurchaseChecker } from "@/features/voice";
 import { financialSnapshotFixture as defaultSnapshot } from "@/test/fixtures/financial-snapshot";
 import { useFinancialStateContext } from "@/providers/financial-state-provider";
 import {
@@ -25,7 +24,6 @@ import {
   PurchaseResultPageContent,
   ReportsPageContent,
   SettingsPageContent,
-  VoicePageContent,
 } from "./page-adapters";
 
 vi.mock("@/features/cooldown", () => ({
@@ -64,10 +62,6 @@ vi.mock("@/features/reports", () => ({
 
 vi.mock("@/features/settings", () => ({
   SettingsPanel: vi.fn(() => <div data-testid="settings-panel" />),
-}));
-
-vi.mock("@/features/voice", () => ({
-  VoicePurchaseChecker: vi.fn(() => <div data-testid="voice-purchase-checker" />),
 }));
 
 vi.mock("@/providers/financial-state-provider", () => ({
@@ -179,29 +173,6 @@ describe("page adapters", () => {
     const props = vi.mocked(CheckerSurface).mock.calls[0][0];
     expect(props.onRunCheck).toBe(financialState.runPurchaseCheck);
     expect(props.onSaveVoiceSession).toBe(financialState.confirmVoiceDraft);
-  });
-
-  it("waits for hydration before passing the exact purchase-check mutation to voice", () => {
-    vi.mocked(useFinancialStateContext).mockReturnValue({
-      ...financialState,
-      isHydrated: false,
-    });
-    const { rerender } = render(<VoicePageContent />);
-
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Loading local financial workspace..."
-    );
-    expect(VoicePurchaseChecker).not.toHaveBeenCalled();
-
-    vi.mocked(useFinancialStateContext).mockReturnValue(financialState);
-    rerender(<VoicePageContent />);
-
-    expect(screen.queryByText("Loading local financial workspace...")).not.toBeInTheDocument();
-    expect(screen.getByTestId("voice-purchase-checker")).toBeInTheDocument();
-    expect(VoicePurchaseChecker).toHaveBeenCalledOnce();
-    expect(vi.mocked(VoicePurchaseChecker).mock.calls[0][0].onRunCheck).toBe(
-      financialState.runPurchaseCheck
-    );
   });
 
   it("reactively passes the latest check and exact result callback identities", () => {
