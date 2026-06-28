@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PurchaseCheckerWizard } from "./purchase-checker-wizard";
@@ -363,7 +363,11 @@ describe("PurchaseCheckerWizard", () => {
     await user.type(screen.getByLabelText(/product name/i), "Standing desk");
     await user.type(screen.getByLabelText(/price/i), "18000");
     await chooseOption(user, /category/i, "Home");
-    await user.type(screen.getByLabelText(/sale deadline/i), "2026-07-15");
+    // The date field is now a shadcn calendar popover: open it and pick a day.
+    await user.click(screen.getByLabelText(/sale deadline/i));
+    await user.click(within(await screen.findByRole("grid")).getByText("15"));
+    const now = new Date();
+    const expectedSaleDeadline = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-15`;
     await user.type(screen.getByLabelText(/location/i), "Makati showroom");
     await user.click(screen.getByRole("button", { name: /continue/i }));
 
@@ -382,7 +386,7 @@ describe("PurchaseCheckerWizard", () => {
       itemName: "Standing desk",
       amount: 18000,
       category: "home",
-      saleDeadline: "2026-07-15",
+      saleDeadline: expectedSaleDeadline,
       location: "Makati showroom",
       notes: "Ask if the store includes delivery.",
       urgency: "need_this_month",

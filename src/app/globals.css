@@ -8,6 +8,7 @@
   --foreground: #eaf0f7;
   --card: rgba(255, 255, 255, 0.05);
   --card-foreground: #eaf0f7;
+  --card-solid: #161a23;            /* opaque card surface for overlays/drawers */
   --popover: #141d33;              /* opaque for menu/dialog legibility */
   --popover-foreground: #eaf0f7;
   --primary: #c6f24e;

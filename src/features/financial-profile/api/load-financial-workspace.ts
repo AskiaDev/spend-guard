@@ -1,6 +1,7 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { confirmedSavingsDelta } from "@/features/ledger/lib/ledger-balance";
 import { mapFinancialWorkspaceRows } from "@/lib/supabase/finance-mappers";
 import { requireUserId } from "@/lib/supabase/server";
 import type { ActionResult } from "@/types/action-result";
@@ -11,7 +12,7 @@ export async function loadFinancialWorkspace(
   supabase: SupabaseClient<Database>,
   userId: string
 ): Promise<ActionResult<FinancialWorkspace>> {
-  const [profile, expenses, debts, goals, purchaseChecks, cooldownItems, weeklyReports] =
+  const [profile, expenses, debts, goals, purchaseChecks, cooldownItems, weeklyReports, confirmedTx] =
     await Promise.all([
       supabase.from("profiles").select("*").eq("user_id", userId).maybeSingle(),
       supabase.from("expenses").select("*").eq("user_id", userId).order("due_day"),
@@ -28,6 +29,11 @@ export async function loadFinancialWorkspace(
         .select("*")
         .eq("user_id", userId)
         .order("created_at", { ascending: false }),
+      supabase
+        .from("transactions")
+        .select("amount, direction")
+        .eq("user_id", userId)
+        .eq("status", "confirmed"),
     ]);
 
   const firstError = [
@@ -38,6 +44,7 @@ export async function loadFinancialWorkspace(
     purchaseChecks.error,
     cooldownItems.error,
     weeklyReports.error,
+    confirmedTx.error,
   ].find(Boolean);
 
   if (firstError) {
@@ -45,10 +52,15 @@ export async function loadFinancialWorkspace(
     return { ok: false, error: "Unable to load your financial workspace." };
   }
 
+  const delta = confirmedSavingsDelta(confirmedTx.data ?? []);
+  const adjustedProfile = profile.data
+    ? { ...profile.data, current_savings: profile.data.current_savings + delta }
+    : profile.data;
+
   return {
     ok: true,
     data: mapFinancialWorkspaceRows({
-      profile: profile.data,
+      profile: adjustedProfile,
       expenses: expenses.data ?? [],
       debts: debts.data ?? [],
       goals: goals.data ?? [],

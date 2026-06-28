@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { resolveAuthRedirectOrigin } from "./auth-redirect-origin";
 import {
   initialAuthActionState,
   resolveSignUpResult,
@@ -77,7 +78,7 @@ export async function signUpAction(
 
   try {
     const requestHeaders = await headers();
-    const origin = requestHeaders.get("origin") ?? "http://localhost:3000";
+    const origin = resolveAuthRedirectOrigin(requestHeaders.get("origin"));
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase.auth.signUp({
       ...credentials.data,

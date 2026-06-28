@@ -47,8 +47,13 @@ function renderGoalsPanel({
   );
 }
 
+async function openGoalDrawer(user: ReturnType<typeof userEvent.setup>, goalLabel: string) {
+  await user.click(screen.getByRole("button", { name: `View ${goalLabel} details` }));
+  return screen.findByRole("dialog");
+}
+
 describe("GoalsPanel", () => {
-  it("renders goal summary metrics, detailed cards, and advisor guidance", () => {
+  it("renders summary metrics, a scannable goal list, and advisor guidance", () => {
     renderGoalsPanel();
 
     const summary = screen.getByTestId("goals-summary-metrics");
@@ -61,39 +66,45 @@ describe("GoalsPanel", () => {
     expect(within(summary).getByText("Monthly Funding")).toBeVisible();
     expect(within(summary).getByText("₱15,000")).toBeVisible();
 
-    const newGoalButton = screen.getByRole("button", { name: "New Goal" });
-    expect(newGoalButton).toBeEnabled();
+    expect(screen.getByRole("button", { name: "New Goal" })).toBeEnabled();
 
-    const emergencyGoal = screen.getByRole("article", { name: "Emergency buffer goal" });
-    expect(within(emergencyGoal).getByText("Emergency buffer")).toBeVisible();
-    expect(within(emergencyGoal).getByText("₱120,000 of ₱180,000")).toBeVisible();
-    expect(within(emergencyGoal).getByText("67% saved")).toBeVisible();
-    expect(within(emergencyGoal).getByText("₱10,000 monthly contribution")).toBeVisible();
-    expect(within(emergencyGoal).getByText("Estimated completion Dec 31, 2026")).toBeVisible();
-    expect(within(emergencyGoal).getByText("Safe-buy date Dec 31, 2026")).toBeVisible();
-    expect(within(emergencyGoal).getByText("Needed monthly")).toBeVisible();
-    expect(within(emergencyGoal).getByText("₱10,000 / payday")).toBeVisible();
-    expect(within(emergencyGoal).getByText("Realistic")).toBeVisible();
-    expect(within(emergencyGoal).getByText("Most important")).toBeVisible();
+    // Each goal renders a row that summarizes the key facts and opens its detail drawer.
+    const emergencyRow = screen.getByRole("button", { name: "View Emergency buffer details" });
+    expect(within(emergencyRow).getByText("Emergency buffer")).toBeVisible();
+    expect(within(emergencyRow).getByText("Most important")).toBeVisible();
+    expect(within(emergencyRow).getByText("67%")).toBeVisible();
+    expect(within(emergencyRow).getByText("Dec 31, 2026")).toBeVisible();
+
     expect(
-      within(emergencyGoal).getByRole("progressbar", { name: "Emergency buffer progress" })
-    ).toHaveAttribute("aria-valuenow", "67");
+      screen.getByRole("button", { name: "View Noise-cancelling headphones details" })
+    ).toBeVisible();
 
-    const headphonesGoal = screen.getByRole("article", {
-      name: "Noise-cancelling headphones goal",
-    });
-    expect(within(headphonesGoal).getByText("Noise-cancelling headphones")).toBeVisible();
-    expect(within(headphonesGoal).getByText("₱5,000 of ₱25,000")).toBeVisible();
-    expect(within(headphonesGoal).getByText("20% saved")).toBeVisible();
-    expect(within(headphonesGoal).getByText("₱5,000 monthly contribution")).toBeVisible();
-    expect(within(headphonesGoal).getByText("Estimated completion Oct 15, 2026")).toBeVisible();
-    expect(within(headphonesGoal).getByText("Safe-buy date Oct 15, 2026")).toBeVisible();
-    expect(within(headphonesGoal).getByText("₱5,000 / payday")).toBeVisible();
+    expect(screen.getByText("Goal funding fits inside your current free cash flow.")).toBeVisible();
 
     expect(screen.getByText("Advisor tip")).toBeVisible();
     expect(
       screen.getByText(/fund the most important goal before flexible wants/i)
     ).toBeVisible();
+  });
+
+  it("opens a drawer with the full goal detail when a row is selected", async () => {
+    const user = userEvent.setup();
+    renderGoalsPanel();
+
+    const drawer = await openGoalDrawer(user, "Emergency buffer");
+
+    expect(within(drawer).getByText("Emergency buffer")).toBeVisible();
+    expect(within(drawer).getByText("Most important")).toBeVisible();
+    expect(within(drawer).getByText("₱180,000")).toBeVisible();
+    expect(within(drawer).getByText("67% of target")).toBeVisible();
+    expect(within(drawer).getByText("67% saved")).toBeVisible();
+    expect(within(drawer).getByText("₱120,000 of ₱180,000")).toBeVisible();
+    expect(within(drawer).getByText("Per payday")).toBeVisible();
+    expect(within(drawer).getByText("Every month")).toBeVisible();
+    expect(within(drawer).getByText("Realistic")).toBeVisible();
+    expect(
+      within(drawer).getByRole("progressbar", { name: "Emergency buffer progress" })
+    ).toHaveAttribute("aria-valuenow", "67");
   });
 
   it("creates a new goal from the enabled goal form", async () => {
@@ -108,7 +119,11 @@ describe("GoalsPanel", () => {
     await user.type(screen.getByLabelText("Target amount"), "60000");
     await user.type(screen.getByLabelText("Saved so far"), "10000");
     await user.type(screen.getByLabelText("Monthly contribution"), "8000");
-    await user.type(screen.getByLabelText("Target date"), "2026-12-15");
+    // The date field is a shadcn calendar popover: open it and pick a day.
+    await user.click(screen.getByLabelText("Target date"));
+    await user.click(within(await screen.findByRole("grid")).getByText("15"));
+    const now = new Date();
+    const expectedTargetDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-15`;
     await user.click(screen.getByLabelText("Priority"));
     await user.click(await screen.findByRole("option", { name: "High priority" }));
     await user.click(screen.getByRole("button", { name: "Create Goal" }));
@@ -118,7 +133,7 @@ describe("GoalsPanel", () => {
       targetAmount: 60_000,
       savedAmount: 10_000,
       monthlyContribution: 8_000,
-      targetDate: "2026-12-15",
+      targetDate: expectedTargetDate,
       priority: "high",
     });
   });
@@ -145,43 +160,45 @@ describe("GoalsPanel", () => {
     expect(onCreateGoal).toHaveBeenCalledOnce();
   });
 
-  it("shows not-realistic guidance when needed funding exceeds free cash flow", () => {
+  it("warns at the page level and in the drawer when funding exceeds free cash flow", async () => {
+    const user = userEvent.setup();
     renderGoalsPanel({ monthlyFreeCashFlow: 2_000 });
 
-    const emergencyGoal = screen.getByRole("article", { name: "Emergency buffer goal" });
-    expect(within(emergencyGoal).getByText("Tight plan")).toBeVisible();
-    expect(within(emergencyGoal).getByText(/above current free cash flow/i)).toBeVisible();
+    expect(
+      screen.getByText("Planned funding is above your current free cash flow.")
+    ).toBeVisible();
+
+    const drawer = await openGoalDrawer(user, "Emergency buffer");
+    expect(within(drawer).getByText("Tight plan")).toBeVisible();
   });
 
-  it("uses the profile pay frequency for per-payday guidance", () => {
+  it("uses the profile pay frequency for per-payday guidance in the drawer", async () => {
+    const user = userEvent.setup();
     renderGoalsPanel({
       snapshot: {
         ...goalsSnapshot,
-        profile: {
-          ...goalsSnapshot.profile,
-          payFrequency: "biweekly",
-        },
+        profile: { ...goalsSnapshot.profile, payFrequency: "biweekly" },
         goals: [goalsSnapshot.goals[1]],
       },
     });
 
-    const headphonesGoal = screen.getByRole("article", {
-      name: "Noise-cancelling headphones goal",
-    });
+    const drawer = await openGoalDrawer(user, "Noise-cancelling headphones");
 
-    expect(within(headphonesGoal).getByText("₱2,308 / payday")).toBeVisible();
+    expect(within(drawer).getByText("₱2,308")).toBeVisible();
+    expect(within(drawer).getByText("Every 2 weeks")).toBeVisible();
   });
 
-  it("keeps goal delete controls accessible, confirms in a dialog, and calls the delete mutation", async () => {
+  it("deletes a goal from the drawer after confirmation", async () => {
     const user = userEvent.setup();
     const onDeleteGoal = vi.fn().mockResolvedValue(undefined);
 
     renderGoalsPanel({ onDeleteGoal });
 
-    expect(screen.getByRole("button", { name: "Delete Emergency buffer" })).toBeVisible();
+    const drawer = await openGoalDrawer(user, "Noise-cancelling headphones");
+    await user.click(within(drawer).getByRole("button", { name: "Delete goal" }));
 
-    await user.click(screen.getByRole("button", { name: "Delete Noise-cancelling headphones" }));
-    await user.click(screen.getByRole("button", { name: "Remove" }));
+    const confirm = await screen.findByRole("alertdialog");
+    await user.click(within(confirm).getByRole("button", { name: "Remove" }));
 
     expect(onDeleteGoal).toHaveBeenCalledOnce();
     expect(onDeleteGoal).toHaveBeenCalledWith("goal_headphones");
@@ -195,7 +212,7 @@ describe("GoalsPanel", () => {
     try {
       renderGoalsPanel();
 
-      expect(screen.getByText("Safe-buy date Dec 31, 2026")).toBeVisible();
+      expect(screen.getByText("Dec 31, 2026")).toBeVisible();
       expect(screen.queryByText(/Dec 30, 2026/)).not.toBeInTheDocument();
     } finally {
       if (originalTimeZone === undefined) {
@@ -214,16 +231,11 @@ describe("GoalsPanel", () => {
       renderGoalsPanel({
         snapshot: {
           ...goalsSnapshot,
-          goals: [
-            {
-              ...goalsSnapshot.goals[0],
-              targetDate: "2026-12-31T00:00:00.000Z",
-            },
-          ],
+          goals: [{ ...goalsSnapshot.goals[0], targetDate: "2026-12-31T00:00:00.000Z" }],
         },
       });
 
-      expect(screen.getByText("Safe-buy date Dec 31, 2026")).toBeVisible();
+      expect(screen.getByText("Dec 31, 2026")).toBeVisible();
       expect(screen.queryByText(/Dec 30, 2026/)).not.toBeInTheDocument();
     } finally {
       if (originalTimeZone === undefined) {
@@ -241,9 +253,11 @@ describe("GoalsPanel", () => {
 
     expect(within(summary).getByText("No active funding")).toBeVisible();
     expect(within(summary).queryByText("100% funded")).not.toBeInTheDocument();
+    expect(screen.getByText(/add a savings target before taking on flexible wants/i)).toBeVisible();
   });
 
-  it("does not present zero-target goals as fully funded", () => {
+  it("does not present zero-target goals as fully funded", async () => {
+    const user = userEvent.setup();
     renderGoalsPanel({
       snapshot: {
         ...goalsSnapshot,
@@ -260,16 +274,17 @@ describe("GoalsPanel", () => {
       },
     });
 
-    const goal = screen.getByRole("article", { name: "Goal without target goal" });
+    const drawer = await openGoalDrawer(user, "Goal without target");
 
-    expect(within(goal).getByText("Set target amount")).toBeVisible();
     expect(
-      within(goal).getByRole("progressbar", { name: "Goal without target progress" })
+      within(drawer).getByRole("progressbar", { name: "Goal without target progress" })
     ).toHaveAttribute("aria-valuenow", "0");
-    expect(within(goal).queryByText("100% saved")).not.toBeInTheDocument();
+    expect(within(drawer).getAllByText("Set target amount").length).toBeGreaterThanOrEqual(1);
+    expect(within(drawer).queryByText("100% saved")).not.toBeInTheDocument();
   });
 
-  it("shows funded dates for completed goals without fabricating today's date", () => {
+  it("shows funded dates for completed goals without fabricating today's date", async () => {
+    const user = userEvent.setup();
     renderGoalsPanel({
       snapshot: {
         ...goalsSnapshot,
@@ -286,10 +301,9 @@ describe("GoalsPanel", () => {
       },
     });
 
-    const goal = screen.getByRole("article", { name: "Completed trip fund goal" });
+    const drawer = await openGoalDrawer(user, "Completed trip fund");
 
-    expect(within(goal).getByText("100% saved")).toBeVisible();
-    expect(within(goal).getByText("Estimated completion Funded")).toBeVisible();
-    expect(within(goal).getByText("Safe-buy date Funded")).toBeVisible();
+    expect(within(drawer).getByText("100% saved")).toBeVisible();
+    expect(within(drawer).getAllByText("Funded").length).toBeGreaterThanOrEqual(1);
   });
 });

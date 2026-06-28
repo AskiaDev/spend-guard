@@ -55,6 +55,8 @@ const emptyReviewDraft: ReviewDraft = {
 const financedPaymentMethods: PaymentMethod[] = ["installment", "loan", "bnpl"];
 const analysisFailureMessage =
   "We couldn’t analyze this purchase yet. Your reviewed details are still here—please try again.";
+// Capture stays open across natural pauses; we only force-stop after this much silence.
+const IDLE_TIMEOUT_MS = 15_000;
 
 function parseSpokenNumber(value: string) {
   const normalized = value.trim().toLowerCase();
@@ -113,6 +115,15 @@ function clearTimer(timerRef: React.MutableRefObject<ReturnType<typeof setInterv
 
   clearInterval(timerRef.current);
   timerRef.current = null;
+}
+
+function clearIdleTimer(idleRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>) {
+  if (idleRef.current === null) {
+    return;
+  }
+
+  clearTimeout(idleRef.current);
+  idleRef.current = null;
 }
 
 function buildReviewDraft(transcript: string): ReviewDraft {
@@ -177,6 +188,8 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
   const mountedRef = useRef(true);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shouldListenRef = useRef(false);
   const transcriptRef = useRef("");
   const userEditedRef = useRef(false);
 
@@ -185,7 +198,9 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
 
     return () => {
       mountedRef.current = false;
+      shouldListenRef.current = false;
       clearTimer(timerRef);
+      clearIdleTimer(idleTimerRef);
       releaseRecognition(recognitionRef, "abort");
     };
   }, []);
@@ -193,6 +208,33 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
   function updateTranscript(value: string) {
     transcriptRef.current = value;
     setTranscript(value);
+  }
+
+  function armIdleTimer() {
+    clearIdleTimer(idleTimerRef);
+    idleTimerRef.current = setTimeout(() => {
+      idleTimerRef.current = null;
+      stopForIdle();
+    }, IDLE_TIMEOUT_MS);
+  }
+
+  function stopForIdle() {
+    // The user stayed silent for the whole idle window — end capture for them.
+    shouldListenRef.current = false;
+    clearIdleTimer(idleTimerRef);
+    setCaptureNotice(
+      "We stopped listening after 15 seconds of silence. Start again whenever you’re ready."
+    );
+
+    const recognition = recognitionRef.current;
+
+    if (recognition) {
+      recognition.stop();
+      return;
+    }
+
+    clearTimer(timerRef);
+    setStage(transcriptRef.current.trim() ? "transcript" : "ready");
   }
 
   function beginTimer() {
@@ -219,12 +261,15 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
     }
 
     clearTimer(timerRef);
+    clearIdleTimer(idleTimerRef);
     releaseRecognition(recognitionRef, "abort");
 
     const recognition = new SpeechRecognitionApi();
     recognition.lang = "en-PH";
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognitionRef.current = recognition;
+    shouldListenRef.current = true;
 
     recognition.onstart = () => {
       if (mountedRef.current && recognitionRef.current === recognition) {
@@ -249,14 +294,29 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
 
       if (parts.length > 0) {
         updateTranscript(parts.join(" "));
+
+        // Speech detected: reset the silence countdown.
+        if (shouldListenRef.current) {
+          armIdleTimer();
+        }
       }
     };
-    recognition.onerror = () => {
+    recognition.onerror = (event) => {
       if (!mountedRef.current || recognitionRef.current !== recognition) {
         return;
       }
 
+      // `no-speech`/`aborted` fire on natural silence in continuous mode — leave the
+      // session for onend to restart so a pause never ends capture early.
+      const isBenign = event.error === "no-speech" || event.error === "aborted";
+
+      if (isBenign && shouldListenRef.current) {
+        return;
+      }
+
+      shouldListenRef.current = false;
       clearTimer(timerRef);
+      clearIdleTimer(idleTimerRef);
       releaseRecognition(recognitionRef, "abort");
       setCaptureNotice(
         "We couldn’t continue voice capture. Your transcript is still here, and you can type or paste instead."
@@ -268,7 +328,19 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
         return;
       }
 
+      // The browser ends a session on each silence/segment. While the user still
+      // intends to capture (Stop not pressed, idle window not elapsed), restart it.
+      if (shouldListenRef.current) {
+        try {
+          recognition.start();
+          return;
+        } catch {
+          // ponytail: restart can throw if the engine is gone — fall through and finalize.
+        }
+      }
+
       clearTimer(timerRef);
+      clearIdleTimer(idleTimerRef);
       recognitionRef.current = null;
       detachRecognition(recognition);
       setStage(transcriptRef.current.trim() ? "transcript" : "ready");
@@ -280,8 +352,11 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
 
     try {
       recognition.start();
+      armIdleTimer();
     } catch {
+      shouldListenRef.current = false;
       clearTimer(timerRef);
+      clearIdleTimer(idleTimerRef);
       releaseRecognition(recognitionRef, "abort");
       setCaptureNotice(
         "We couldn’t start voice capture. You can still type or paste your request."
@@ -291,7 +366,9 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
   }
 
   function stopCapture() {
+    shouldListenRef.current = false;
     clearTimer(timerRef);
+    clearIdleTimer(idleTimerRef);
 
     const recognition = recognitionRef.current;
 
@@ -309,7 +386,9 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
       return;
     }
 
+    shouldListenRef.current = false;
     clearTimer(timerRef);
+    clearIdleTimer(idleTimerRef);
     releaseRecognition(recognitionRef, "abort");
     const regexDraft = buildReviewDraft(transcript);
     userEditedRef.current = false;
@@ -331,7 +410,9 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
   }
 
   function resetCapture() {
+    shouldListenRef.current = false;
     clearTimer(timerRef);
+    clearIdleTimer(idleTimerRef);
     releaseRecognition(recognitionRef, "abort");
     updateTranscript("");
     setReviewDraft(emptyReviewDraft);

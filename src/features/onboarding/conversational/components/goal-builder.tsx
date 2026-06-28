@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { Controller, useFieldArray, type Control } from "react-hook-form";
 import { type OnboardingFormValues, emptyGoalRow } from "../lib/onboarding-form";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "../../vault/components/primitives/empty-state";
 import { RepeatableRow } from "../../vault/components/primitives/repeatable-row";
@@ -124,11 +125,11 @@ function GoalRowCard({
               control={control}
               name={`goals.${index}.targetDate`}
               render={({ field }) => (
-                <Input
-                  type="date"
+                <DatePicker
                   id={`conv-goal-${index}-date`}
-                  aria-label="Target date (optional)"
-                  {...field}
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  placeholder="Select date"
                 />
               )}
             />

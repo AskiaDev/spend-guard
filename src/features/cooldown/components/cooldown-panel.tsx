@@ -121,7 +121,7 @@ export function CooldownPanel({
     <div className="grid gap-5">
       {/* ponytail: Tabs wraps the header card; TabsContent unused — panel is a single shared div below */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as CooldownTab)}>
-        <div className="grid gap-4 rounded-card border border-border bg-card glass p-5 shadow-card">
+        <div className="grid gap-5 rounded-card border border-border bg-card glass p-5 shadow-card">
           <div className="flex items-start gap-3">
             <div className="grid size-11 place-items-center rounded-control bg-caution/10 text-caution">
               <TimerReset className="size-5" aria-hidden="true" />
@@ -140,40 +140,32 @@ export function CooldownPanel({
             </div>
           </div>
 
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-            <TabsList
-              aria-label="Cooldown views"
-              className="flex h-auto w-auto gap-2 overflow-x-auto rounded-none bg-transparent p-0 pb-1"
-            >
+          <div className="flex flex-col gap-3 border-t border-border/60 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <TabsList aria-label="Cooldown views" className="h-11 w-full p-1 sm:w-auto">
               {tabs.map((tab) => (
                 <TabsTrigger
                   key={tab.id}
                   value={tab.id}
                   id={getTabId(tab.id)}
                   aria-controls={itemsPanelId}
-                  className={cn(
-                    "h-10 flex-none shrink-0 rounded-control px-4 text-sm font-semibold ring-1 ring-border transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                    "data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:ring-primary data-[state=active]:shadow-none",
-                    "data-[state=inactive]:bg-card data-[state=inactive]:text-foreground data-[state=inactive]:hover:bg-muted/20"
-                  )}
+                  className="px-4 sm:px-6"
                 >
                   {tab.label}
                 </TabsTrigger>
               ))}
             </TabsList>
 
-            <div className="grid gap-1">
+            <div className="flex items-center gap-2.5">
               <Label
                 htmlFor="sort-select"
-                className="text-xs font-semibold uppercase tracking-normal text-muted-foreground"
+                className="shrink-0 text-xs font-medium text-muted-foreground"
               >
-                Sort cooldown items
+                Sort
               </Label>
               <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
                 <SelectTrigger
                   id="sort-select"
-                  className="h-11 rounded-control border-border bg-card text-sm font-medium text-foreground"
+                  className="h-11 w-full rounded-control border-border bg-card text-sm font-medium text-foreground sm:w-[184px]"
                 >
                   <SelectValue />
                 </SelectTrigger>

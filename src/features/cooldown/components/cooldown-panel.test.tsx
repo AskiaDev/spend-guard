@@ -93,7 +93,6 @@ describe("CooldownPanel", () => {
     renderPanel([]);
 
     const tablist = screen.getByRole("tablist", { name: "Cooldown views" });
-    expect(tablist).toHaveClass("overflow-x-auto");
 
     const tabs = within(tablist).getAllByRole("tab");
     expect(tabs.map((tab) => tab.textContent)).toEqual(["All", "Waiting", "Wishlist"]);
@@ -106,7 +105,7 @@ describe("CooldownPanel", () => {
     expect(tabs[1]).toHaveAttribute("tabIndex", "-1");
 
     // Radix Select trigger shows selected option text, not a form value
-    expect(screen.getByLabelText("Sort cooldown items")).toHaveTextContent("Recheck date");
+    expect(screen.getByLabelText("Sort")).toHaveTextContent("Recheck date");
 
     const examples = screen.getByRole("region", { name: "Example items" });
     expect(within(examples).getByText("Example items")).toBeVisible();
@@ -201,7 +200,7 @@ describe("CooldownPanel", () => {
       screen.queryByRole("article", { name: "Laptop cooldown item" })
     ).not.toBeInTheDocument();
     // Radix Select trigger shows selected option text, not a form value
-    expect(screen.getByLabelText("Sort cooldown items")).toHaveTextContent("Recheck date");
+    expect(screen.getByLabelText("Sort")).toHaveTextContent("Recheck date");
   });
 
   it("links tabs to a tabpanel and supports arrow-key navigation", async () => {
@@ -292,7 +291,7 @@ describe("CooldownPanel", () => {
     expect(articlesBefore[1]).toBe("Espresso machine cooldown item");
 
     // Switch to amount low to high: Espresso (32 000) before Laptop (45 000)
-    await user.click(screen.getByLabelText("Sort cooldown items"));
+    await user.click(screen.getByLabelText("Sort"));
     await user.click(await screen.findByRole("option", { name: "Amount low to high" }));
 
     const articlesAfter = screen

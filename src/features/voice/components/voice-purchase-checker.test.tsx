@@ -15,10 +15,11 @@ const suppliedTranscript =
 
 class MockSpeechRecognition extends EventTarget {
   lang = "";
+  continuous = false;
   interimResults = false;
   onstart: (() => void) | null = null;
   onend: (() => void) | null = null;
-  onerror: (() => void) | null = null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null = null;
   onresult: ((event: SpeechRecognitionEvent) => void) | null = null;
   start = vi.fn();
   stop = vi.fn();
@@ -75,6 +76,12 @@ function emitTranscript(value: string) {
 function emitRecognitionEnd() {
   act(() => {
     recognition.onend?.();
+  });
+}
+
+function emitRecognitionError(code: string) {
+  act(() => {
+    recognition.onerror?.({ error: code } as SpeechRecognitionErrorEvent);
   });
 }
 
@@ -193,6 +200,78 @@ describe("VoicePurchaseChecker", () => {
 
     expect(screen.getByRole("heading", { name: /check the transcript/i })).toBeVisible();
     expect(screen.getByLabelText(/purchase transcript/i)).toHaveValue(suppliedTranscript);
+  });
+
+  it("listens continuously, restarts when the browser ends a segment, and force-stops after 15s of silence", () => {
+    vi.useFakeTimers();
+
+    render(<VoicePurchaseChecker onRunCheck={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /start voice capture/i }));
+
+    // Continuous keeps the session alive across natural pauses.
+    expect(recognition.continuous).toBe(true);
+    expect(recognition.start).toHaveBeenCalledOnce();
+
+    emitTranscript("Can I buy a phone");
+
+    // Browser ends the segment after a short pause: restart instead of stopping.
+    emitRecognitionEnd();
+    expect(recognition.start).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("heading", { name: /listening/i })).toBeVisible();
+
+    // 15 seconds with no further speech: force-stop into the transcript stage.
+    act(() => {
+      vi.advanceTimersByTime(15000);
+    });
+    expect(recognition.stop).toHaveBeenCalledOnce();
+
+    emitRecognitionEnd();
+    expect(screen.getByRole("heading", { name: /check the transcript/i })).toBeVisible();
+    expect(screen.getByLabelText(/purchase transcript/i)).toHaveValue("Can I buy a phone");
+  });
+
+  it("resets the 15s idle timer whenever new speech arrives", () => {
+    vi.useFakeTimers();
+
+    render(<VoicePurchaseChecker onRunCheck={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /start voice capture/i }));
+
+    emitTranscript("first");
+    act(() => {
+      vi.advanceTimersByTime(10000); // 10s of silence, still within the window
+    });
+    expect(recognition.stop).not.toHaveBeenCalled();
+    expect(screen.getByRole("heading", { name: /listening/i })).toBeVisible();
+
+    emitTranscript("first and second"); // new speech resets the idle window
+    act(() => {
+      vi.advanceTimersByTime(10000); // 10s more, but only 10s since last speech
+    });
+    expect(recognition.stop).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(5000); // now a full 15s since the last speech
+    });
+    expect(recognition.stop).toHaveBeenCalledOnce();
+  });
+
+  it("ignores no-speech errors but stops with guidance on a fatal microphone error", () => {
+    render(<VoicePurchaseChecker onRunCheck={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /start voice capture/i }));
+
+    // A silent gap raises `no-speech`; the session keeps going.
+    emitRecognitionError("no-speech");
+    emitRecognitionEnd();
+    expect(recognition.start).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("heading", { name: /listening/i })).toBeVisible();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+    // A real failure (e.g. denied mic permission) stops capture with non-blaming guidance.
+    emitRecognitionError("not-allowed");
+    expect(recognition.abort).toHaveBeenCalledOnce();
+    expect(screen.getByRole("status")).toHaveTextContent(/couldn’t continue voice capture/i);
+    expect(screen.getByRole("button", { name: /start voice capture/i })).toBeVisible();
   });
 
   it("extracts editable review fields and re-record clears transcript and draft values", async () => {

@@ -12,7 +12,18 @@ const emailOtpTypes: EmailOtpType[] = [
 ];
 
 function safeNextPath(value: string | null): string {
-  return value?.startsWith("/") && !value.startsWith("//") ? value : "/";
+  return value?.startsWith("/") && !value.startsWith("//") ? value : "/onboarding";
+}
+
+function confirmationResultUrl(request: NextRequest, status: "success" | "error", next: string) {
+  const resultUrl = new URL("/auth/confirmed", request.url);
+  resultUrl.searchParams.set("status", status);
+
+  if (status === "success") {
+    resultUrl.searchParams.set("next", next);
+  }
+
+  return resultUrl;
 }
 
 export async function GET(request: NextRequest) {
@@ -30,8 +41,8 @@ export async function GET(request: NextRequest) {
       : { error: new Error("Missing confirmation parameters.") };
 
   if (!result.error) {
-    return NextResponse.redirect(new URL(next, request.url));
+    return NextResponse.redirect(confirmationResultUrl(request, "success", next));
   }
 
-  return NextResponse.redirect(new URL("/login?error=confirmation", request.url));
+  return NextResponse.redirect(confirmationResultUrl(request, "error", next));
 }

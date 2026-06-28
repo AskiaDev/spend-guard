@@ -9,6 +9,7 @@ import {
   SearchCheck,
   Settings,
   Target,
+  Upload,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -26,6 +27,7 @@ const secondaryNavigation = [
   { href: "/expenses", label: "Expenses", icon: ReceiptText },
   { href: "/debts", label: "Debts", icon: CircleDollarSign },
   { href: "/reports", label: "Reports", icon: FileText },
+  { href: "/import", label: "Import", icon: Upload },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 

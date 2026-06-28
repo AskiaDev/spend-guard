@@ -234,8 +234,36 @@ export interface Database {
         Relationships: [];
       };
       transactions: {
-        Row: { id: string; user_id: string; amount: number; label: string; created_at: string };
-        Insert: { user_id: string; amount: number; label: string };
+        Row: {
+          id: string;
+          user_id: string;
+          amount: number;
+          label: string;
+          created_at: string;
+          occurred_at: string | null;
+          direction: string | null;
+          category: string | null;
+          counterparty: string | null;
+          source: string | null;
+          source_ref: string | null;
+          confidence: number | null;
+          status: string;
+          raw_extract: Json | null;
+        };
+        Insert: {
+          user_id: string;
+          amount: number;
+          label: string;
+          occurred_at?: string | null;
+          direction?: string | null;
+          category?: string | null;
+          counterparty?: string | null;
+          source?: string | null;
+          source_ref?: string | null;
+          confidence?: number | null;
+          status?: string;
+          raw_extract?: Json | null;
+        };
         Update: Partial<Database["public"]["Tables"]["transactions"]["Insert"]>;
         Relationships: [];
       };

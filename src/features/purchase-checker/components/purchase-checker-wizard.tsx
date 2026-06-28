@@ -7,6 +7,7 @@ import { Controller, useForm } from "react-hook-form";
 import { StepProgress } from "@/components/finance/step-progress";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Input, Label, Textarea } from "@/components/ui/form-fields";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
@@ -448,12 +449,20 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="grid gap-2">
                   <Label htmlFor="purchase-sale-deadline">Sale deadline</Label>
-                  <Input
-                    id="purchase-sale-deadline"
-                    aria-describedby={errors.saleDeadline ? errorIds.saleDeadline : undefined}
-                    aria-invalid={errors.saleDeadline ? "true" : undefined}
-                    type="date"
-                    {...register("saleDeadline")}
+                  <Controller
+                    control={control}
+                    name="saleDeadline"
+                    render={({ field }) => (
+                      <DatePicker
+                        id="purchase-sale-deadline"
+                        value={field.value ?? ""}
+                        onChange={field.onChange}
+                        ariaInvalid={errors.saleDeadline ? true : undefined}
+                        ariaDescribedBy={
+                          errors.saleDeadline ? errorIds.saleDeadline : undefined
+                        }
+                      />
+                    )}
                   />
                   <FieldErrorText id={errorIds.saleDeadline}>
                     {errors.saleDeadline}
