@@ -19,6 +19,7 @@ import { StatusBadge } from "@/components/finance/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { RemoveConfirmation } from "@/components/ui/remove-confirmation";
 import {
   Select,
   SelectContent,
@@ -356,18 +357,23 @@ function CooldownItemCard({
         >
           <MoreHorizontal className="size-4" aria-hidden="true" />
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={`Remove ${item.itemName}`}
-          onClick={async () => {
+        <RemoveConfirmation
+          title="Remove cooldown item?"
+          description={<>This will permanently remove {item.itemName} from your cooldown list.</>}
+          onConfirm={async () => {
             await onRemove(item.id);
             gooeyToast.success(`${item.itemName} removed`);
           }}
         >
-          <Trash2 className="size-4" aria-hidden="true" />
-        </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={`Remove ${item.itemName}`}
+          >
+            <Trash2 className="size-4" aria-hidden="true" />
+          </Button>
+        </RemoveConfirmation>
       </div>
     </article>
   );

@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { PageSkeleton } from "@/components/feedback/page-skeleton";
 import { CooldownPanel } from "@/features/cooldown";
 import { DashboardOverview } from "@/features/dashboard";
@@ -17,6 +19,19 @@ import { useFinancialStateContext } from "@/providers/financial-state-provider";
 
 function HydrationNotice() {
   return <PageSkeleton cardCount={3} label="Loading local financial workspace..." />;
+}
+
+export function DashboardGreetingTitle() {
+  const state = useFinancialStateContext();
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setNow(new Date()), 0);
+
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  return formatDashboardGreeting(now, state.isHydrated ? state.snapshot.profile.fullName : undefined);
 }
 
 export function DashboardPageContent() {
@@ -84,6 +99,7 @@ export function GoalsPageContent() {
       snapshot={state.snapshot}
       monthlyFreeCashFlow={state.metrics.monthlyFreeCashFlow}
       onCreateGoal={state.createGoal}
+      onUpdateGoal={state.updateGoal}
       onDeleteGoal={state.deleteGoal}
     />
   );
@@ -176,4 +192,23 @@ export function ReportsPageContent() {
       onGenerateReport={state.generateWeeklyReport}
     />
   );
+}
+
+export function formatDashboardGreeting(now: Date | null, fullName?: string) {
+  const greeting = now ? getTimeGreeting(now.getHours()) : "Hello";
+  const firstName = fullName?.trim().split(/\s+/)[0];
+
+  return firstName ? `${greeting}, ${firstName}!` : `${greeting}!`;
+}
+
+function getTimeGreeting(hour: number) {
+  if (hour < 12) {
+    return "Good morning";
+  }
+
+  if (hour < 18) {
+    return "Good afternoon";
+  }
+
+  return "Good evening";
 }

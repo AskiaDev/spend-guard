@@ -30,11 +30,13 @@ function renderGoalsPanel({
   snapshot = goalsSnapshot,
   monthlyFreeCashFlow = 20_000,
   onCreateGoal = vi.fn().mockResolvedValue(undefined),
+  onUpdateGoal = vi.fn().mockResolvedValue(undefined),
   onDeleteGoal = vi.fn().mockResolvedValue(undefined),
 }: {
   snapshot?: FinancialSnapshot;
   monthlyFreeCashFlow?: number;
   onCreateGoal?: (goal: Omit<Goal, "id">) => Promise<Goal | undefined>;
+  onUpdateGoal?: (id: string, goal: Omit<Goal, "id">) => Promise<void>;
   onDeleteGoal?: (id: string) => Promise<void>;
 } = {}) {
   return render(
@@ -42,6 +44,7 @@ function renderGoalsPanel({
       snapshot={snapshot}
       monthlyFreeCashFlow={monthlyFreeCashFlow}
       onCreateGoal={onCreateGoal}
+      onUpdateGoal={onUpdateGoal}
       onDeleteGoal={onDeleteGoal}
     />
   );
@@ -203,6 +206,31 @@ describe("GoalsPanel", () => {
     expect(onDeleteGoal).toHaveBeenCalledOnce();
     expect(onDeleteGoal).toHaveBeenCalledWith("goal_headphones");
     expect(gooeyToast.success).toHaveBeenCalledWith("Goal removed");
+  });
+
+  it("updates a goal from the drawer edit form", async () => {
+    const user = userEvent.setup();
+    const onUpdateGoal = vi.fn().mockResolvedValue(undefined);
+
+    renderGoalsPanel({ onUpdateGoal });
+
+    const drawer = await openGoalDrawer(user, "Noise-cancelling headphones");
+    await user.click(within(drawer).getByRole("button", { name: "Edit goal" }));
+    await user.clear(within(drawer).getByLabelText("Target amount"));
+    await user.type(within(drawer).getByLabelText("Target amount"), "30000");
+    await user.clear(within(drawer).getByLabelText("Monthly contribution"));
+    await user.type(within(drawer).getByLabelText("Monthly contribution"), "6000");
+    await user.click(within(drawer).getByRole("button", { name: "Save Goal" }));
+
+    expect(onUpdateGoal).toHaveBeenCalledWith("goal_headphones", {
+      label: "Noise-cancelling headphones",
+      targetAmount: 30_000,
+      savedAmount: 5_000,
+      monthlyContribution: 6_000,
+      targetDate: "2026-10-15",
+      priority: "medium",
+    });
+    expect(gooeyToast.success).toHaveBeenCalledWith("Goal updated");
   });
 
   it("formats date-only target dates as local calendar dates", () => {

@@ -19,6 +19,7 @@ import {
   DashboardPageContent,
   DebtsPageContent,
   ExpensesPageContent,
+  formatDashboardGreeting,
   GoalsPageContent,
   PurchaseCheckerPageContent,
   PurchaseResultPageContent,
@@ -129,6 +130,7 @@ describe("page adapters", () => {
       addGoalFromCheck: vi.fn(),
       addGoalFromCooldown: vi.fn(),
       createGoal: vi.fn(),
+      updateGoal: vi.fn(),
       createExpense: vi.fn(),
       updateExpense: vi.fn(),
       deleteExpense: vi.fn(),
@@ -226,6 +228,7 @@ describe("page adapters", () => {
     expect(props.snapshot).toBe(financialState.snapshot);
     expect(props.monthlyFreeCashFlow).toBe(financialState.metrics.monthlyFreeCashFlow);
     expect(props.onCreateGoal).toBe(financialState.createGoal);
+    expect(props.onUpdateGoal).toBe(financialState.updateGoal);
     expect(props.onDeleteGoal).toBe(financialState.deleteGoal);
   });
 
@@ -296,4 +299,16 @@ describe("page adapters", () => {
     expect(props.onDeleteVoiceTranscripts).toBe(financialState.deleteVoiceTranscripts);
   });
 
+});
+
+describe("formatDashboardGreeting", () => {
+  it("uses the current time of day and the first profile name", () => {
+    expect(formatDashboardGreeting(new Date(2026, 5, 24, 9), "Miguel Santos")).toBe(
+      "Good morning, Miguel!"
+    );
+    expect(formatDashboardGreeting(new Date(2026, 5, 24, 14), "  Askia  ")).toBe(
+      "Good afternoon, Askia!"
+    );
+    expect(formatDashboardGreeting(new Date(2026, 5, 24, 20))).toBe("Good evening!");
+  });
 });

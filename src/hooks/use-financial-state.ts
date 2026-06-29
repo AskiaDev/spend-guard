@@ -1,7 +1,7 @@
 "use client";
 
 import { addDays, addMonths, startOfWeek } from "date-fns";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createCooldownItemAction,
   deleteCooldownItemAction,
@@ -18,7 +18,11 @@ import {
 } from "@/features/expenses/api/manage-expense";
 import { loadFinancialWorkspaceAction } from "@/features/financial-profile/api/load-financial-workspace";
 import { saveFinancialProfileAction } from "@/features/financial-profile/api/save-financial-profile";
-import { createGoalAction, deleteGoalAction } from "@/features/goals/api/create-goal";
+import {
+  createGoalAction,
+  deleteGoalAction,
+  updateGoalAction,
+} from "@/features/goals/api/create-goal";
 import {
   markPurchaseCheckStatusAction,
   savePurchaseCheckAction,
@@ -66,6 +70,10 @@ type GoalDraft = Omit<Goal, "id">;
 type ExpenseDraft = Omit<Expense, "id">;
 type DebtDraft = Omit<Debt, "id">;
 
+function prependUniqueCheck(check: PurchaseCheck, checks: PurchaseCheck[]) {
+  return [check, ...checks.filter((existing) => existing.id !== check.id)];
+}
+
 export function useFinancialState() {
   const [snapshot, setSnapshot] = useState<FinancialSnapshot>(() => emptySnapshot);
   const [checks, setChecks] = useState<PurchaseCheck[]>([]);
@@ -73,6 +81,7 @@ export function useFinancialState() {
   const [weeklyReports, setWeeklyReports] = useState<WeeklyReport[]>([]);
   const [isHydrated, setIsHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pendingLocalChecksRef = useRef<PurchaseCheck[]>([]);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -85,8 +94,13 @@ export function useFinancialState() {
       return;
     }
 
+    const refreshedCheckIds = new Set(result.data.checks.map((check) => check.id));
+    pendingLocalChecksRef.current = pendingLocalChecksRef.current.filter(
+      (check) => !refreshedCheckIds.has(check.id)
+    );
+
     setSnapshot(result.data.snapshot);
-    setChecks(result.data.checks);
+    setChecks([...pendingLocalChecksRef.current, ...result.data.checks]);
     setCooldownItems(result.data.cooldownItems);
     setWeeklyReports(result.data.weeklyReports);
     setIsHydrated(true);
@@ -150,7 +164,9 @@ export function useFinancialState() {
         createdAt: saved.data.createdAt,
       };
 
-      await refresh();
+      pendingLocalChecksRef.current = prependUniqueCheck(check, pendingLocalChecksRef.current);
+      setChecks((current) => prependUniqueCheck(check, current));
+      void refresh();
       return { check, result };
     },
     [refresh, snapshot]
@@ -287,6 +303,20 @@ export function useFinancialState() {
   const deleteGoal = useCallback(
     async (id: string) => {
       const result = await deleteGoalAction(id);
+
+      if (!result.ok) {
+        setError(result.error);
+        throw new Error(result.error);
+      }
+
+      await refresh();
+    },
+    [refresh]
+  );
+
+  const updateGoal = useCallback(
+    async (id: string, goalDraft: GoalDraft) => {
+      const result = await updateGoalAction(id, goalDraft);
 
       if (!result.ok) {
         setError(result.error);
@@ -493,6 +523,7 @@ export function useFinancialState() {
     markPurchaseCheckStatus,
     removeCooldownItem,
     deleteGoal,
+    updateGoal,
     createExpense,
     updateExpense,
     deleteExpense,

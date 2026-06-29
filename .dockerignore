@@ -1,0 +1,14 @@
+.DS_Store
+.git
+.next
+.superpowers
+coverage
+node_modules
+npm-debug.log*
+test-results
+tsconfig.tsbuildinfo
+
+.env*
+
+supabase/.branches
+supabase/.temp

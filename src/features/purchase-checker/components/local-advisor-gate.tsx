@@ -79,18 +79,24 @@ export function LocalAdvisorGate({
   const [probe, setProbe] = useState(0);
   const warmupRunRef = useRef(0);
 
-  const warmModel = useCallback(async () => {
+  const warmModel = useCallback(async ({ background = false }: { background?: boolean } = {}) => {
     const run = warmupRunRef.current + 1;
     warmupRunRef.current = run;
-    setStatus("downloading");
+    if (!background) {
+      setStatus("downloading");
+    }
     try {
       await localClient.generateText(WARMUP_INPUT);
       if (warmupRunRef.current !== run) return;
       setReadyFlag(storageKey);
-      setStatus("ready");
+      if (!background) {
+        setStatus("ready");
+      }
     } catch {
       if (warmupRunRef.current !== run) return;
-      setStatus("failed");
+      if (!background) {
+        setStatus("failed");
+      }
     }
   }, [localClient, storageKey]);
 
@@ -102,16 +108,17 @@ export function LocalAdvisorGate({
     let cancelled = false;
 
     async function detect() {
+      if (hasReadyFlag(storageKey)) {
+        setStatus("ready");
+        void warmModel({ background: true });
+        return;
+      }
+
       const available = await localClient.isAvailable();
       if (cancelled) return;
 
       if (!available) {
         setStatus("unsupported");
-        return;
-      }
-
-      if (hasReadyFlag(storageKey)) {
-        setStatus("ready");
         return;
       }
 
@@ -124,7 +131,7 @@ export function LocalAdvisorGate({
       cancelled = true;
       warmupRunRef.current += 1;
     };
-  }, [localClient, probe, shouldGate, storageKey]);
+  }, [localClient, probe, shouldGate, storageKey, warmModel]);
 
   if (!shouldGate || status === "ready") {
     return children;

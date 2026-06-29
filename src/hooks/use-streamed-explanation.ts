@@ -5,10 +5,19 @@ import { useEffect, useState } from "react";
 import { resolveModelClients } from "@/lib/ai/resolve-model-clients";
 import type { ModelClient } from "@/lib/ai/types";
 
+export type StreamedExplanationPhase =
+  | "idle"
+  | "checking"
+  | "preparing"
+  | "streaming"
+  | "complete"
+  | "fallback";
+
 export interface StreamedExplanation {
   text: string;
   isStreaming: boolean;
   usedModel: boolean;
+  phase: StreamedExplanationPhase;
 }
 
 interface UseStreamedExplanationArgs {
@@ -37,29 +46,43 @@ export function useStreamedExplanation({
   const [text, setText] = useState(fallback);
   const [isStreaming, setIsStreaming] = useState(false);
   const [usedModel, setUsedModel] = useState(false);
+  const [phase, setPhase] = useState<StreamedExplanationPhase>("idle");
 
   useEffect(() => {
     const chain = clients ?? resolveModelClients();
-    if (chain.length === 0) {
-      return;
-    }
-
     let cancelled = false;
 
     (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+
+      setText(fallback);
+      setIsStreaming(false);
+      setUsedModel(false);
+
+      if (chain.length === 0) {
+        setPhase("idle");
+        return;
+      }
+
       for (const client of chain) {
         if (!client.streamText) continue;
         try {
+          setPhase("checking");
           if (!(await client.isAvailable())) continue;
+          if (cancelled) return;
 
           let accumulated = "";
           let started = false;
+          setPhase("preparing");
           for await (const chunk of client.streamText({ system, prompt })) {
             if (cancelled) return;
             accumulated += chunk;
+            if (!accumulated.trim()) continue;
             if (!started) {
               started = true;
               setIsStreaming(true);
+              setPhase("streaming");
             }
             setText(accumulated);
           }
@@ -68,18 +91,25 @@ export function useStreamedExplanation({
             if (!cancelled) {
               setUsedModel(true);
               setIsStreaming(false);
+              setPhase("complete");
             }
             return;
           }
         } catch {
           // Unavailable or failed mid-stream — drop the indicator and try the next client.
-          if (!cancelled) setIsStreaming(false);
+          if (!cancelled) {
+            setText(fallback);
+            setUsedModel(false);
+            setIsStreaming(false);
+          }
         }
       }
 
       if (!cancelled) {
         setIsStreaming(false);
+        setUsedModel(false);
         setText(fallback);
+        setPhase("fallback");
       }
     })();
 
@@ -88,5 +118,5 @@ export function useStreamedExplanation({
     };
   }, [system, prompt, fallback, clients]);
 
-  return { text, isStreaming, usedModel };
+  return { text, isStreaming, usedModel, phase };
 }

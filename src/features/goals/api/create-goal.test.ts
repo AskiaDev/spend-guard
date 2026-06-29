@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createGoalAction, deleteGoalAction } from "./create-goal";
+import { createGoalAction, deleteGoalAction, updateGoalAction } from "./create-goal";
 
 vi.mock("@/lib/supabase/server", () => ({ requireUserId: vi.fn() }));
 
@@ -76,6 +76,44 @@ describe("goal actions", () => {
     });
 
     expect(result).toEqual({ ok: false, error: "Unable to create this goal." });
+  });
+
+  it("updates goals only for the authenticated user", async () => {
+    const eqUser = vi.fn(async () => ({ error: null }));
+    const eqId = vi.fn(() => ({ eq: eqUser }));
+    const update = vi.fn(() => ({ eq: eqId }));
+    const supabase = { from: vi.fn(() => ({ update })) };
+    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
+
+    const result = await updateGoalAction("goal-1", {
+      label: "Camera upgrade",
+      targetAmount: 60_000,
+      savedAmount: 12_000,
+      monthlyContribution: 9_000,
+      targetDate: "2026-12-15",
+      priority: "high",
+    });
+
+    expect(result).toEqual({ ok: true, data: null });
+    expect(supabase.from).toHaveBeenCalledWith("goals");
+    expect(update).toHaveBeenCalledWith({
+      label: "Camera upgrade",
+      target_amount: 60_000,
+      saved_amount: 12_000,
+      monthly_contribution: 9_000,
+      target_date: "2026-12-15",
+      priority: "high",
+    });
+    expect(eqId).toHaveBeenCalledWith("id", "goal-1");
+    expect(eqUser).toHaveBeenCalledWith("user_id", "user-1");
+  });
+
+  it("rejects goal updates without an id", async () => {
+    await expect(updateGoalAction("", {})).resolves.toEqual({
+      ok: false,
+      error: "Goal ID is required.",
+    });
+    expect(mockedRequireUserId).not.toHaveBeenCalled();
   });
 
   it("deletes goals only for the authenticated user", async () => {

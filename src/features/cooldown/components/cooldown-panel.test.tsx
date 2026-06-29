@@ -273,6 +273,7 @@ describe("CooldownPanel", () => {
     renderPanel(cooldownItems, { onRemove });
 
     await user.click(screen.getByRole("button", { name: "Remove Laptop" }));
+    await user.click(await screen.findByRole("button", { name: "Remove" }));
 
     expect(onRemove).toHaveBeenCalledOnce();
     expect(onRemove).toHaveBeenCalledWith("cooldown_laptop");

@@ -24,6 +24,7 @@ import {
   type ReviewedEntry,
 } from "@/lib/schemas/ledger";
 import { cn } from "@/lib/utils";
+import { useFinancialStateContext } from "@/providers/financial-state-provider";
 
 // ponytail: CONCURRENCY=3 matches the spec constraint (plan global §processing option A)
 const CONCURRENCY = 3;
@@ -93,6 +94,7 @@ function formatCategory(cat: LedgerCategory): string {
 
 export function ImportWizard() {
   const router = useRouter();
+  const { refresh } = useFinancialStateContext();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [done, setDone] = useState(0);
@@ -157,6 +159,7 @@ export function ImportWizard() {
       setError(result.error);
       return;
     }
+    await refresh();
     router.push("/");
   }
 

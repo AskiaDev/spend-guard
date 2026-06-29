@@ -46,16 +46,28 @@ export function AdvisorExplanation({
   clients?: ModelClient[];
 }) {
   const result = toDecisionResult(check);
-  const { text, isStreaming, usedModel } = useStreamedExplanation({
+  const { text, isStreaming, usedModel, phase } = useStreamedExplanation({
     system: buildAdvisorSystemPrompt(),
     prompt: buildAdvisorPrompt(result, check),
     fallback: check.advisorText,
     clients: clients ?? (live ? undefined : NO_CLIENTS),
   });
+  const preparationStatus =
+    phase === "checking"
+      ? "Checking advisor availability..."
+      : phase === "preparing"
+        ? "Preparing advisor explanation..."
+        : null;
+  const showAiLabel = phase === "streaming" || phase === "complete" || usedModel;
 
   return (
     <div className="grid gap-2">
-      {usedModel || isStreaming ? (
+      {preparationStatus ? (
+        <p role="status" className="text-xs font-medium text-primary">
+          {preparationStatus}
+        </p>
+      ) : null}
+      {showAiLabel ? (
         <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           AI explanation
           {isStreaming ? (
@@ -74,6 +86,11 @@ export function AdvisorExplanation({
           </span>
         ) : null}
       </p>
+      {phase === "fallback" ? (
+        <p className="text-xs leading-5 text-muted-foreground">
+          Advisor AI is unavailable, so SpendGuard is using the saved explanation.
+        </p>
+      ) : null}
       <FinancialDisclaimer variant="inline" />
     </div>
   );

@@ -64,7 +64,7 @@ describe("LocalAdvisorGate", () => {
     expect(localClient.generateText).toHaveBeenCalledOnce();
   });
 
-  it("does not warm the model again after this browser has already downloaded it", async () => {
+  it("renders children and warms the local model in the background when it was already downloaded", async () => {
     localStorage.setItem(`spendguard:litert-ready:${DEFAULT_LITERT_MODEL_URL}`, "1");
     const localClient = client();
 
@@ -75,6 +75,7 @@ describe("LocalAdvisorGate", () => {
     );
 
     expect(await screen.findByText("checker form")).toBeInTheDocument();
-    expect(localClient.generateText).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /download model/i })).not.toBeInTheDocument();
+    await waitFor(() => expect(localClient.generateText).toHaveBeenCalledOnce());
   });
 });

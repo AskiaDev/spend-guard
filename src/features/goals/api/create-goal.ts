@@ -42,6 +42,51 @@ export async function createGoalAction(input: unknown): Promise<ActionResult<nul
   }
 }
 
+export async function updateGoalAction(id: string, input: unknown): Promise<ActionResult<null>> {
+  if (!id) {
+    return { ok: false, error: "Goal ID is required." };
+  }
+
+  const parsed = goalSchema.safeParse(input);
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: "Check the goal fields.",
+      fieldErrors: parsed.error.flatten().fieldErrors,
+    };
+  }
+
+  try {
+    const { supabase, userId } = await requireUserId();
+    const goal = parsed.data;
+    const { error } = await supabase
+      .from("goals")
+      .update({
+        label: goal.label,
+        target_amount: goal.targetAmount,
+        saved_amount: goal.savedAmount,
+        monthly_contribution: goal.monthlyContribution,
+        target_date: goal.targetDate ?? null,
+        priority: goal.priority,
+      })
+      .eq("id", id)
+      .eq("user_id", userId);
+
+    if (error) {
+      console.error("Unable to update Supabase goal", error);
+      return { ok: false, error: "Unable to update this goal." };
+    }
+
+    return { ok: true, data: null };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Unable to update goal.",
+    };
+  }
+}
+
 export async function deleteGoalAction(id: string): Promise<ActionResult<null>> {
   if (!id) {
     return { ok: false, error: "Goal ID is required." };

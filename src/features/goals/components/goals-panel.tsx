@@ -20,40 +20,27 @@ import { cn, formatCurrency } from "@/lib/utils";
 import type { FinancialSnapshot, Goal } from "@/types/finance";
 
 import { getGoalSummary } from "../lib/goal-calculations";
+import {
+  emptyGoalForm,
+  parseGoalForm,
+  type GoalDraft,
+  type GoalFormErrors,
+  type GoalFormValues,
+} from "../lib/goal-form";
 import { GoalDetailDrawer } from "./goal-detail-drawer";
 import { GOALS_LIST_GRID, GoalRow } from "./goal-row";
-
-type GoalDraft = Omit<Goal, "id">;
-
-type GoalFormValues = {
-  label: string;
-  targetAmount: string;
-  savedAmount: string;
-  monthlyContribution: string;
-  targetDate: string;
-  priority: Goal["priority"];
-};
-
-type GoalFormErrors = Partial<Record<keyof GoalFormValues, string>>;
-
-const emptyGoalForm: GoalFormValues = {
-  label: "",
-  targetAmount: "",
-  savedAmount: "0",
-  monthlyContribution: "",
-  targetDate: "",
-  priority: "medium",
-};
 
 export function GoalsPanel({
   snapshot,
   monthlyFreeCashFlow,
   onCreateGoal,
+  onUpdateGoal,
   onDeleteGoal,
 }: {
   snapshot: FinancialSnapshot;
   monthlyFreeCashFlow: number;
   onCreateGoal: (goal: GoalDraft) => Promise<Goal | undefined>;
+  onUpdateGoal: (id: string, goal: GoalDraft) => Promise<void>;
   onDeleteGoal: (id: string) => Promise<void>;
 }) {
   const currency = snapshot.profile.currency;
@@ -66,6 +53,7 @@ export function GoalsPanel({
   const [formErrors, setFormErrors] = useState<GoalFormErrors>({});
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [pendingCreate, setPendingCreate] = useState(false);
+  const [pendingUpdateId, setPendingUpdateId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [activeGoal, setActiveGoal] = useState<Goal | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -125,6 +113,22 @@ export function GoalsPanel({
       setFormMessage("We couldn't delete this goal. Please try again.");
     } finally {
       setPendingDeleteId(null);
+    }
+  }
+
+  async function updateGoal(id: string, goal: GoalDraft) {
+    setFormMessage(null);
+    setPendingUpdateId(id);
+
+    try {
+      await onUpdateGoal(id, goal);
+      setActiveGoal((current) => (current?.id === id ? { id, ...goal } : current));
+      gooeyToast.success("Goal updated");
+    } catch {
+      setFormMessage("We couldn't update this goal. Please try again.");
+      throw new Error("Unable to update goal.");
+    } finally {
+      setPendingUpdateId(null);
     }
   }
 
@@ -411,6 +415,8 @@ export function GoalsPanel({
         currency={currency}
         monthlyFreeCashFlow={monthlyFreeCashFlow}
         payFrequency={payFrequency}
+        onUpdate={updateGoal}
+        isUpdating={activeGoal ? pendingUpdateId === activeGoal.id : false}
         onDelete={deleteGoal}
         isDeleting={activeGoal ? pendingDeleteId === activeGoal.id : false}
       />
@@ -437,71 +443,5 @@ function SummaryMetric({
         <p className="text-xs leading-5 text-muted-foreground">{helper}</p>
       </CardContent>
     </Card>
-  );
-}
-
-function parseGoalForm(values: GoalFormValues):
-  | { ok: true; goal: GoalDraft }
-  | { ok: false; errors: GoalFormErrors } {
-  const errors: GoalFormErrors = {};
-  const label = values.label.trim();
-  const targetAmount = Number(values.targetAmount);
-  const savedAmount = values.savedAmount.trim() === "" ? 0 : Number(values.savedAmount);
-  const monthlyContribution = Number(values.monthlyContribution);
-  const targetDate = values.targetDate.trim();
-
-  if (!label) {
-    errors.label = "Name this goal.";
-  }
-
-  if (!Number.isFinite(targetAmount) || targetAmount <= 0) {
-    errors.targetAmount = "Enter a target amount above zero.";
-  }
-
-  if (!Number.isFinite(savedAmount) || savedAmount < 0) {
-    errors.savedAmount = "Enter saved amount as zero or more.";
-  }
-
-  if (Number.isFinite(targetAmount) && Number.isFinite(savedAmount) && savedAmount > targetAmount) {
-    errors.savedAmount = "Saved amount cannot exceed the target.";
-  }
-
-  if (!Number.isFinite(monthlyContribution) || monthlyContribution <= 0) {
-    errors.monthlyContribution = "Enter a monthly contribution above zero.";
-  }
-
-  if (targetDate && !isIsoDate(targetDate)) {
-    errors.targetDate = "Enter a valid target date.";
-  }
-
-  if (Object.keys(errors).length > 0) {
-    return { ok: false, errors };
-  }
-
-  return {
-    ok: true,
-    goal: {
-      label,
-      targetAmount,
-      savedAmount,
-      monthlyContribution,
-      targetDate: targetDate || undefined,
-      priority: values.priority,
-    },
-  };
-}
-
-function isIsoDate(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
   );
 }

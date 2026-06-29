@@ -4,9 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PurchaseCheckerWizard } from "./purchase-checker-wizard";
 
 const pushSpy = vi.hoisted(() => vi.fn());
+const prefetchSpy = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: pushSpy }),
+  useRouter: () => ({ push: pushSpy, prefetch: prefetchSpy }),
 }));
 
 function expectInvalidFieldDescribedBy(field: HTMLElement, errorText: RegExp) {
@@ -57,6 +58,7 @@ async function completeWizardToPayment(user: ReturnType<typeof userEvent.setup>)
 describe("PurchaseCheckerWizard", () => {
   beforeEach(() => {
     pushSpy.mockClear();
+    prefetchSpy.mockClear();
   });
 
   it("blocks Continue until product, positive price, and category exist", async () => {
@@ -269,6 +271,38 @@ describe("PurchaseCheckerWizard", () => {
 
     resolveAnalysis({});
 
+    await waitFor(() => expect(pushSpy).toHaveBeenCalledWith("/checker/result"));
+  });
+
+  it("prefetches the result route when the payment step opens", async () => {
+    const user = userEvent.setup();
+
+    render(<PurchaseCheckerWizard onRunCheck={vi.fn()} />);
+
+    await completeWizardToPayment(user);
+
+    await waitFor(() => expect(prefetchSpy).toHaveBeenCalledWith("/checker/result"));
+  });
+
+  it("shows saving and opening result states around a completed check", async () => {
+    const user = userEvent.setup();
+    let resolveSave: (value: unknown) => void = () => {};
+    const save = new Promise((resolve) => {
+      resolveSave = resolve;
+    });
+    const onRunCheck = vi.fn(() => save);
+
+    render(<PurchaseCheckerWizard onRunCheck={onRunCheck} />);
+
+    await completeWizardToPayment(user);
+    await user.click(screen.getByRole("button", { name: /analyze purchase/i }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/saving check/i);
+    expect(pushSpy).not.toHaveBeenCalled();
+
+    resolveSave({});
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/opening result/i);
     await waitFor(() => expect(pushSpy).toHaveBeenCalledWith("/checker/result"));
   });
 

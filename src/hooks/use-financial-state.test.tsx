@@ -9,6 +9,7 @@ const actions = vi.hoisted(() => ({
   markStatus: vi.fn(),
   createGoal: vi.fn(),
   deleteGoal: vi.fn(),
+  updateGoal: vi.fn(),
   createExpense: vi.fn(),
   updateExpense: vi.fn(),
   deleteExpense: vi.fn(),
@@ -37,6 +38,7 @@ vi.mock("@/features/purchase-checker/api/save-purchase-check", () => ({
 vi.mock("@/features/goals/api/create-goal", () => ({
   createGoalAction: actions.createGoal,
   deleteGoalAction: actions.deleteGoal,
+  updateGoalAction: actions.updateGoal,
 }));
 vi.mock("@/features/expenses/api/manage-expense", () => ({
   createExpenseAction: actions.createExpense,
@@ -88,6 +90,7 @@ describe("useFinancialState Supabase mode", () => {
     actions.markStatus.mockResolvedValue({ ok: true, data: null });
     actions.createGoal.mockResolvedValue({ ok: true, data: null });
     actions.deleteGoal.mockResolvedValue({ ok: true, data: null });
+    actions.updateGoal.mockResolvedValue({ ok: true, data: null });
     actions.createExpense.mockResolvedValue({ ok: true, data: null });
     actions.updateExpense.mockResolvedValue({ ok: true, data: null });
     actions.deleteExpense.mockResolvedValue({ ok: true, data: null });
@@ -301,6 +304,127 @@ describe("useFinancialState Supabase mode", () => {
       transcript: "Can I buy a phone for 25k?",
       extractedFields: expect.objectContaining({ itemName: "phone" }),
     });
+  });
+
+  it("prepends a saved purchase check locally before the background refresh finishes", async () => {
+    const { result } = renderHook(() => useFinancialState());
+    await waitFor(() => expect(result.current.isHydrated).toBe(true));
+
+    let resolveRefresh: (value: Awaited<ReturnType<typeof actions.load>>) => void = () => {};
+    const delayedRefresh = new Promise<Awaited<ReturnType<typeof actions.load>>>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    actions.load.mockClear();
+    actions.load.mockReturnValueOnce(delayedRefresh);
+
+    let savedCheck: Awaited<ReturnType<typeof result.current.runPurchaseCheck>> | undefined;
+    await act(async () => {
+      savedCheck = await result.current.runPurchaseCheck({
+        itemName: "Phone",
+        amount: 25_000,
+        urgency: "want",
+        paymentMethod: "cash",
+      });
+    });
+
+    expect(savedCheck?.check.id).toBe("4fd8e28f-798a-4d71-b279-3ea9473c9ba3");
+    expect(result.current.checks[0]?.id).toBe("4fd8e28f-798a-4d71-b279-3ea9473c9ba3");
+
+    await act(async () => {
+      resolveRefresh({
+        ok: true,
+        data: {
+          snapshot: emptySnapshot,
+          checks: [savedCheck!.check],
+          cooldownItems: [],
+          weeklyReports: [],
+        },
+      });
+      await delayedRefresh;
+    });
+  });
+
+  it("resolves a purchase check save without waiting for a delayed refresh", async () => {
+    const { result } = renderHook(() => useFinancialState());
+    await waitFor(() => expect(result.current.isHydrated).toBe(true));
+
+    let resolveRefresh: (value: Awaited<ReturnType<typeof actions.load>>) => void = () => {};
+    const delayedRefresh = new Promise<Awaited<ReturnType<typeof actions.load>>>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    actions.load.mockClear();
+    actions.load.mockReturnValueOnce(delayedRefresh);
+
+    let runPromise!: Promise<Awaited<ReturnType<typeof result.current.runPurchaseCheck>>>;
+    act(() => {
+      runPromise = result.current.runPurchaseCheck({
+        itemName: "Phone",
+        amount: 25_000,
+        urgency: "want",
+        paymentMethod: "cash",
+      });
+    });
+
+    await waitFor(() => expect(actions.saveCheck).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(result.current.checks[0]?.id).toBe("4fd8e28f-798a-4d71-b279-3ea9473c9ba3")
+    );
+    let resolvedBeforeRefresh = false;
+    runPromise.then(() => {
+      resolvedBeforeRefresh = true;
+    });
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+    await act(async () => {
+      resolveRefresh({
+        ok: true,
+        data: {
+          snapshot: emptySnapshot,
+          checks: [],
+          cooldownItems: [],
+          weeklyReports: [],
+        },
+      });
+      await runPromise;
+    });
+
+    expect(resolvedBeforeRefresh).toBe(true);
+  });
+
+  it("keeps a just-saved purchase check when the background refresh is stale", async () => {
+    const { result } = renderHook(() => useFinancialState());
+    await waitFor(() => expect(result.current.isHydrated).toBe(true));
+
+    let resolveRefresh: (value: Awaited<ReturnType<typeof actions.load>>) => void = () => {};
+    const delayedRefresh = new Promise<Awaited<ReturnType<typeof actions.load>>>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    actions.load.mockClear();
+    actions.load.mockReturnValueOnce(delayedRefresh);
+
+    await act(async () => {
+      await result.current.runPurchaseCheck({
+        itemName: "Phone",
+        amount: 25_000,
+        urgency: "want",
+        paymentMethod: "cash",
+      });
+    });
+
+    await act(async () => {
+      resolveRefresh({
+        ok: true,
+        data: {
+          snapshot: emptySnapshot,
+          checks: [],
+          cooldownItems: [],
+          weeklyReports: [],
+        },
+      });
+      await delayedRefresh;
+    });
+
+    expect(result.current.checks[0]?.id).toBe("4fd8e28f-798a-4d71-b279-3ea9473c9ba3");
   });
 
   it("keeps the last remote mutation error visible", async () => {

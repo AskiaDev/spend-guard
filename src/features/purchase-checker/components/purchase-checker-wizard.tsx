@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { StepProgress } from "@/components/finance/step-progress";
 import { Button } from "@/components/ui/button";
@@ -46,6 +46,7 @@ interface PurchaseWizardValues {
 }
 
 type PurchaseWizardErrors = Partial<Record<keyof PurchaseWizardValues, string>>;
+type SubmitPhase = "idle" | "validating" | "saving" | "opening";
 
 const steps = [{ label: "Product details" }, { label: "Motivation" }, { label: "Payment" }];
 
@@ -99,6 +100,11 @@ const paymentOptions: { value: PaymentMethod; label: string; description: string
 
 const failureMessage =
   "We couldn’t analyze this purchase yet. Your details are still here—please try again.";
+const submitStatusLabels: Record<Exclude<SubmitPhase, "idle">, string> = {
+  validating: "Validating details...",
+  saving: "Saving check...",
+  opening: "Opening result...",
+};
 
 function isPositiveNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
@@ -197,6 +203,8 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
   const [errors, setErrors] = useState<PurchaseWizardErrors>({});
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [draftMessage, setDraftMessage] = useState<string | null>(null);
+  const [submitPhase, setSubmitPhase] = useState<SubmitPhase>("idle");
+  const submitInFlightRef = useRef(false);
 
   const {
     control,
@@ -228,6 +236,16 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
 
   const paymentMethod = watch("paymentMethod");
   const showPaymentSchedule = isFinancedPaymentMethod(paymentMethod);
+  const submitStatus =
+    submitPhase === "idle" ? null : submitStatusLabels[submitPhase];
+  const isSubmitBusy = isSubmitting || submitPhase !== "idle";
+  const submitLoadingText = submitStatus ?? "Validating details...";
+
+  useEffect(() => {
+    if (currentStep === 3) {
+      router.prefetch("/checker/result");
+    }
+  }, [currentStep, router]);
 
   function validateStepOne() {
     const values = getValues();
@@ -350,14 +368,27 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
     setDraftMessage(null);
     setAnalysisError(null);
 
+    if (submitInFlightRef.current) {
+      return;
+    }
+
+    submitInFlightRef.current = true;
+    setSubmitPhase("validating");
+
     if (!validateStepThree()) {
+      submitInFlightRef.current = false;
+      setSubmitPhase("idle");
       return;
     }
 
     try {
+      setSubmitPhase("saving");
       await onRunCheck(buildPurchaseInput(values));
+      setSubmitPhase("opening");
       router.push("/checker/result");
     } catch {
+      submitInFlightRef.current = false;
+      setSubmitPhase("idle");
       setAnalysisError(failureMessage);
     }
   }
@@ -754,6 +785,16 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
                   {draftMessage}
                 </p>
               ) : null}
+
+              {submitStatus ? (
+                <p
+                  aria-live="polite"
+                  className="rounded-control border border-primary/20 bg-primary/10 px-3 py-2 text-sm font-medium text-primary"
+                  role="status"
+                >
+                  {submitStatus}
+                </p>
+              ) : null}
             </section>
           ) : null}
 
@@ -795,9 +836,9 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
               {currentStep === 3 ? (
                 <Button
                   type="submit"
-                  disabled={isSubmitting}
-                  isLoading={isSubmitting}
-                  loadingText="Analyzing..."
+                  disabled={isSubmitBusy}
+                  isLoading={isSubmitBusy}
+                  loadingText={submitLoadingText}
                 >
                   Analyze Purchase
                 </Button>

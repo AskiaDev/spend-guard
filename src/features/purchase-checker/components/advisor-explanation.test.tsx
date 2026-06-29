@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { ModelClient } from "@/lib/ai/types";
@@ -15,6 +15,15 @@ function streamingClient(chunks: string[]): ModelClient {
       for (const chunk of chunks) yield chunk;
     },
   };
+}
+
+function deferred() {
+  let resolve: () => void = () => {};
+  const promise = new Promise<void>((next) => {
+    resolve = next;
+  });
+
+  return { promise, resolve };
 }
 
 const check: PurchaseCheck = {
@@ -64,6 +73,60 @@ describe("AdvisorExplanation", () => {
     expect(screen.getByText(/AI explanation/i)).toBeInTheDocument();
     // ...and the component never renders a decision the model could have flipped.
     expect(screen.queryByText(/NOT_RECOMMENDED|SAFE_TO_BUY/)).not.toBeInTheDocument();
+  });
+
+  it("shows advisor preparation while keeping the saved fallback visible before the first token", async () => {
+    const firstToken = deferred();
+    const secondToken = deferred();
+    const client: ModelClient = {
+      id: "cloud",
+      isAvailable: async () => true,
+      generateText: async () => "AI explanation.",
+      async *streamText() {
+        await firstToken.promise;
+        yield "AI ";
+        await secondToken.promise;
+        yield "explanation.";
+      },
+    };
+
+    render(<AdvisorExplanation check={check} live clients={[client]} />);
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/preparing advisor/i);
+    expect(screen.getByText("Deterministic advisor narrative.")).toBeVisible();
+
+    act(() => firstToken.resolve());
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          (_, element) =>
+            element?.getAttribute("aria-live") === "polite" &&
+            element.textContent?.startsWith("AI") === true
+        )
+      ).toBeVisible()
+    );
+    expect(screen.getByText(/AI explanation/i)).toBeInTheDocument();
+    expect(screen.getByText(/generating/i)).toBeInTheDocument();
+
+    act(() => secondToken.resolve());
+    await waitFor(() => expect(screen.getByText("AI explanation.")).toBeVisible());
+  });
+
+  it("keeps fallback text and shows a non-blocking notice when providers fail", async () => {
+    const failing: ModelClient = {
+      id: "cloud",
+      isAvailable: async () => true,
+      generateText: async () => "unused",
+      async *streamText() {
+        throw new Error("provider failed");
+      },
+    };
+
+    render(<AdvisorExplanation check={check} live clients={[failing]} />);
+
+    expect(await screen.findByText("Deterministic advisor narrative.")).toBeVisible();
+    expect(await screen.findByText(/using the saved explanation/i)).toBeVisible();
+    expect(screen.getByText("Deterministic advisor narrative.").textContent?.trim()).not.toBe("");
   });
 });
 

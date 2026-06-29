@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { DashboardPageContent } from "./_components/page-adapters";
+import { DashboardGreetingTitle, DashboardPageContent } from "./_components/page-adapters";
 import { PageFrame } from "./_components/page-frame";
 
 export const metadata: Metadata = {
@@ -10,7 +10,7 @@ export default function DashboardPage() {
   return (
     <PageFrame
       eyebrow="Today’s spending guard"
-      title="Good morning, Miguel!"
+      title={<DashboardGreetingTitle />}
       description="Start with your safe-to-spend picture before making a purchase decision."
     >
       <DashboardPageContent />
