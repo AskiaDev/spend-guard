@@ -24,6 +24,9 @@ export async function createExpenseAction(input: unknown): Promise<ActionResult<
       amount: expense.amount,
       due_day: expense.dueDay,
       is_recurring: expense.isRecurring,
+      payment_cadence: expense.paymentCadence,
+      next_due_date: expense.nextDueDate ?? null,
+      second_due_day: expense.secondDueDay ?? null,
     });
 
     if (error) {
@@ -68,6 +71,9 @@ export async function updateExpenseAction(
         amount: expense.amount,
         due_day: expense.dueDay,
         is_recurring: expense.isRecurring,
+        payment_cadence: expense.paymentCadence,
+        next_due_date: expense.nextDueDate ?? null,
+        second_due_day: expense.secondDueDay ?? null,
       })
       .eq("id", id)
       .eq("user_id", userId);

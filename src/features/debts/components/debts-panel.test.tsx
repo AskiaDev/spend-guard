@@ -30,6 +30,7 @@ function renderDebtsPanel({
       onCreateDebt={onCreateDebt}
       onUpdateDebt={onUpdateDebt}
       onDeleteDebt={onDeleteDebt}
+      referenceDate={new Date(2026, 5, 29)}
     />
   );
 }
@@ -43,13 +44,13 @@ describe("DebtsPanel", () => {
     expect(within(summary).getByText("1")).toBeVisible();
     expect(within(summary).getByText("Total balance")).toBeVisible();
     expect(within(summary).getByText(/35,000/)).toBeVisible();
-    expect(within(summary).getByText("Day 20")).toBeVisible();
+    expect(within(summary).getByText("07/20/26")).toBeVisible();
 
     const card = screen.getByRole("article", { name: "Credit card debt" });
     expect(within(card).getByText("Credit card")).toBeVisible();
     expect(within(card).getByText("32% APR")).toBeVisible();
     expect(within(card).getByText(/35,000/)).toBeVisible();
-    expect(within(card).getByText("Day 20")).toBeVisible();
+    expect(within(card).getByText("Monthly · 07/20/26")).toBeVisible();
     expect(within(card).getByRole("button", { name: "Edit Credit card" })).toBeEnabled();
     expect(within(card).getByRole("button", { name: "Delete Credit card" })).toBeEnabled();
   });
@@ -74,6 +75,65 @@ describe("DebtsPanel", () => {
       minimumPayment: 2000,
       dueDay: 5,
       interestRate: 0.18,
+      paymentCadence: "monthly",
+      nextDueDate: undefined,
+      secondDueDay: undefined,
+    });
+  });
+
+  it("creates a biweekly debt from the form", async () => {
+    const user = userEvent.setup();
+    const onCreateDebt = vi.fn().mockResolvedValue(undefined);
+    renderDebtsPanel({ onCreateDebt });
+
+    await user.click(screen.getByRole("button", { name: "New Debt" }));
+    await user.type(screen.getByLabelText("Debt name"), "Atome");
+    await user.type(screen.getByLabelText("Balance"), "10900");
+    await user.type(screen.getByLabelText("Minimum payment"), "3800");
+    await user.click(screen.getByLabelText("Payment schedule"));
+    await user.click(await screen.findByRole("option", { name: "Every 2 weeks" }));
+    await user.click(screen.getByRole("button", { name: "Next due date" }));
+    await user.click(within(await screen.findByRole("grid")).getByText("30"));
+    await user.click(screen.getByRole("button", { name: "Create Debt" }));
+
+    expect(onCreateDebt).toHaveBeenCalledWith({
+      label: "Atome",
+      outstandingBalance: 10900,
+      minimumPayment: 3800,
+      dueDay: 30,
+      interestRate: undefined,
+      paymentCadence: "biweekly",
+      nextDueDate: "2026-06-30",
+      secondDueDay: undefined,
+    });
+  });
+
+  it("creates a semi-monthly debt from the form", async () => {
+    const user = userEvent.setup();
+    const onCreateDebt = vi.fn().mockResolvedValue(undefined);
+    renderDebtsPanel({ onCreateDebt });
+
+    await user.click(screen.getByRole("button", { name: "New Debt" }));
+    await user.type(screen.getByLabelText("Debt name"), "Split loan");
+    await user.type(screen.getByLabelText("Balance"), "30000");
+    await user.type(screen.getByLabelText("Minimum payment"), "1500");
+    await user.click(screen.getByLabelText("Payment schedule"));
+    await user.click(await screen.findByRole("option", { name: "Twice a month" }));
+    await user.clear(screen.getByLabelText("First due day"));
+    await user.type(screen.getByLabelText("First due day"), "1");
+    await user.clear(screen.getByLabelText("Second due day"));
+    await user.type(screen.getByLabelText("Second due day"), "15");
+    await user.click(screen.getByRole("button", { name: "Create Debt" }));
+
+    expect(onCreateDebt).toHaveBeenCalledWith({
+      label: "Split loan",
+      outstandingBalance: 30000,
+      minimumPayment: 1500,
+      dueDay: 1,
+      interestRate: undefined,
+      paymentCadence: "semi_monthly",
+      nextDueDate: undefined,
+      secondDueDay: 15,
     });
   });
 
@@ -94,6 +154,9 @@ describe("DebtsPanel", () => {
       minimumPayment: 5000,
       dueDay: 20,
       interestRate: undefined,
+      paymentCadence: "monthly",
+      nextDueDate: undefined,
+      secondDueDay: undefined,
     });
   });
 

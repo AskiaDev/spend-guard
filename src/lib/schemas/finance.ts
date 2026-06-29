@@ -1,11 +1,12 @@
 import { z } from "zod";
-import { PAY_FREQUENCIES } from "@/types/finance";
+import { PAY_FREQUENCIES, RECURRING_CADENCES } from "@/types/finance";
 
 const money = z.coerce.number().min(0, "Enter a positive amount.");
 const dueDay = z.coerce.number().int().min(1).max(31);
 const nonBlankArrayItem = z.string().trim().min(1);
 const emptyToUndefined = (value: unknown) =>
   value === "" || value === null || value === undefined ? undefined : value;
+const optionalDueDay = z.preprocess(emptyToUndefined, dueDay.optional());
 const optionalInstallmentMonths = z.preprocess(
   emptyToUndefined,
   z.coerce.number().int().min(1).max(60).optional()
@@ -68,6 +69,13 @@ export const payFrequencySchema = z
   .enum(PAY_FREQUENCIES)
   .default("monthly");
 
+export const recurringCadenceSchema = z.enum(RECURRING_CADENCES).default("monthly");
+
+const optionalIsoDate = z.preprocess(
+  emptyToUndefined,
+  z.string().refine(isIsoDate, "Enter a valid next due date.").optional()
+);
+
 export const financialProfileSchema = z.object({
   currency: z.enum(["PHP", "USD", "EUR", "JPY", "SGD"]).default("PHP"),
   monthlyIncome: money,
@@ -85,22 +93,80 @@ export const financialProfileSchema = z.object({
   estimatedVariableExpenses: money.default(0),
 });
 
-export const expenseSchema = z.object({
-  id: z.string().optional(),
-  label: z.string().min(1, "Name this expense."),
-  amount: money,
-  dueDay,
-  isRecurring: z.coerce.boolean().default(true),
-});
+export const expenseSchema = z
+  .object({
+    id: z.string().optional(),
+    label: z.string().min(1, "Name this expense."),
+    amount: money,
+    dueDay,
+    isRecurring: z.coerce.boolean().default(true),
+    paymentCadence: recurringCadenceSchema,
+    nextDueDate: optionalIsoDate,
+    secondDueDay: optionalDueDay,
+  })
+  .superRefine((value, context) => {
+    if (value.isRecurring && value.paymentCadence === "biweekly" && !value.nextDueDate) {
+      context.addIssue({
+        code: "custom",
+        path: ["nextDueDate"],
+        message: "Choose the next due date for a biweekly expense.",
+      });
+    }
 
-export const debtSchema = z.object({
-  id: z.string().optional(),
-  label: z.string().min(1, "Name this debt."),
-  outstandingBalance: money,
-  minimumPayment: money,
-  dueDay,
-  interestRate: z.coerce.number().min(0).max(1).optional(),
-});
+    if (value.isRecurring && value.paymentCadence === "semi_monthly") {
+      if (!value.secondDueDay) {
+        context.addIssue({
+          code: "custom",
+          path: ["secondDueDay"],
+          message: "Enter the second due day for a semi-monthly expense.",
+        });
+      } else if (value.secondDueDay === value.dueDay) {
+        context.addIssue({
+          code: "custom",
+          path: ["secondDueDay"],
+          message: "Use two different due days.",
+        });
+      }
+    }
+  });
+
+export const debtSchema = z
+  .object({
+    id: z.string().optional(),
+    label: z.string().min(1, "Name this debt."),
+    outstandingBalance: money,
+    minimumPayment: money,
+    dueDay,
+    interestRate: z.coerce.number().min(0).max(1).optional(),
+    paymentCadence: recurringCadenceSchema,
+    nextDueDate: optionalIsoDate,
+    secondDueDay: optionalDueDay,
+  })
+  .superRefine((value, context) => {
+    if (value.paymentCadence === "biweekly" && !value.nextDueDate) {
+      context.addIssue({
+        code: "custom",
+        path: ["nextDueDate"],
+        message: "Choose the next due date for a biweekly debt.",
+      });
+    }
+
+    if (value.paymentCadence === "semi_monthly") {
+      if (!value.secondDueDay) {
+        context.addIssue({
+          code: "custom",
+          path: ["secondDueDay"],
+          message: "Enter the second due day for a semi-monthly debt.",
+        });
+      } else if (value.secondDueDay === value.dueDay) {
+        context.addIssue({
+          code: "custom",
+          path: ["secondDueDay"],
+          message: "Use two different due days.",
+        });
+      }
+    }
+  });
 
 export const goalSchema = z
   .object({

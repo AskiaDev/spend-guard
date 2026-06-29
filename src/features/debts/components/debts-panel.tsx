@@ -1,26 +1,31 @@
 "use client";
 
-import { CalendarDays, CreditCard, Pencil, Plus, Trash2, X } from "lucide-react";
+import { CalendarDays, CreditCard, Pencil, Plus, Trash2 } from "lucide-react";
 import { gooeyToast } from "goey-toast";
 import { useState, type FormEvent } from "react";
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { DatePicker } from "@/components/ui/date-picker";
 import { FieldError, Input, Label } from "@/components/ui/form-fields";
+import { MutationDrawer } from "@/components/ui/mutation-drawer";
+import { RemoveConfirmation } from "@/components/ui/remove-confirmation";
+import {
+  formatNextRecurringDueDate,
+  formatShortDate,
+  getMonthlyRecurringAmount,
+  getNextRecurringDueDate,
+} from "@/lib/calculations/next-due-date";
 import { formatCurrency } from "@/lib/utils";
-import type { CurrencyCode, Debt } from "@/types/finance";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { CurrencyCode, Debt, RecurringCadence } from "@/types/finance";
 
 type DebtDraft = Omit<Debt, "id">;
 
@@ -29,7 +34,10 @@ type DebtFormValues = {
   outstandingBalance: string;
   minimumPayment: string;
   dueDay: string;
+  secondDueDay: string;
   interestRate: string;
+  paymentCadence: RecurringCadence;
+  nextDueDate: string;
 };
 
 type DebtFormErrors = Partial<Record<keyof DebtFormValues, string>>;
@@ -39,7 +47,10 @@ const emptyDebtForm: DebtFormValues = {
   outstandingBalance: "",
   minimumPayment: "",
   dueDay: "1",
+  secondDueDay: "15",
   interestRate: "",
+  paymentCadence: "monthly",
+  nextDueDate: "",
 };
 
 export function DebtsPanel({
@@ -48,12 +59,14 @@ export function DebtsPanel({
   onCreateDebt,
   onUpdateDebt,
   onDeleteDebt,
+  referenceDate = new Date(),
 }: {
   debts: Debt[];
   currency: CurrencyCode;
   onCreateDebt: (debt: DebtDraft) => Promise<Debt | undefined>;
   onUpdateDebt: (id: string, debt: DebtDraft) => Promise<void>;
   onDeleteDebt: (id: string) => Promise<void>;
+  referenceDate?: Date;
 }) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -62,7 +75,11 @@ export function DebtsPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const totalBalance = debts.reduce((total, debt) => total + debt.outstandingBalance, 0);
-  const totalMinimum = debts.reduce((total, debt) => total + debt.minimumPayment, 0);
+  const totalMinimum = debts.reduce(
+    (total, debt) =>
+      total + getMonthlyRecurringAmount(debt.minimumPayment, debt.paymentCadence),
+    0
+  );
   const formErrorMessages = Object.values(formErrors).filter(Boolean);
 
   function updateField<K extends keyof DebtFormValues>(field: K, value: DebtFormValues[K]) {
@@ -90,7 +107,10 @@ export function DebtsPanel({
       outstandingBalance: String(debt.outstandingBalance),
       minimumPayment: String(debt.minimumPayment),
       dueDay: String(debt.dueDay),
+      secondDueDay: debt.secondDueDay === undefined ? "15" : String(debt.secondDueDay),
       interestRate: debt.interestRate === undefined ? "" : String(debt.interestRate),
+      paymentCadence: debt.paymentCadence ?? "monthly",
+      nextDueDate: debt.nextDueDate ?? "",
     });
     setFormErrors({});
     setMessage(null);
@@ -182,29 +202,24 @@ export function DebtsPanel({
       ) : null}
 
       {isFormOpen ? (
-        <Card aria-labelledby="debt-form-heading">
-          <CardContent>
-            <form className="grid gap-4" onSubmit={submitDebt} noValidate>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 id="debt-form-heading" className="text-lg font-semibold text-foreground">
-                    {editingId ? "Edit debt" : "New debt"}
-                  </h3>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    Minimum payments and due days feed the 30-day debt window.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Cancel debt form"
-                  onClick={closeForm}
-                >
-                  <X className="size-4" aria-hidden="true" />
-                </Button>
+        <MutationDrawer.Root
+          open={isFormOpen}
+          onOpenChange={(open) => !open && closeForm()}
+          closeLabel="Close debt form"
+        >
+          <MutationDrawer.Form onSubmit={submitDebt}>
+            <MutationDrawer.Header>
+              <div>
+                <MutationDrawer.Title>
+                  {editingId ? "Edit debt" : "New debt"}
+                </MutationDrawer.Title>
+                <MutationDrawer.Description>
+                  Minimum payments and due days feed the 30-day debt window.
+                </MutationDrawer.Description>
               </div>
+            </MutationDrawer.Header>
 
+            <MutationDrawer.Body>
               {formErrorMessages.length > 0 ? (
                 <div
                   role="alert"
@@ -219,43 +234,103 @@ export function DebtsPanel({
                 </div>
               ) : null}
 
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                <div className="grid gap-2 md:col-span-2">
-                  <Label htmlFor="debt-label">Debt name</Label>
-                  <Input
-                    id="debt-label"
-                    value={formValues.label}
-                    onChange={(event) => updateField("label", event.target.value)}
-                    aria-invalid={formErrors.label ? "true" : undefined}
-                  />
-                  <FieldError>{formErrors.label}</FieldError>
-                </div>
+              <div className="grid gap-2">
+                <Label htmlFor="debt-label">Debt name</Label>
+                <Input
+                  id="debt-label"
+                  value={formValues.label}
+                  onChange={(event) => updateField("label", event.target.value)}
+                  aria-invalid={formErrors.label ? "true" : undefined}
+                />
+                <FieldError>{formErrors.label}</FieldError>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="debt-balance">Balance</Label>
+                <Input
+                  id="debt-balance"
+                  inputMode="decimal"
+                  type="number"
+                  min="0"
+                  value={formValues.outstandingBalance}
+                  onChange={(event) => updateField("outstandingBalance", event.target.value)}
+                  aria-invalid={formErrors.outstandingBalance ? "true" : undefined}
+                />
+                <FieldError>{formErrors.outstandingBalance}</FieldError>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="debt-minimum">Minimum payment</Label>
+                <Input
+                  id="debt-minimum"
+                  inputMode="decimal"
+                  type="number"
+                  min="0"
+                  value={formValues.minimumPayment}
+                  onChange={(event) => updateField("minimumPayment", event.target.value)}
+                  aria-invalid={formErrors.minimumPayment ? "true" : undefined}
+                />
+                <FieldError>{formErrors.minimumPayment}</FieldError>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="debt-schedule">Payment schedule</Label>
+                <Select
+                  value={formValues.paymentCadence}
+                  onValueChange={(value) =>
+                    updateField("paymentCadence", value as RecurringCadence)
+                  }
+                >
+                  <SelectTrigger id="debt-schedule">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="semi_monthly">Twice a month</SelectItem>
+                    <SelectItem value="biweekly">Every 2 weeks</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {formValues.paymentCadence === "biweekly" ? (
                 <div className="grid gap-2">
-                  <Label htmlFor="debt-balance">Balance</Label>
-                  <Input
-                    id="debt-balance"
-                    inputMode="decimal"
-                    type="number"
-                    min="0"
-                    value={formValues.outstandingBalance}
-                    onChange={(event) => updateField("outstandingBalance", event.target.value)}
-                    aria-invalid={formErrors.outstandingBalance ? "true" : undefined}
+                  <Label htmlFor="debt-next-due-date">Next due date</Label>
+                  <DatePicker
+                    id="debt-next-due-date"
+                    value={formValues.nextDueDate}
+                    onChange={(value) => updateField("nextDueDate", value)}
+                    ariaInvalid={formErrors.nextDueDate ? true : undefined}
                   />
-                  <FieldError>{formErrors.outstandingBalance}</FieldError>
+                  <FieldError>{formErrors.nextDueDate}</FieldError>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="debt-minimum">Minimum payment</Label>
-                  <Input
-                    id="debt-minimum"
-                    inputMode="decimal"
-                    type="number"
-                    min="0"
-                    value={formValues.minimumPayment}
-                    onChange={(event) => updateField("minimumPayment", event.target.value)}
-                    aria-invalid={formErrors.minimumPayment ? "true" : undefined}
-                  />
-                  <FieldError>{formErrors.minimumPayment}</FieldError>
+              ) : formValues.paymentCadence === "semi_monthly" ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="debt-due-day">First due day</Label>
+                    <Input
+                      id="debt-due-day"
+                      inputMode="numeric"
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={formValues.dueDay}
+                      onChange={(event) => updateField("dueDay", event.target.value)}
+                      aria-invalid={formErrors.dueDay ? "true" : undefined}
+                    />
+                    <FieldError>{formErrors.dueDay}</FieldError>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="debt-second-due-day">Second due day</Label>
+                    <Input
+                      id="debt-second-due-day"
+                      inputMode="numeric"
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={formValues.secondDueDay}
+                      onChange={(event) => updateField("secondDueDay", event.target.value)}
+                      aria-invalid={formErrors.secondDueDay ? "true" : undefined}
+                    />
+                    <FieldError>{formErrors.secondDueDay}</FieldError>
+                  </div>
                 </div>
+              ) : (
                 <div className="grid gap-2">
                   <Label htmlFor="debt-due-day">Due day</Label>
                   <Input
@@ -270,34 +345,32 @@ export function DebtsPanel({
                   />
                   <FieldError>{formErrors.dueDay}</FieldError>
                 </div>
-                <div className="grid gap-2 md:max-w-xs">
-                  <Label htmlFor="debt-interest">Interest rate</Label>
-                  <Input
-                    id="debt-interest"
-                    inputMode="decimal"
-                    type="number"
-                    min="0"
-                    max="1"
-                    step="0.01"
-                    value={formValues.interestRate}
-                    onChange={(event) => updateField("interestRate", event.target.value)}
-                    aria-invalid={formErrors.interestRate ? "true" : undefined}
-                  />
-                  <FieldError>{formErrors.interestRate}</FieldError>
-                </div>
+              )}
+              <div className="grid gap-2">
+                <Label htmlFor="debt-interest">Interest rate</Label>
+                <Input
+                  id="debt-interest"
+                  inputMode="decimal"
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={formValues.interestRate}
+                  onChange={(event) => updateField("interestRate", event.target.value)}
+                  aria-invalid={formErrors.interestRate ? "true" : undefined}
+                />
+                <FieldError>{formErrors.interestRate}</FieldError>
               </div>
+            </MutationDrawer.Body>
 
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button type="button" variant="secondary" onClick={closeForm}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={pendingAction === "save"} isLoading={pendingAction === "save"}>
-                  {editingId ? "Save Debt" : "Create Debt"}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+            <MutationDrawer.Footer>
+              <Button type="submit" disabled={pendingAction === "save"} isLoading={pendingAction === "save"}>
+                {editingId ? "Save Debt" : "Create Debt"}
+              </Button>
+              <MutationDrawer.Cancel>Cancel</MutationDrawer.Cancel>
+            </MutationDrawer.Footer>
+          </MutationDrawer.Form>
+        </MutationDrawer.Root>
       ) : null}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="debt-summary">
@@ -312,7 +385,11 @@ export function DebtsPanel({
           value={formatCurrency(totalMinimum, currency)}
           helper="Monthly floor"
         />
-        <SummaryMetric label="Next due" value={getNextDueDay(debts)} helper="Earliest due day" />
+        <SummaryMetric
+          label="Next due"
+          value={getNextDueDate(debts, referenceDate)}
+          helper="Earliest due date"
+        />
       </div>
 
       {debts.length > 0 ? (
@@ -347,47 +424,32 @@ export function DebtsPanel({
                   >
                     <Pencil className="size-4" aria-hidden="true" />
                   </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Delete ${debt.label}`}
-                        disabled={pendingAction === `delete-${debt.id}`}
-                        isLoading={pendingAction === `delete-${debt.id}`}
-                      >
-                        <Trash2 className="size-4" aria-hidden="true" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent size="sm">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Remove debt?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will permanently remove {debt.label} from your tracked debts.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          variant="destructive"
-                          onClick={() => void deleteDebt(debt)}
-                        >
-                          Remove
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <RemoveConfirmation
+                    title="Remove debt?"
+                    description={<>This will permanently remove {debt.label} from your tracked debts.</>}
+                    onConfirm={() => deleteDebt(debt)}
+                  >
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Delete ${debt.label}`}
+                      disabled={pendingAction === `delete-${debt.id}`}
+                      isLoading={pendingAction === `delete-${debt.id}`}
+                    >
+                      <Trash2 className="size-4" aria-hidden="true" />
+                    </Button>
+                  </RemoveConfirmation>
                 </div>
               </div>
               <dl className="grid gap-3 text-sm sm:grid-cols-2">
                 <DebtFact label="Minimum payment">
                   {formatCurrency(debt.minimumPayment, currency)} minimum
                 </DebtFact>
-                <DebtFact label="Due date">
+                <DebtFact label="Next due">
                   <span className="flex items-center gap-2">
                     <CalendarDays className="size-4" aria-hidden="true" />
-                    Day {debt.dueDay}
+                    {formatDebtSchedule(debt, referenceDate)}
                   </span>
                 </DebtFact>
               </dl>
@@ -438,12 +500,8 @@ function DebtFact({ label, children }: { label: string; children: React.ReactNod
   );
 }
 
-function getNextDueDay(debts: Debt[]) {
-  if (debts.length === 0) {
-    return "None";
-  }
-
-  return `Day ${Math.min(...debts.map((debt) => debt.dueDay))}`;
+function getNextDueDate(debts: Debt[], referenceDate: Date) {
+  return formatNextRecurringDueDate(debts, referenceDate);
 }
 
 function parseDebtForm(values: DebtFormValues):
@@ -453,7 +511,11 @@ function parseDebtForm(values: DebtFormValues):
   const label = values.label.trim();
   const outstandingBalance = Number(values.outstandingBalance);
   const minimumPayment = Number(values.minimumPayment);
-  const dueDay = Number(values.dueDay);
+  const dueDay =
+    values.paymentCadence === "biweekly"
+      ? getDayFromIsoDate(values.nextDueDate)
+      : Number(values.dueDay);
+  const secondDueDay = Number(values.secondDueDay);
   const interestRate =
     values.interestRate.trim() === "" ? undefined : Number(values.interestRate);
 
@@ -473,8 +535,20 @@ function parseDebtForm(values: DebtFormValues):
     errors.minimumPayment = "Enter a positive minimum payment.";
   }
 
-  if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31) {
+  if (values.paymentCadence !== "biweekly" && (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31)) {
     errors.dueDay = "Use a due day from 1 to 31.";
+  }
+
+  if (values.paymentCadence === "semi_monthly") {
+    if (!Number.isInteger(secondDueDay) || secondDueDay < 1 || secondDueDay > 31) {
+      errors.secondDueDay = "Use a second due day from 1 to 31.";
+    } else if (secondDueDay === dueDay) {
+      errors.secondDueDay = "Use two different due days.";
+    }
+  }
+
+  if (values.paymentCadence === "biweekly" && !isIsoDate(values.nextDueDate)) {
+    errors.nextDueDate = "Choose the next due date.";
   }
 
   if (interestRate !== undefined && (!Number.isFinite(interestRate) || interestRate < 0 || interestRate > 1)) {
@@ -493,6 +567,35 @@ function parseDebtForm(values: DebtFormValues):
       minimumPayment,
       dueDay,
       interestRate,
+      paymentCadence: values.paymentCadence,
+      nextDueDate: values.paymentCadence === "biweekly" ? values.nextDueDate : undefined,
+      secondDueDay: values.paymentCadence === "semi_monthly" ? secondDueDay : undefined,
     },
   };
+}
+
+function formatDebtSchedule(debt: Debt, referenceDate: Date) {
+  const next = formatShortDate(getNextRecurringDueDate(debt, referenceDate));
+
+  if (debt.paymentCadence === "biweekly") {
+    return `Every 2 weeks · ${next}`;
+  }
+
+  if (debt.paymentCadence === "semi_monthly") {
+    return `Twice a month · ${next}`;
+  }
+
+  return `Monthly · ${next}`;
+}
+
+function isIsoDate(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function getDayFromIsoDate(value: string) {
+  if (!isIsoDate(value)) {
+    return 1;
+  }
+
+  return Number(value.slice(8, 10));
 }

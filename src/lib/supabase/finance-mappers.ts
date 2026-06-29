@@ -8,6 +8,7 @@ import type {
   GoalPriority,
   PayFrequency,
   PaymentMethod,
+  RecurringCadence,
   PurchaseCheckStatus,
   PurchaseDecision,
   PurchaseUrgency,
@@ -77,6 +78,13 @@ export function mapFinancialWorkspaceRows(rows: FinancialWorkspaceRows): Financi
         amount: Number(expense.amount),
         dueDay: expense.due_day,
         isRecurring: expense.is_recurring,
+        paymentCadence: enumValue<RecurringCadence>(
+          expense.payment_cadence ?? "monthly",
+          ["monthly", "semi_monthly", "biweekly"],
+          "monthly"
+        ),
+        nextDueDate: expense.next_due_date ?? undefined,
+        secondDueDay: expense.second_due_day ?? undefined,
       })),
       debts: rows.debts.map((debt) => ({
         id: debt.id,
@@ -85,6 +93,13 @@ export function mapFinancialWorkspaceRows(rows: FinancialWorkspaceRows): Financi
         minimumPayment: Number(debt.minimum_payment),
         dueDay: debt.due_day,
         interestRate: debt.interest_rate === null ? undefined : Number(debt.interest_rate),
+        paymentCadence: enumValue<RecurringCadence>(
+          debt.payment_cadence ?? "monthly",
+          ["monthly", "semi_monthly", "biweekly"],
+          "monthly"
+        ),
+        nextDueDate: debt.next_due_date ?? undefined,
+        secondDueDay: debt.second_due_day ?? undefined,
       })),
       goals: rows.goals.map((goal) => ({
         id: goal.id,

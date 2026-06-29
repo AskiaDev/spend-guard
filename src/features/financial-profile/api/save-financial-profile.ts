@@ -65,6 +65,9 @@ export async function saveFinancialProfileAction(
               amount: expense.amount,
               due_day: expense.dueDay,
               is_recurring: expense.isRecurring,
+              payment_cadence: expense.paymentCadence,
+              next_due_date: expense.nextDueDate ?? null,
+              second_due_day: expense.secondDueDay ?? null,
             }))
           )
         : Promise.resolve({ error: null }),
@@ -77,6 +80,9 @@ export async function saveFinancialProfileAction(
               minimum_payment: debt.minimumPayment,
               due_day: debt.dueDay,
               interest_rate: debt.interestRate ?? null,
+              payment_cadence: debt.paymentCadence,
+              next_due_date: debt.nextDueDate ?? null,
+              second_due_day: debt.secondDueDay ?? null,
             }))
           )
         : Promise.resolve({ error: null }),

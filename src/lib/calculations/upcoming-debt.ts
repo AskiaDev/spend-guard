@@ -1,6 +1,5 @@
 import type { Debt } from "@/types/finance";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { getDaysUntil, getUpcomingRecurringDates } from "./next-due-date";
 
 /**
  * Number of calendar days, inclusive of today, that defines the "upcoming" window.
@@ -27,16 +26,14 @@ export interface UpcomingDebt {
  * reference date so it is deterministic in tests; the UI passes `new Date()` at the render boundary.
  */
 export function getUpcomingDebts(debts: Debt[], referenceDate: Date): UpcomingDebt[] {
-  const today = startOfDay(referenceDate);
-
   return debts
-    .map((debt) => {
-      const next = nextOccurrence(debt.dueDay, today);
-      const daysUntilDue = Math.round((next.getTime() - today.getTime()) / DAY_MS);
-
-      return { debt, nextDueDate: toDateString(next), daysUntilDue };
-    })
-    .filter((item) => item.daysUntilDue >= 0 && item.daysUntilDue <= UPCOMING_DEBT_WINDOW_DAYS)
+    .flatMap((debt) =>
+      getUpcomingRecurringDates(debt, referenceDate, UPCOMING_DEBT_WINDOW_DAYS).map((date) => ({
+        debt,
+        nextDueDate: toDateString(date),
+        daysUntilDue: getDaysUntil(date, referenceDate),
+      }))
+    )
     .sort(byDaysThenPayment);
 }
 
@@ -46,25 +43,6 @@ export function getUpcomingDebtTotal(debts: Debt[], referenceDate: Date): number
     (total, item) => total + item.debt.minimumPayment,
     0
   );
-}
-
-function nextOccurrence(dueDay: number, today: Date): Date {
-  const candidate = clampToMonth(today.getFullYear(), today.getMonth(), dueDay);
-
-  if (candidate.getTime() >= today.getTime()) {
-    return candidate;
-  }
-
-  return clampToMonth(today.getFullYear(), today.getMonth() + 1, dueDay);
-}
-
-function clampToMonth(year: number, month: number, day: number): Date {
-  const lastDay = new Date(year, month + 1, 0).getDate();
-  return new Date(year, month, Math.min(day, lastDay));
-}
-
-function startOfDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 function toDateString(date: Date): string {

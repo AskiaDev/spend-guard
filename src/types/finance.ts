@@ -22,6 +22,16 @@ export const PAY_FREQUENCIES = ["monthly", "semi_monthly", "biweekly", "weekly"]
 
 export type PayFrequency = (typeof PAY_FREQUENCIES)[number];
 
+export const RECURRING_CADENCES = ["monthly", "semi_monthly", "biweekly"] as const;
+
+export type RecurringCadence = (typeof RECURRING_CADENCES)[number];
+
+export const RECURRING_CADENCE_LABELS: Record<RecurringCadence, string> = {
+  monthly: "Monthly",
+  semi_monthly: "Twice a month",
+  biweekly: "Every 2 weeks",
+};
+
 export const PAY_FREQUENCY_LABELS: Record<PayFrequency, string> = {
   monthly: "Monthly",
   semi_monthly: "Twice a month",
@@ -49,6 +59,9 @@ export interface Expense {
   amount: number;
   dueDay: number;
   isRecurring: boolean;
+  paymentCadence?: RecurringCadence;
+  nextDueDate?: string;
+  secondDueDay?: number;
 }
 
 export interface Debt {
@@ -58,6 +71,9 @@ export interface Debt {
   minimumPayment: number;
   dueDay: number;
   interestRate?: number;
+  paymentCadence?: RecurringCadence;
+  nextDueDate?: string;
+  secondDueDay?: number;
 }
 
 export interface Goal {

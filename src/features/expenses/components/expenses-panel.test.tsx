@@ -30,6 +30,7 @@ function renderExpensesPanel({
       onCreateExpense={onCreateExpense}
       onUpdateExpense={onUpdateExpense}
       onDeleteExpense={onDeleteExpense}
+      referenceDate={new Date(2026, 5, 29)}
     />
   );
 }
@@ -43,13 +44,13 @@ describe("ExpensesPanel", () => {
     expect(within(screen.getByLabelText("Tracked expenses metric")).getByText("2")).toBeVisible();
     expect(within(summary).getByText("Monthly total")).toBeVisible();
     expect(within(summary).getByText(/28,500/)).toBeVisible();
-    expect(within(summary).getByText("Day 1")).toBeVisible();
+    expect(within(summary).getByText("07/01/26")).toBeVisible();
 
     const rent = screen.getByRole("article", { name: "Rent expense" });
     expect(within(rent).getByText("Rent")).toBeVisible();
     expect(within(rent).getByText("Recurring")).toBeVisible();
     expect(within(rent).getByText(/22,000/)).toBeVisible();
-    expect(within(rent).getByText("Due every month on day 1")).toBeVisible();
+    expect(within(rent).getByText("Monthly · 07/01/26")).toBeVisible();
     expect(within(rent).getByRole("button", { name: "Edit Rent" })).toBeEnabled();
     expect(within(rent).getByRole("button", { name: "Delete Rent" })).toBeEnabled();
   });
@@ -73,6 +74,61 @@ describe("ExpensesPanel", () => {
       amount: 1200,
       dueDay: 10,
       isRecurring: false,
+      paymentCadence: "monthly",
+      nextDueDate: undefined,
+      secondDueDay: undefined,
+    });
+  });
+
+  it("creates a biweekly recurring expense from the form", async () => {
+    const user = userEvent.setup();
+    const onCreateExpense = vi.fn().mockResolvedValue(undefined);
+    renderExpensesPanel({ onCreateExpense });
+
+    await user.click(screen.getByRole("button", { name: "New Expense" }));
+    await user.type(screen.getByLabelText("Expense name"), "Therapy");
+    await user.type(screen.getByLabelText("Amount"), "2000");
+    await user.click(screen.getByLabelText("Schedule"));
+    await user.click(await screen.findByRole("option", { name: "Every 2 weeks" }));
+    await user.click(screen.getByRole("button", { name: "Next due date" }));
+    await user.click(within(await screen.findByRole("grid")).getByText("30"));
+    await user.click(screen.getByRole("button", { name: "Create Expense" }));
+
+    expect(onCreateExpense).toHaveBeenCalledWith({
+      label: "Therapy",
+      amount: 2000,
+      dueDay: 30,
+      isRecurring: true,
+      paymentCadence: "biweekly",
+      nextDueDate: "2026-06-30",
+      secondDueDay: undefined,
+    });
+  });
+
+  it("creates a semi-monthly recurring expense from the form", async () => {
+    const user = userEvent.setup();
+    const onCreateExpense = vi.fn().mockResolvedValue(undefined);
+    renderExpensesPanel({ onCreateExpense });
+
+    await user.click(screen.getByRole("button", { name: "New Expense" }));
+    await user.type(screen.getByLabelText("Expense name"), "Rent split");
+    await user.type(screen.getByLabelText("Amount"), "14000");
+    await user.click(screen.getByLabelText("Schedule"));
+    await user.click(await screen.findByRole("option", { name: "Twice a month" }));
+    await user.clear(screen.getByLabelText("First due day"));
+    await user.type(screen.getByLabelText("First due day"), "1");
+    await user.clear(screen.getByLabelText("Second due day"));
+    await user.type(screen.getByLabelText("Second due day"), "15");
+    await user.click(screen.getByRole("button", { name: "Create Expense" }));
+
+    expect(onCreateExpense).toHaveBeenCalledWith({
+      label: "Rent split",
+      amount: 14000,
+      dueDay: 1,
+      isRecurring: true,
+      paymentCadence: "semi_monthly",
+      nextDueDate: undefined,
+      secondDueDay: 15,
     });
   });
 
@@ -91,6 +147,9 @@ describe("ExpensesPanel", () => {
       amount: 7000,
       dueDay: 15,
       isRecurring: true,
+      paymentCadence: "monthly",
+      nextDueDate: undefined,
+      secondDueDay: undefined,
     });
   });
 

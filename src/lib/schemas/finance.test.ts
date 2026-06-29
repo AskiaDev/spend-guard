@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { financialProfileSchema, purchaseInputSchema } from "./finance";
+import { debtSchema, expenseSchema, financialProfileSchema, purchaseInputSchema } from "./finance";
 
 describe("financialProfileSchema", () => {
   const baseProfile = {
@@ -190,6 +190,69 @@ describe("purchaseInputSchema", () => {
         urgency: "can_wait",
         paymentMethod: "cash",
         location: "x".repeat(121),
+      })
+    ).toThrow();
+  });
+});
+
+describe("recurring payment schemas", () => {
+  it("defaults expenses and debts to monthly cadence", () => {
+    expect(
+      expenseSchema.parse({ label: "Rent", amount: 10_000, dueDay: 1, isRecurring: true })
+    ).toMatchObject({ paymentCadence: "monthly" });
+    expect(
+      debtSchema.parse({
+        label: "Atome",
+        outstandingBalance: 10_900,
+        minimumPayment: 3_800,
+        dueDay: 6,
+      })
+    ).toMatchObject({ paymentCadence: "monthly" });
+  });
+
+  it("requires a next due date for biweekly recurring rows", () => {
+    expect(
+      debtSchema.parse({
+        label: "Atome",
+        outstandingBalance: 10_900,
+        minimumPayment: 3_800,
+        dueDay: 6,
+        paymentCadence: "biweekly",
+        nextDueDate: "2026-07-06",
+      })
+    ).toMatchObject({ paymentCadence: "biweekly", nextDueDate: "2026-07-06" });
+
+    expect(() =>
+      expenseSchema.parse({
+        label: "Therapy",
+        amount: 2_000,
+        dueDay: 6,
+        isRecurring: true,
+        paymentCadence: "biweekly",
+      })
+    ).toThrow();
+  });
+
+  it("requires two different due days for semi-monthly rows", () => {
+    expect(
+      expenseSchema.parse({
+        label: "Rent",
+        amount: 14_000,
+        dueDay: 1,
+        secondDueDay: 15,
+        isRecurring: true,
+        paymentCadence: "semi_monthly",
+      })
+    ).toMatchObject({ paymentCadence: "semi_monthly", dueDay: 1, secondDueDay: 15 });
+
+    expect(() =>
+      debtSchema.parse({
+        label: "Loan",
+        outstandingBalance: 30_000,
+        minimumPayment: 2_000,
+        dueDay: 1,
+        secondDueDay: 1,
+        paymentCadence: "semi_monthly",
       })
     ).toThrow();
   });

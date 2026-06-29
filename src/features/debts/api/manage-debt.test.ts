@@ -34,7 +34,59 @@ describe("debt actions", () => {
       minimum_payment: 5_000,
       due_day: 20,
       interest_rate: 0.32,
+      payment_cadence: "monthly",
+      next_due_date: null,
+      second_due_day: null,
     });
+  });
+
+  it("inserts biweekly debt schedules with a next due date", async () => {
+    const insert = vi.fn(async () => ({ error: null }));
+    const supabase = { from: vi.fn(() => ({ insert })) };
+    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
+
+    const result = await createDebtAction({
+      label: "Atome",
+      outstandingBalance: 10_900,
+      minimumPayment: 3_800,
+      dueDay: 6,
+      paymentCadence: "biweekly",
+      nextDueDate: "2026-07-06",
+    });
+
+    expect(result).toEqual({ ok: true, data: null });
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payment_cadence: "biweekly",
+        next_due_date: "2026-07-06",
+        second_due_day: null,
+      })
+    );
+  });
+
+  it("inserts semi-monthly debt schedules with two due days", async () => {
+    const insert = vi.fn(async () => ({ error: null }));
+    const supabase = { from: vi.fn(() => ({ insert })) };
+    mockedRequireUserId.mockResolvedValueOnce({ supabase, userId: "user-1" } as never);
+
+    const result = await createDebtAction({
+      label: "Loan",
+      outstandingBalance: 30_000,
+      minimumPayment: 2_000,
+      dueDay: 1,
+      secondDueDay: 15,
+      paymentCadence: "semi_monthly",
+    });
+
+    expect(result).toEqual({ ok: true, data: null });
+    expect(insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        due_day: 1,
+        payment_cadence: "semi_monthly",
+        next_due_date: null,
+        second_due_day: 15,
+      })
+    );
   });
 
   it("persists blank interest as null", async () => {
@@ -75,6 +127,9 @@ describe("debt actions", () => {
       minimum_payment: 4_000,
       due_day: 18,
       interest_rate: 0.25,
+      payment_cadence: "monthly",
+      next_due_date: null,
+      second_due_day: null,
     });
     expect(eqId).toHaveBeenCalledWith("id", "debt-1");
     expect(eqUser).toHaveBeenCalledWith("user_id", "user-1");

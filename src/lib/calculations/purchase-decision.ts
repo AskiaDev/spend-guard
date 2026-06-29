@@ -25,6 +25,10 @@ import {
   calculateReservedGoalAmount,
 } from "./goal-impact";
 import { calculateHealthScore } from "./health-score";
+import {
+  getMonthlyRecurringAmount,
+  getUpcomingRecurringPaymentTotal,
+} from "./next-due-date";
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -58,12 +62,44 @@ function recurringExpenseTotal(snapshot: FinancialSnapshot): number {
   return sum(
     snapshot.expenses
       .filter((expense) => expense.isRecurring)
-      .map((expense) => expense.amount)
+      .map((expense) => getMonthlyRecurringAmount(expense.amount, expense.paymentCadence))
   );
 }
 
 function minimumDebtPayments(snapshot: FinancialSnapshot): number {
-  return sum(snapshot.debts.map((debt) => debt.minimumPayment));
+  return sum(
+    snapshot.debts.map((debt) =>
+      getMonthlyRecurringAmount(debt.minimumPayment, debt.paymentCadence)
+    )
+  );
+}
+
+function upcomingExpenseTotal(snapshot: FinancialSnapshot, referenceDate: Date): number {
+  return getUpcomingRecurringPaymentTotal(
+    snapshot.expenses
+      .filter((expense) => expense.isRecurring)
+      .map((expense) => ({
+        amount: expense.amount,
+        dueDay: expense.dueDay,
+        paymentCadence: expense.paymentCadence,
+        nextDueDate: expense.nextDueDate,
+        secondDueDay: expense.secondDueDay,
+      })),
+    referenceDate
+  );
+}
+
+function upcomingDebtTotal(snapshot: FinancialSnapshot, referenceDate: Date): number {
+  return getUpcomingRecurringPaymentTotal(
+    snapshot.debts.map((debt) => ({
+      amount: debt.minimumPayment,
+      dueDay: debt.dueDay,
+      paymentCadence: debt.paymentCadence,
+      nextDueDate: debt.nextDueDate,
+      secondDueDay: debt.secondDueDay,
+    })),
+    referenceDate
+  );
 }
 
 export function calculateMonthlyFreeCashFlow(snapshot: FinancialSnapshot): number {
@@ -86,12 +122,15 @@ export function calculateDebtPressure(snapshot: FinancialSnapshot): number {
   });
 }
 
-export function calculateSafeToSpend(snapshot: FinancialSnapshot): number {
+export function calculateSafeToSpend(
+  snapshot: FinancialSnapshot,
+  referenceDate = new Date()
+): number {
   return calculateSafeToSpendFromInput({
     currentSavings: snapshot.profile.currentSavings,
     emergencyBuffer: calculateEmergencyBuffer(snapshot.profile),
-    upcomingBills30Days: recurringExpenseTotal(snapshot),
-    upcomingDebt30Days: minimumDebtPayments(snapshot),
+    upcomingBills30Days: upcomingExpenseTotal(snapshot, referenceDate),
+    upcomingDebt30Days: upcomingDebtTotal(snapshot, referenceDate),
     reservedGoalAmount: calculateReservedGoalAmount(snapshot.goals),
   });
 }
@@ -213,14 +252,15 @@ export function evaluatePurchase(input: PurchaseEvaluationInput): PurchaseEvalua
 
 export function calculatePurchaseDecision(
   snapshot: FinancialSnapshot,
-  purchase: PurchaseInput
+  purchase: PurchaseInput,
+  referenceDate = new Date()
 ): PurchaseDecisionResult {
-  const safeToSpend = calculateSafeToSpend(snapshot);
+  const safeToSpend = calculateSafeToSpend(snapshot, referenceDate);
   const monthlyFreeCashFlow = calculateMonthlyFreeCashFlow(snapshot);
   const emergencyProgress = calculateEmergencyProgress(snapshot);
   const debtPressure = calculateDebtPressure(snapshot);
   const emergencyBuffer = calculateEmergencyBuffer(snapshot.profile);
-  const upcomingDebt30Days = minimumDebtPayments(snapshot);
+  const upcomingDebt30Days = upcomingDebtTotal(snapshot, referenceDate);
   const evaluation = evaluatePurchase({
     price: purchase.amount,
     currentSavings: snapshot.profile.currentSavings,

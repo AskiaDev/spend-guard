@@ -25,6 +25,9 @@ export async function createDebtAction(input: unknown): Promise<ActionResult<nul
       minimum_payment: debt.minimumPayment,
       due_day: debt.dueDay,
       interest_rate: debt.interestRate ?? null,
+      payment_cadence: debt.paymentCadence,
+      next_due_date: debt.nextDueDate ?? null,
+      second_due_day: debt.secondDueDay ?? null,
     });
 
     if (error) {
@@ -67,6 +70,9 @@ export async function updateDebtAction(id: string, input: unknown): Promise<Acti
         minimum_payment: debt.minimumPayment,
         due_day: debt.dueDay,
         interest_rate: debt.interestRate ?? null,
+        payment_cadence: debt.paymentCadence,
+        next_due_date: debt.nextDueDate ?? null,
+        second_due_day: debt.secondDueDay ?? null,
       })
       .eq("id", id)
       .eq("user_id", userId);

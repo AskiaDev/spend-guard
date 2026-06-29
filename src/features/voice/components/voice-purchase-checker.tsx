@@ -775,7 +775,7 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
                 ) : null}
               </section>
 
-              <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 -mx-2 flex flex-col-reverse gap-2 rounded-card border border-border bg-card/95 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-elevated backdrop-blur sm:flex-row sm:justify-end lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
+              <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 flex flex-col-reverse gap-2 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:flex-row sm:justify-end lg:static lg:p-0">
                 <Button type="button" variant="secondary" onClick={resetCapture}>
                   <RotateCcw aria-hidden="true" className="size-4" />
                   Record again

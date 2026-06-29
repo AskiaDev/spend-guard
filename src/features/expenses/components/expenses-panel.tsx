@@ -1,24 +1,16 @@
 "use client";
 
-import { CalendarDays, Pencil, Plus, ReceiptText, Trash2, X } from "lucide-react";
+import { CalendarDays, Pencil, Plus, ReceiptText, Trash2 } from "lucide-react";
 import { gooeyToast } from "goey-toast";
 import { useState, type FormEvent } from "react";
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { DatePicker } from "@/components/ui/date-picker";
 import { FieldError, Input, Label } from "@/components/ui/form-fields";
+import { MutationDrawer } from "@/components/ui/mutation-drawer";
+import { RemoveConfirmation } from "@/components/ui/remove-confirmation";
 import {
   Select,
   SelectContent,
@@ -26,8 +18,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  formatNextRecurringDueDate,
+  formatShortDate,
+  getMonthlyRecurringAmount,
+  getNextRecurringDueDate,
+} from "@/lib/calculations/next-due-date";
 import { formatCurrency } from "@/lib/utils";
-import type { CurrencyCode, Expense } from "@/types/finance";
+import type { CurrencyCode, Expense, RecurringCadence } from "@/types/finance";
 
 type ExpenseDraft = Omit<Expense, "id">;
 
@@ -35,7 +33,10 @@ type ExpenseFormValues = {
   label: string;
   amount: string;
   dueDay: string;
+  secondDueDay: string;
   isRecurring: "true" | "false";
+  paymentCadence: RecurringCadence;
+  nextDueDate: string;
 };
 
 type ExpenseFormErrors = Partial<Record<keyof ExpenseFormValues, string>>;
@@ -44,7 +45,10 @@ const emptyExpenseForm: ExpenseFormValues = {
   label: "",
   amount: "",
   dueDay: "1",
+  secondDueDay: "15",
   isRecurring: "true",
+  paymentCadence: "monthly",
+  nextDueDate: "",
 };
 
 export function ExpensesPanel({
@@ -53,12 +57,14 @@ export function ExpensesPanel({
   onCreateExpense,
   onUpdateExpense,
   onDeleteExpense,
+  referenceDate = new Date(),
 }: {
   expenses: Expense[];
   currency: CurrencyCode;
   onCreateExpense: (expense: ExpenseDraft) => Promise<Expense | undefined>;
   onUpdateExpense: (id: string, expense: ExpenseDraft) => Promise<void>;
   onDeleteExpense: (id: string) => Promise<void>;
+  referenceDate?: Date;
 }) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -66,7 +72,14 @@ export function ExpensesPanel({
   const [formErrors, setFormErrors] = useState<ExpenseFormErrors>({});
   const [message, setMessage] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
-  const totalMonthly = expenses.reduce((total, expense) => total + expense.amount, 0);
+  const totalMonthly = expenses.reduce(
+    (total, expense) =>
+      total +
+      (expense.isRecurring
+        ? getMonthlyRecurringAmount(expense.amount, expense.paymentCadence)
+        : expense.amount),
+    0
+  );
   const recurringCount = expenses.filter((expense) => expense.isRecurring).length;
   const formErrorMessages = Object.values(formErrors).filter(Boolean);
 
@@ -94,7 +107,10 @@ export function ExpensesPanel({
       label: expense.label,
       amount: String(expense.amount),
       dueDay: String(expense.dueDay),
+      secondDueDay: expense.secondDueDay === undefined ? "15" : String(expense.secondDueDay),
       isRecurring: expense.isRecurring ? "true" : "false",
+      paymentCadence: expense.paymentCadence ?? "monthly",
+      nextDueDate: expense.nextDueDate ?? "",
     });
     setFormErrors({});
     setMessage(null);
@@ -186,29 +202,24 @@ export function ExpensesPanel({
       ) : null}
 
       {isFormOpen ? (
-        <Card aria-labelledby="expense-form-heading">
-          <CardContent>
-            <form className="grid gap-4" onSubmit={submitExpense} noValidate>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h3 id="expense-form-heading" className="text-lg font-semibold text-foreground">
-                    {editingId ? "Edit expense" : "New expense"}
-                  </h3>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    Due dates keep the 30-day bill window honest.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Cancel expense form"
-                  onClick={closeForm}
-                >
-                  <X className="size-4" aria-hidden="true" />
-                </Button>
+        <MutationDrawer.Root
+          open={isFormOpen}
+          onOpenChange={(open) => !open && closeForm()}
+          closeLabel="Close expense form"
+        >
+          <MutationDrawer.Form onSubmit={submitExpense}>
+            <MutationDrawer.Header>
+              <div>
+                <MutationDrawer.Title>
+                  {editingId ? "Edit expense" : "New expense"}
+                </MutationDrawer.Title>
+                <MutationDrawer.Description>
+                  Due dates keep the 30-day bill window honest.
+                </MutationDrawer.Description>
               </div>
+            </MutationDrawer.Header>
 
+            <MutationDrawer.Body>
               {formErrorMessages.length > 0 ? (
                 <div
                   role="alert"
@@ -223,30 +234,109 @@ export function ExpensesPanel({
                 </div>
               ) : null}
 
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <div className="grid gap-2 xl:col-span-2">
-                  <Label htmlFor="expense-label">Expense name</Label>
-                  <Input
-                    id="expense-label"
-                    value={formValues.label}
-                    onChange={(event) => updateField("label", event.target.value)}
-                    aria-invalid={formErrors.label ? "true" : undefined}
-                  />
-                  <FieldError>{formErrors.label}</FieldError>
-                </div>
+              <div className="grid gap-2">
+                <Label htmlFor="expense-label">Expense name</Label>
+                <Input
+                  id="expense-label"
+                  value={formValues.label}
+                  onChange={(event) => updateField("label", event.target.value)}
+                  aria-invalid={formErrors.label ? "true" : undefined}
+                />
+                <FieldError>{formErrors.label}</FieldError>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="expense-amount">Amount</Label>
+                <Input
+                  id="expense-amount"
+                  inputMode="decimal"
+                  type="number"
+                  min="0"
+                  value={formValues.amount}
+                  onChange={(event) => updateField("amount", event.target.value)}
+                  aria-invalid={formErrors.amount ? "true" : undefined}
+                />
+                <FieldError>{formErrors.amount}</FieldError>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="recurring">Recurring</Label>
+                <Select
+                  value={formValues.isRecurring}
+                  onValueChange={(value) =>
+                    updateField("isRecurring", value as "true" | "false")
+                  }
+                >
+                  <SelectTrigger id="recurring">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Recurring</SelectItem>
+                    <SelectItem value="false">One-time</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {formValues.isRecurring === "true" ? (
                 <div className="grid gap-2">
-                  <Label htmlFor="expense-amount">Amount</Label>
-                  <Input
-                    id="expense-amount"
-                    inputMode="decimal"
-                    type="number"
-                    min="0"
-                    value={formValues.amount}
-                    onChange={(event) => updateField("amount", event.target.value)}
-                    aria-invalid={formErrors.amount ? "true" : undefined}
-                  />
-                  <FieldError>{formErrors.amount}</FieldError>
+                  <Label htmlFor="expense-schedule">Schedule</Label>
+                  <Select
+                    value={formValues.paymentCadence}
+                    onValueChange={(value) =>
+                      updateField("paymentCadence", value as RecurringCadence)
+                    }
+                  >
+                    <SelectTrigger id="expense-schedule">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="semi_monthly">Twice a month</SelectItem>
+                      <SelectItem value="biweekly">Every 2 weeks</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
+              ) : null}
+              {formValues.isRecurring === "true" && formValues.paymentCadence === "biweekly" ? (
+                <div className="grid gap-2">
+                  <Label htmlFor="expense-next-due-date">Next due date</Label>
+                  <DatePicker
+                    id="expense-next-due-date"
+                    value={formValues.nextDueDate}
+                    onChange={(value) => updateField("nextDueDate", value)}
+                    ariaInvalid={formErrors.nextDueDate ? true : undefined}
+                  />
+                  <FieldError>{formErrors.nextDueDate}</FieldError>
+                </div>
+              ) : formValues.isRecurring === "true" && formValues.paymentCadence === "semi_monthly" ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="expense-due-day">First due day</Label>
+                    <Input
+                      id="expense-due-day"
+                      inputMode="numeric"
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={formValues.dueDay}
+                      onChange={(event) => updateField("dueDay", event.target.value)}
+                      aria-invalid={formErrors.dueDay ? "true" : undefined}
+                    />
+                    <FieldError>{formErrors.dueDay}</FieldError>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="expense-second-due-day">Second due day</Label>
+                    <Input
+                      id="expense-second-due-day"
+                      inputMode="numeric"
+                      type="number"
+                      min="1"
+                      max="31"
+                      value={formValues.secondDueDay}
+                      onChange={(event) => updateField("secondDueDay", event.target.value)}
+                      aria-invalid={formErrors.secondDueDay ? "true" : undefined}
+                    />
+                    <FieldError>{formErrors.secondDueDay}</FieldError>
+                  </div>
+                </div>
+              ) : (
                 <div className="grid gap-2">
                   <Label htmlFor="expense-due-day">Due day</Label>
                   <Input
@@ -261,36 +351,17 @@ export function ExpensesPanel({
                   />
                   <FieldError>{formErrors.dueDay}</FieldError>
                 </div>
-                <div className="grid gap-2 md:max-w-xs">
-                  <Label htmlFor="recurring">Recurring</Label>
-                  <Select
-                    value={formValues.isRecurring}
-                    onValueChange={(value) =>
-                      updateField("isRecurring", value as "true" | "false")
-                    }
-                  >
-                    <SelectTrigger id="recurring">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="true">Recurring</SelectItem>
-                      <SelectItem value="false">One-time</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+              )}
+            </MutationDrawer.Body>
 
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button type="button" variant="secondary" onClick={closeForm}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={pendingAction === "save"} isLoading={pendingAction === "save"}>
-                  {editingId ? "Save Expense" : "Create Expense"}
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+            <MutationDrawer.Footer>
+              <Button type="submit" disabled={pendingAction === "save"} isLoading={pendingAction === "save"}>
+                {editingId ? "Save Expense" : "Create Expense"}
+              </Button>
+              <MutationDrawer.Cancel>Cancel</MutationDrawer.Cancel>
+            </MutationDrawer.Footer>
+          </MutationDrawer.Form>
+        </MutationDrawer.Root>
       ) : null}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" data-testid="expense-summary">
@@ -307,8 +378,8 @@ export function ExpensesPanel({
         />
         <SummaryMetric
           label="Next due"
-          value={getNextDueDay(expenses)}
-          helper="Earliest due day"
+          value={getNextDueDate(expenses, referenceDate)}
+          helper="Earliest due date"
         />
       </div>
 
@@ -344,42 +415,29 @@ export function ExpensesPanel({
                   >
                     <Pencil className="size-4" aria-hidden="true" />
                   </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Delete ${expense.label}`}
-                        disabled={pendingAction === `delete-${expense.id}`}
-                        isLoading={pendingAction === `delete-${expense.id}`}
-                      >
-                        <Trash2 className="size-4" aria-hidden="true" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent size="sm">
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Remove expense?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will permanently remove {expense.label} from your tracked expenses.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          variant="destructive"
-                          onClick={() => void deleteExpense(expense)}
-                        >
-                          Remove
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <RemoveConfirmation
+                    title="Remove expense?"
+                    description={
+                      <>This will permanently remove {expense.label} from your tracked expenses.</>
+                    }
+                    onConfirm={() => deleteExpense(expense)}
+                  >
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Delete ${expense.label}`}
+                      disabled={pendingAction === `delete-${expense.id}`}
+                      isLoading={pendingAction === `delete-${expense.id}`}
+                    >
+                      <Trash2 className="size-4" aria-hidden="true" />
+                    </Button>
+                  </RemoveConfirmation>
                 </div>
               </div>
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <CalendarDays className="size-4" aria-hidden="true" />
-                Due every month on day {expense.dueDay}
+                {formatExpenseSchedule(expense, referenceDate)}
               </p>
             </article>
           ))}
@@ -420,12 +478,8 @@ function SummaryMetric({
   );
 }
 
-function getNextDueDay(expenses: Expense[]) {
-  if (expenses.length === 0) {
-    return "None";
-  }
-
-  return `Day ${Math.min(...expenses.map((expense) => expense.dueDay))}`;
+function getNextDueDate(expenses: Expense[], referenceDate: Date) {
+  return formatNextRecurringDueDate(expenses, referenceDate);
 }
 
 function parseExpenseForm(values: ExpenseFormValues):
@@ -434,7 +488,12 @@ function parseExpenseForm(values: ExpenseFormValues):
   const errors: ExpenseFormErrors = {};
   const label = values.label.trim();
   const amount = Number(values.amount);
-  const dueDay = Number(values.dueDay);
+  const isRecurring = values.isRecurring === "true";
+  const dueDay =
+    isRecurring && values.paymentCadence === "biweekly"
+      ? getDayFromIsoDate(values.nextDueDate)
+      : Number(values.dueDay);
+  const secondDueDay = Number(values.secondDueDay);
 
   if (!label) {
     errors.label = "Name this expense.";
@@ -444,8 +503,23 @@ function parseExpenseForm(values: ExpenseFormValues):
     errors.amount = "Enter a positive amount.";
   }
 
-  if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31) {
+  if (
+    (!isRecurring || values.paymentCadence !== "biweekly") &&
+    (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31)
+  ) {
     errors.dueDay = "Use a due day from 1 to 31.";
+  }
+
+  if (isRecurring && values.paymentCadence === "semi_monthly") {
+    if (!Number.isInteger(secondDueDay) || secondDueDay < 1 || secondDueDay > 31) {
+      errors.secondDueDay = "Use a second due day from 1 to 31.";
+    } else if (secondDueDay === dueDay) {
+      errors.secondDueDay = "Use two different due days.";
+    }
+  }
+
+  if (isRecurring && values.paymentCadence === "biweekly" && !isIsoDate(values.nextDueDate)) {
+    errors.nextDueDate = "Choose the next due date.";
   }
 
   if (Object.keys(errors).length > 0) {
@@ -458,7 +532,42 @@ function parseExpenseForm(values: ExpenseFormValues):
       label,
       amount,
       dueDay,
-      isRecurring: values.isRecurring === "true",
+      isRecurring,
+      paymentCadence: isRecurring ? values.paymentCadence : "monthly",
+      nextDueDate:
+        isRecurring && values.paymentCadence === "biweekly" ? values.nextDueDate : undefined,
+      secondDueDay:
+        isRecurring && values.paymentCadence === "semi_monthly" ? secondDueDay : undefined,
     },
   };
+}
+
+function formatExpenseSchedule(expense: Expense, referenceDate: Date) {
+  if (!expense.isRecurring) {
+    return `One-time · Day ${expense.dueDay}`;
+  }
+
+  const next = formatShortDate(getNextRecurringDueDate(expense, referenceDate));
+
+  if (expense.paymentCadence === "biweekly") {
+    return `Every 2 weeks · ${next}`;
+  }
+
+  if (expense.paymentCadence === "semi_monthly") {
+    return `Twice a month · ${next}`;
+  }
+
+  return `Monthly · ${next}`;
+}
+
+function isIsoDate(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function getDayFromIsoDate(value: string) {
+  if (!isIsoDate(value)) {
+    return 1;
+  }
+
+  return Number(value.slice(8, 10));
 }

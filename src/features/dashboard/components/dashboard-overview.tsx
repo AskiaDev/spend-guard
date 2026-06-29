@@ -34,6 +34,7 @@ import {
   referencePurchases,
 } from "@/features/reference-data";
 import { getHealthStatus, type HealthStatus } from "@/lib/calculations/health-score";
+import { getMonthlyRecurringAmount } from "@/lib/calculations/next-due-date";
 import { getUpcomingDebts, getUpcomingDebtTotal } from "@/lib/calculations/upcoming-debt";
 import { cn, formatCurrency } from "@/lib/utils";
 import type {
@@ -63,8 +64,19 @@ export function DashboardOverview({
   referenceDate,
 }: DashboardOverviewProps) {
   const currency = snapshot.profile.currency;
-  const totalExpenses = snapshot.expenses.reduce((total, expense) => total + expense.amount, 0);
-  const totalDebtPayments = snapshot.debts.reduce((total, debt) => total + debt.minimumPayment, 0);
+  const totalExpenses = snapshot.expenses.reduce(
+    (total, expense) =>
+      total +
+      (expense.isRecurring
+        ? getMonthlyRecurringAmount(expense.amount, expense.paymentCadence)
+        : expense.amount),
+    0
+  );
+  const totalDebtPayments = snapshot.debts.reduce(
+    (total, debt) =>
+      total + getMonthlyRecurringAmount(debt.minimumPayment, debt.paymentCadence),
+    0
+  );
   const totalDebtBalance = snapshot.debts.reduce(
     (total, debt) => total + debt.outstandingBalance,
     0
@@ -171,7 +183,7 @@ export function DashboardOverview({
               <ul className="grid gap-3">
                 {upcomingDebts.map(({ debt, nextDueDate, daysUntilDue }) => (
                   <li
-                    key={debt.id}
+                    key={`${debt.id}-${nextDueDate}`}
                     className="flex items-center justify-between gap-3 rounded-control border border-border bg-muted/30 p-4"
                   >
                     <div className="min-w-0">

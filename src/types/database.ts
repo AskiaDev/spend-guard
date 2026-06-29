@@ -48,6 +48,9 @@ export interface Database {
           amount: number;
           due_day: number;
           is_recurring: boolean;
+          payment_cadence: string;
+          next_due_date: string | null;
+          second_due_day: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -57,6 +60,9 @@ export interface Database {
           amount: number;
           due_day: number;
           is_recurring?: boolean;
+          payment_cadence?: string;
+          next_due_date?: string | null;
+          second_due_day?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["expenses"]["Insert"]>;
         Relationships: [];
@@ -70,6 +76,9 @@ export interface Database {
           minimum_payment: number;
           due_day: number;
           interest_rate: number | null;
+          payment_cadence: string;
+          next_due_date: string | null;
+          second_due_day: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -80,6 +89,9 @@ export interface Database {
           minimum_payment: number;
           due_day: number;
           interest_rate?: number | null;
+          payment_cadence?: string;
+          next_due_date?: string | null;
+          second_due_day?: number | null;
         };
         Update: Partial<Database["public"]["Tables"]["debts"]["Insert"]>;
         Relationships: [];
