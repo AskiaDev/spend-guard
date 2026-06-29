@@ -82,9 +82,9 @@ describe("useStreamedExplanation", () => {
     const clients = [streamingClient(["unused"], false)];
     const { result } = renderHook(() => useStreamedExplanation({ ...base, clients }));
 
-    await waitFor(() => expect(result.current.text).toBe("Deterministic narrative."));
+    await waitFor(() => expect(result.current.phase).toBe("fallback"));
+    expect(result.current.text).toBe("Deterministic narrative.");
     expect(result.current.usedModel).toBe(false);
-    expect(result.current.phase).toBe("fallback");
   });
 
   it("confines a contradictory model to explanation prose, exposing no decision to hijack", async () => {
