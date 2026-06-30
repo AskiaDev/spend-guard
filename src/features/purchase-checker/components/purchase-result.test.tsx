@@ -68,7 +68,6 @@ describe("PurchaseResult", () => {
 
     const summary = screen.getByRole("region", { name: "Purchase summary" });
     expect(within(summary).getByText("iPhone Pro Max 1TB")).toBeVisible();
-    expect(within(summary).getByText("₱170,000")).toBeVisible();
     expect(within(summary).getByText(/installment/i)).toBeVisible();
     expect(within(summary).getByText(/24 months/i)).toBeVisible();
     expect(within(summary).getByText("Phone")).toBeVisible();
@@ -76,24 +75,15 @@ describe("PurchaseResult", () => {
     expect(within(summary).getByText("Jul 15, 2026")).toBeVisible();
 
     const impact = screen.getByRole("region", { name: "Plan impact" });
-    expect(within(impact).getAllByRole("listitem")).toHaveLength(9);
     expect(within(impact).getByText("Purchase price")).toBeVisible();
+    expect(within(impact).getByText("₱170,000")).toBeVisible();
     expect(within(impact).getByText("Risk score")).toBeVisible();
     expect(within(impact).getByText("95 / 100")).toBeVisible();
-    expect(within(impact).getByText("Savings after purchase")).toBeVisible();
-    expect(within(impact).getByText("₱120,000")).toBeVisible();
-    expect(within(impact).getByText("Emergency fund impact")).toBeVisible();
-    expect(within(impact).getByText("50% funded")).toBeVisible();
-    expect(within(impact).getByText("Debt conflict")).toBeVisible();
-    expect(within(impact).getByText("18% debt pressure")).toBeVisible();
+    expect(within(impact).getByText("Very high")).toBeVisible();
     expect(within(impact).getByText("Goal delay")).toBeVisible();
     expect(within(impact).getByText("3 months")).toBeVisible();
     expect(within(impact).getByText("Safe to spend")).toBeVisible();
-    expect(within(impact).getByText("Monthly free cash")).toBeVisible();
-    expect(within(impact).getByText("Cooldown recommendation")).toBeVisible();
     expect(within(impact).getByText("₱20,000")).toBeVisible();
-    expect(within(impact).getByText("₱10,000")).toBeVisible();
-    expect(within(impact).getByText("30 days")).toBeVisible();
 
     const reasons = screen.getByRole("region", { name: "Why this decision" });
     expect(within(reasons).getAllByRole("listitem")).toHaveLength(5);
@@ -104,9 +94,8 @@ describe("PurchaseResult", () => {
     const advisor = screen.getByRole("region", { name: "Advisor explanation" });
     expect(within(advisor).getByText(activeCheck.advisorText)).toBeVisible();
     expect(screen.getByText("Recommended action")).toBeVisible();
-    expect(
-      screen.getByText("Pause this purchase, use the cooldown period, and save toward it as a goal.")
-    ).toBeVisible();
+    expect(screen.getByText("Pause this purchase")).toBeVisible();
+    expect(screen.getByText("Use the cooldown period, and save toward it as a goal.")).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Add to Goal" }));
     expect(screen.getByRole("status")).toHaveTextContent("Goal created from this check.");
@@ -279,6 +268,7 @@ describe("PurchaseResult", () => {
     ).toBeVisible();
     const summary = screen.getByRole("region", { name: "Purchase summary" });
     expect(summary).toHaveTextContent("iPhone Pro Max 1TB");
-    expect(within(summary).getByText("₱170,000")).toBeVisible();
+    const impact = screen.getByRole("region", { name: "Plan impact" });
+    expect(within(impact).getByText("₱170,000")).toBeVisible();
   });
 });

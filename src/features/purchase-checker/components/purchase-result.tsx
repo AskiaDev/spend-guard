@@ -1,11 +1,18 @@
 "use client";
 
 import {
-  ArrowLeft,
   CheckCircle2,
+  CircleAlert,
+  Clock3,
+  CreditCard,
   LayoutDashboard,
+  Lightbulb,
   PauseCircle,
+  Search,
+  ShieldCheck,
   Target,
+  TriangleAlert,
+  WalletCards,
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -91,17 +98,67 @@ const decisionExplanations: Record<PurchaseDecision, string> = {
     "This purchase is not recommended right now because it would put too much pressure on your current plan.",
 };
 
-const recommendedActions: Record<PurchaseDecision, string> = {
-  SAFE_TO_BUY: "Keep the purchase within the checked amount and avoid adding new financing costs.",
-  BUY_WITH_CAUTION:
-    "Compare a lower-cost option and keep enough cash available for essentials and surprises.",
-  WAIT: "Use the cooldown period to review the need and build more room in your plan.",
-  NOT_RECOMMENDED:
-    "Pause this purchase, use the cooldown period, and save toward it as a goal.",
-};
-
 const navigationActionClass =
-  "inline-flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-control px-4 text-sm font-semibold text-muted-foreground ring-1 ring-border transition-colors hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "inline-flex h-12 min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-control bg-secondary px-4 text-sm font-semibold text-foreground ring-1 ring-border transition-[background-color,box-shadow,filter] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+const decisionVisuals = {
+  SAFE_TO_BUY: {
+    Icon: ShieldCheck,
+    panelClass: "border-safe/45 shadow-[0_0_0_1px_rgb(95_208_138/0.12)]",
+    iconClass: "border-safe text-safe",
+    titleClass: "text-safe",
+    metricClass: "text-safe",
+    actionTitle: "Keep the plan intact",
+    actionCopy: "Buy only at the checked amount and avoid adding extra financing.",
+    nudge:
+      "This fits your plan. Keep the purchase inside the checked amount so the buffer stays protected.",
+  },
+  BUY_WITH_CAUTION: {
+    Icon: TriangleAlert,
+    panelClass: "border-caution/45 shadow-[0_0_0_1px_rgb(240_180_80/0.12)]",
+    iconClass: "border-caution text-caution",
+    titleClass: "text-caution",
+    metricClass: "text-caution",
+    actionTitle: "Compare before buying",
+    actionCopy: "Use the checked amount as a ceiling and keep cash available for surprises.",
+    nudge:
+      "A lower-cost option or shorter commitment can keep this from crowding out your priorities.",
+  },
+  WAIT: {
+    Icon: Clock3,
+    panelClass: "border-caution/45 shadow-[0_0_0_1px_rgb(240_180_80/0.12)]",
+    iconClass: "border-caution text-caution",
+    titleClass: "text-caution",
+    metricClass: "text-caution",
+    actionTitle: "Use the cooldown",
+    actionCopy: "Give the purchase more time and check it again after your plan has more room.",
+    nudge:
+      "Waiting now gives your monthly plan more room and lowers the chance of a rushed decision.",
+  },
+  NOT_RECOMMENDED: {
+    Icon: CircleAlert,
+    panelClass: "border-risk/45 shadow-[0_0_0_1px_rgb(255_133_133/0.12)]",
+    iconClass: "border-risk text-risk",
+    titleClass: "text-risk",
+    metricClass: "text-risk",
+    actionTitle: "Pause this purchase",
+    actionCopy: "Use the cooldown period, and save toward it as a goal.",
+    nudge:
+      "Take time to reassess. A short pause now can help protect your goals and financial stability.",
+  },
+} satisfies Record<
+  PurchaseDecision,
+  {
+    Icon: typeof ShieldCheck;
+    panelClass: string;
+    iconClass: string;
+    titleClass: string;
+    metricClass: string;
+    actionTitle: string;
+    actionCopy: string;
+    nudge: string;
+  }
+>;
 
 export function PurchaseResult({
   check,
@@ -126,52 +183,35 @@ export function PurchaseResult({
     statusOverride?.checkId === activeCheck.id
       ? statusOverride.status
       : activeCheck.status ?? "checked";
+  const decisionVisual = decisionVisuals[activeCheck.decision];
+  const DecisionIcon = decisionVisual.Icon;
 
-  const impactItems = [
+  const impactItems: Array<{
+    label: string;
+    value: string;
+    detail: string | null;
+    valueClass?: string;
+  }> = [
     {
       label: "Purchase price",
       value: formatCurrency(activeCheck.amount, displayCurrency),
-      detail: "Total amount included in this decision.",
+      detail: null,
     },
     {
       label: "Risk score",
       value: `${activeCheck.riskScore} / 100`,
-      detail: "Higher scores mean more pressure on the current plan.",
-    },
-    {
-      label: "Savings after purchase",
-      value: formatCurrency(activeCheck.savingsAfterPurchase, displayCurrency),
-      detail: "Projected savings left after the payment made today.",
-    },
-    {
-      label: "Emergency fund impact",
-      value: `${Math.round((activeCheck.emergencyProgress ?? 0) * 100)}% funded`,
-      detail: "Emergency-buffer progress recorded when this check ran.",
-    },
-    {
-      label: "Debt conflict",
-      value: `${Math.round((activeCheck.debtPressure ?? 0) * 100)}% debt pressure`,
-      detail: "Minimum debt payments compared with monthly income.",
+      detail: riskLabel(activeCheck.riskScore),
+      valueClass: decisionVisual.metricClass,
     },
     {
       label: "Goal delay",
       value: formatMonths(activeCheck.goalDelayMonths ?? 0),
-      detail: "Estimated delay to current goals from buying now.",
+      detail: "To current goals",
     },
     {
       label: "Safe to spend",
       value: formatCurrency(activeCheck.safeToSpend, displayCurrency),
-      detail: "Current flexible amount after plan commitments.",
-    },
-    {
-      label: "Monthly free cash",
-      value: formatCurrency(activeCheck.monthlyFreeCashFlow, displayCurrency),
-      detail: "Cash flow remaining after monthly commitments.",
-    },
-    {
-      label: "Cooldown recommendation",
-      value: `${activeCheck.cooldownDays} ${activeCheck.cooldownDays === 1 ? "day" : "days"}`,
-      detail: "Time to pause before checking this purchase again.",
+      detail: "After commitments",
     },
   ];
   const mutationActionsDisabled = isExample || pendingMutation !== null;
@@ -225,7 +265,7 @@ export function PurchaseResult({
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-5">
       {isExample ? (
         <div className="rounded-card border border-caution/30 bg-caution/10 px-4 py-3 text-sm text-foreground">
           <p className="font-semibold text-caution">Example decision</p>
@@ -235,133 +275,188 @@ export function PurchaseResult({
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(15rem,0.38fr)_minmax(0,0.62fr)] lg:items-start">
-        <Card aria-labelledby="purchase-summary-heading">
-          <CardHeader>
-            <CardTitle id="purchase-summary-heading">Purchase summary</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-5">
-            <div>
-              <p className="text-sm text-muted-foreground">Product</p>
-              <p className="mt-1 text-lg font-semibold text-foreground">{activeCheck.itemName}</p>
-              <p className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-                {formatCurrency(activeCheck.amount, displayCurrency)}
+      <section
+        aria-labelledby="plan-impact-heading"
+        className={cn(
+          "overflow-hidden rounded-card border bg-[linear-gradient(135deg,rgb(255_255_255/0.075),rgb(255_255_255/0.035))] p-5 shadow-card backdrop-blur md:p-7",
+          decisionVisual.panelClass
+        )}
+      >
+        <h2 id="plan-impact-heading" className="sr-only">
+          Plan impact
+        </h2>
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(30rem,0.95fr)] xl:items-center">
+          <div className="flex min-w-0 gap-4 md:items-center md:gap-6">
+            <span
+              aria-hidden="true"
+              className={cn(
+                "flex size-20 shrink-0 items-center justify-center rounded-full border-4 bg-background/20 md:size-24",
+                decisionVisual.iconClass
+              )}
+            >
+              <DecisionIcon className="size-10 md:size-12" strokeWidth={2.5} />
+            </span>
+            <div className="min-w-0">
+              <StatusBadge decision={activeCheck.decision} className="mb-3" />
+              <h2
+                className={cn(
+                  "text-3xl font-bold leading-tight tracking-tight md:text-4xl",
+                  decisionVisual.titleClass
+                )}
+              >
+                {decisionHeadline(activeCheck.decision)}
+              </h2>
+              <p className="mt-2 max-w-2xl text-base leading-7 text-muted-foreground">
+                {decisionExplanations[activeCheck.decision]}
               </p>
             </div>
+          </div>
 
-            <dl className="grid gap-3 border-t border-border pt-4 text-sm">
-              <SummaryRow label="Payment method">
-                {formatPaymentMethod(activeCheck)}
-              </SummaryRow>
-              {activeCheck.category ? (
-                <SummaryRow label="Category">{formatLabel(activeCheck.category)}</SummaryRow>
-              ) : null}
-              <SummaryRow label="Urgency">{formatLabel(activeCheck.urgency)}</SummaryRow>
-              <SummaryRow label="Status">{statusLabels[currentStatus]}</SummaryRow>
-              {activeCheck.location ? (
-                <SummaryRow label="Location">{activeCheck.location}</SummaryRow>
-              ) : null}
-              {activeCheck.saleDeadline ? (
-                <SummaryRow label="Sale deadline">
-                  {formatDateLabel(activeCheck.saleDeadline)}
+          <dl className="grid gap-0 border-t border-border pt-5 sm:grid-cols-2 xl:border-l xl:border-t-0 xl:pt-0">
+            {impactItems.map((item) => (
+              <div
+                key={item.label}
+                className="min-w-0 border-border py-3 sm:px-5 sm:[&:nth-child(odd)]:border-r xl:border-r xl:first:pt-0 xl:last:border-r-0"
+              >
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {item.label}
+                </dt>
+                <dd
+                  className={cn(
+                    "mt-2 truncate text-2xl font-bold tabular-nums text-foreground",
+                    item.valueClass
+                  )}
+                >
+                  {item.value}
+                </dd>
+                {item.detail ? (
+                  <p className="mt-1 text-sm leading-5 text-muted-foreground">{item.detail}</p>
+                ) : null}
+              </div>
+            ))}
+          </dl>
+        </div>
+      </section>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)] xl:items-start">
+        <div className="grid gap-5">
+          <Card aria-labelledby="purchase-summary-heading" className="overflow-hidden">
+            <CardHeader>
+              <CardTitle id="purchase-summary-heading" className="text-2xl">
+                Purchase summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-6 md:grid-cols-[minmax(0,1fr)_15rem] md:items-center">
+              <dl className="grid gap-4 text-sm">
+                <SummaryRow label="Product" icon={WalletCards}>
+                  {activeCheck.itemName}
                 </SummaryRow>
-              ) : null}
-              {activeCheck.monthlyPayment ? (
-                <SummaryRow label="Monthly payment">
-                  {formatCurrency(activeCheck.monthlyPayment, displayCurrency)}
+                <SummaryRow label="Payment method" icon={CreditCard}>
+                  {formatPaymentMethod(activeCheck)}
                 </SummaryRow>
-              ) : null}
-              {activeCheck.notes ? (
-                <SummaryRow label="Notes">{activeCheck.notes}</SummaryRow>
-              ) : null}
-            </dl>
+                <SummaryRow label="Urgency" icon={Clock3}>
+                  {formatLabel(activeCheck.urgency)}
+                </SummaryRow>
+                {activeCheck.monthlyPayment ? (
+                  <SummaryRow label="Monthly payment" icon={CreditCard}>
+                    {formatCurrency(activeCheck.monthlyPayment, displayCurrency)}
+                  </SummaryRow>
+                ) : null}
+                {activeCheck.category ? (
+                  <SummaryRow label="Category">{formatLabel(activeCheck.category)}</SummaryRow>
+                ) : null}
+                {activeCheck.location ? (
+                  <SummaryRow label="Location">{activeCheck.location}</SummaryRow>
+                ) : null}
+                {activeCheck.saleDeadline ? (
+                  <SummaryRow label="Sale deadline">
+                    {formatDateLabel(activeCheck.saleDeadline)}
+                  </SummaryRow>
+                ) : null}
+                {activeCheck.notes ? (
+                  <SummaryRow label="Notes">{activeCheck.notes}</SummaryRow>
+                ) : null}
+                <SummaryRow label="Status">{statusLabels[currentStatus]}</SummaryRow>
+              </dl>
 
-            <div className="rounded-control bg-muted/20 p-4 text-center">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Decision confidence
-              </p>
-              <ScoreGauge
-                score={decisionConfidence}
-                label="Decision confidence"
-                className="mt-2"
-              />
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                Presentation confidence for this explanation, not a financial score.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid gap-6">
-          <Card>
-            <CardContent className="grid gap-4 p-6">
-              <StatusBadge decision={activeCheck.decision} className="w-fit" />
-              <div>
-                <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                  {decisionHeadline(activeCheck.decision)}
-                </h2>
-                <p className="mt-2 max-w-2xl text-base leading-7 text-muted-foreground">
-                  {decisionExplanations[activeCheck.decision]}
+              <div className="border-t border-border pt-5 text-center md:border-l md:border-t-0 md:pt-0 md:pl-6">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Decision confidence
+                </p>
+                <ScoreGauge
+                  score={decisionConfidence}
+                  label="Decision confidence"
+                  className="mt-3"
+                />
+                <p className="mt-2 text-base font-semibold text-primary">
+                  {confidenceLabel(decisionConfidence)}
                 </p>
               </div>
             </CardContent>
           </Card>
 
-          <Card aria-labelledby="plan-impact-heading">
+          <Card aria-labelledby="decision-reasons-heading" className="overflow-hidden">
             <CardHeader>
-              <CardTitle id="plan-impact-heading">Plan impact</CardTitle>
+              <CardTitle id="decision-reasons-heading" className="text-2xl">
+                Why this decision
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <ul className="grid gap-3 sm:grid-cols-2">
-                {impactItems.map((item) => (
-                  <li key={item.label} className="rounded-control border border-border bg-muted/20 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      {item.label}
-                    </p>
-                    <p className="mt-2 text-xl font-bold text-foreground">{item.value}</p>
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.detail}</p>
+              <ul className="grid gap-2.5">
+                {displayedReasons.map((reason, index) => (
+                  <li
+                    key={`${index}-${reason}`}
+                    className="flex gap-3 text-sm leading-6 text-muted-foreground"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="mt-2 size-2 shrink-0 rounded-full bg-primary shadow-[0_0_14px_rgb(198_242_78/0.45)]"
+                    />
+                    <span>{reason}</span>
                   </li>
                 ))}
               </ul>
             </CardContent>
           </Card>
-
-          <div className="grid gap-6 xl:grid-cols-2">
-            <Card aria-labelledby="decision-reasons-heading">
-              <CardHeader>
-                <CardTitle id="decision-reasons-heading">Why this decision</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="grid gap-3">
-                  {displayedReasons.map((reason, index) => (
-                    <li key={`${index}-${reason}`} className="flex gap-3 text-sm leading-6 text-muted-foreground">
-                      <span aria-hidden="true" className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" />
-                      <span>{reason}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card aria-labelledby="advisor-explanation-heading">
-              <CardHeader>
-                <CardTitle id="advisor-explanation-heading">Advisor explanation</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-5">
-                <AdvisorExplanation key={activeCheck.id} check={activeCheck} live={!isExample} />
-                <div className="rounded-control border border-primary/20 bg-primary/10 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-                    Recommended action
-                  </p>
-                  <p className="mt-2 text-sm font-medium leading-6 text-foreground">
-                    {recommendedActions[activeCheck.decision]}
-                  </p>
-                </div>
-                <LessonBlock check={activeCheck} />
-              </CardContent>
-            </Card>
-          </div>
         </div>
+
+        <Card aria-label="Advisor explanation" className="overflow-hidden">
+          <CardContent className="grid gap-6 p-6 md:p-7">
+            <div className="flex gap-4">
+              <span
+                aria-hidden="true"
+                className="flex size-14 shrink-0 items-center justify-center rounded-full border border-border bg-muted/20 text-primary"
+              >
+                <ShieldCheck className="size-7" />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-2xl font-bold tracking-tight text-foreground">
+                  Recommended action
+                </h2>
+                <p className="mt-2 text-xl font-bold leading-tight text-primary">
+                  {decisionVisual.actionTitle}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-foreground">
+                  {decisionVisual.actionCopy}
+                </p>
+              </div>
+            </div>
+
+            <div className="border-t border-border pt-5">
+              <h3 className="text-xl font-bold tracking-tight text-foreground">Advisor note</h3>
+              <div className="mt-3">
+                <AdvisorExplanation key={activeCheck.id} check={activeCheck} live={!isExample} />
+              </div>
+            </div>
+
+            <div className="flex gap-4 rounded-control border border-primary/30 bg-primary/10 p-4 text-primary">
+              <Lightbulb aria-hidden="true" className="mt-0.5 size-7 shrink-0" />
+              <p className="text-sm font-semibold leading-6">{decisionVisual.nudge}</p>
+            </div>
+
+            <LessonBlock check={activeCheck} />
+          </CardContent>
+        </Card>
       </div>
 
       <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 -mx-2 rounded-card border border-border bg-card/95 px-3 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-elevated backdrop-blur lg:bottom-4 lg:mx-0 lg:p-3">
@@ -375,7 +470,17 @@ export function PurchaseResult({
             {mutationSuccess}
           </p>
         ) : null}
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+          <Button
+            type="button"
+            disabled={mutationActionsDisabled}
+            isLoading={pendingMutation === "cooldown"}
+            loadingText="Adding to cooldown..."
+            onClick={() => void runMutation("cooldown", onAddCooldown)}
+          >
+            <PauseCircle className="size-4" aria-hidden="true" />
+            Add to Cooldown
+          </Button>
           <Button
             type="button"
             variant="secondary"
@@ -387,17 +492,12 @@ export function PurchaseResult({
             <Target className="size-4" aria-hidden="true" />
             Add to Goal
           </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={mutationActionsDisabled}
-            isLoading={pendingMutation === "cooldown"}
-            loadingText="Adding to cooldown..."
-            onClick={() => void runMutation("cooldown", onAddCooldown)}
-          >
-            <PauseCircle className="size-4" aria-hidden="true" />
-            Add to Cooldown
-          </Button>
+          <Link href="/checker" className={cn(navigationActionClass, "col-span-2 md:col-span-1")}>
+            <Search className="size-4" aria-hidden="true" />
+            Check Another Purchase
+          </Link>
+        </div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-3">
           <Button
             type="button"
             variant="secondary"
@@ -420,10 +520,6 @@ export function PurchaseResult({
             <XCircle className="size-4" aria-hidden="true" />
             Mark as skipped
           </Button>
-          <Link href="/checker" className={navigationActionClass}>
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Check Another Purchase
-          </Link>
           <Link href="/" className={cn(navigationActionClass, "text-primary")}>
             <LayoutDashboard className="size-4" aria-hidden="true" />
             Back to Dashboard
@@ -434,11 +530,22 @@ export function PurchaseResult({
   );
 }
 
-function SummaryRow({ label, children }: { label: string; children: React.ReactNode }) {
+function SummaryRow({
+  label,
+  children,
+  icon: Icon,
+}: {
+  label: string;
+  children: React.ReactNode;
+  icon?: typeof WalletCards;
+}) {
   return (
-    <div className="flex items-start justify-between gap-4">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-right font-medium text-foreground">{children}</dd>
+    <div className="grid grid-cols-[1.5rem_minmax(0,1fr)_minmax(0,1fr)] items-start gap-3">
+      <span aria-hidden="true" className="mt-0.5 text-primary">
+        {Icon ? <Icon className="size-5" /> : null}
+      </span>
+      <dt className="min-w-0 text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 text-right font-medium text-foreground break-words">{children}</dd>
     </div>
   );
 }
@@ -518,4 +625,32 @@ function decisionHeadline(decision: PurchaseDecision) {
   }
 
   return "Not recommended right now";
+}
+
+function riskLabel(score: number) {
+  if (score >= 85) {
+    return "Very high";
+  }
+
+  if (score >= 65) {
+    return "High";
+  }
+
+  if (score >= 35) {
+    return "Moderate";
+  }
+
+  return "Low";
+}
+
+function confidenceLabel(score: number) {
+  if (score >= 85) {
+    return "High confidence";
+  }
+
+  if (score >= 60) {
+    return "Moderate confidence";
+  }
+
+  return "Low confidence";
 }
