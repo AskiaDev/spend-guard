@@ -1,7 +1,8 @@
 "use client";
 
 import { addDays, addMonths, startOfWeek } from "date-fns";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo, useState } from "react";
 import {
   createCooldownItemAction,
   deleteCooldownItemAction,
@@ -16,7 +17,11 @@ import {
   deleteExpenseAction,
   updateExpenseAction,
 } from "@/features/expenses/api/manage-expense";
-import { loadFinancialWorkspaceAction } from "@/features/financial-profile/api/load-financial-workspace";
+import {
+  financialWorkspaceKeys,
+  financialWorkspaceQueryOptions,
+  isFinancialWorkspaceEmpty,
+} from "@/features/financial-profile/api/financial-workspace-query";
 import { saveFinancialProfileAction } from "@/features/financial-profile/api/save-financial-profile";
 import {
   createGoalAction,
@@ -50,13 +55,13 @@ import type {
   Debt,
   Expense,
   FinancialProfile,
-  FinancialSnapshot,
   Goal,
   PurchaseCheck,
   PurchaseCheckStatus,
   PurchaseInput,
   VoicePurchaseDraft,
   WeeklyReport,
+  FinancialWorkspace,
 } from "@/types/finance";
 
 interface OnboardingPayload {
@@ -74,52 +79,46 @@ function prependUniqueCheck(check: PurchaseCheck, checks: PurchaseCheck[]) {
   return [check, ...checks.filter((existing) => existing.id !== check.id)];
 }
 
+function mergeUniqueChecks(pendingChecks: PurchaseCheck[], remoteChecks: PurchaseCheck[]) {
+  return pendingChecks.reduceRight(
+    (checks, check) => prependUniqueCheck(check, checks),
+    remoteChecks
+  );
+}
+
+function mutationErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+
 export function useFinancialState() {
-  const [snapshot, setSnapshot] = useState<FinancialSnapshot>(() => emptySnapshot);
-  const [checks, setChecks] = useState<PurchaseCheck[]>([]);
-  const [cooldownItems, setCooldownItems] = useState<CooldownItem[]>([]);
-  const [weeklyReports, setWeeklyReports] = useState<WeeklyReport[]>([]);
-  const [isHydrated, setIsHydrated] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const pendingLocalChecksRef = useRef<PurchaseCheck[]>([]);
+  const queryClient = useQueryClient();
+  const workspaceQuery = useQuery(financialWorkspaceQueryOptions());
+  const workspace = workspaceQuery.data;
+  const [pendingLocalChecks, setPendingLocalChecks] = useState<PurchaseCheck[]>([]);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    setError(null);
+    setMutationError(null);
+    await queryClient.invalidateQueries({ queryKey: financialWorkspaceKeys.workspace() });
+  }, [queryClient]);
 
-    const result = await loadFinancialWorkspaceAction();
-
-    if (!result.ok) {
-      setError(result.error);
-      setIsHydrated(true);
-      return;
-    }
-
-    const refreshedCheckIds = new Set(result.data.checks.map((check) => check.id));
-    pendingLocalChecksRef.current = pendingLocalChecksRef.current.filter(
-      (check) => !refreshedCheckIds.has(check.id)
-    );
-
-    setSnapshot(result.data.snapshot);
-    setChecks([...pendingLocalChecksRef.current, ...result.data.checks]);
-    setCooldownItems(result.data.cooldownItems);
-    setWeeklyReports(result.data.weeklyReports);
-    setIsHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      void refresh();
-    }, 0);
-
-    return () => window.clearTimeout(timeout);
-  }, [refresh]);
+  const snapshot = workspace?.snapshot ?? emptySnapshot;
+  const checks = useMemo(
+    () => mergeUniqueChecks(pendingLocalChecks, workspace?.checks ?? []),
+    [pendingLocalChecks, workspace?.checks]
+  );
+  const cooldownItems = workspace?.cooldownItems ?? [];
+  const weeklyReports = workspace?.weeklyReports ?? [];
+  const queryError = mutationErrorMessage(workspaceQuery.error, "");
+  const error = mutationError ?? (queryError === "" ? null : queryError);
+  const isHydrated = workspaceQuery.isFetched;
 
   const replaceFinancialSetup = useCallback(
     async ({ profile, expenses, debts, goals }: OnboardingPayload) => {
       const result = await saveFinancialProfileAction({ profile, expenses, debts, goals });
 
       if (!result.ok) {
-        setError(result.error);
+        setMutationError(result.error);
         return;
       }
 
@@ -154,7 +153,7 @@ export function useFinancialState() {
       const saved = await savePurchaseCheckAction(purchase, checkWithoutIdentity);
 
       if (!saved.ok) {
-        setError(saved.error);
+        setMutationError(saved.error);
         throw new Error(saved.error);
       }
 
@@ -164,12 +163,22 @@ export function useFinancialState() {
         createdAt: saved.data.createdAt,
       };
 
-      pendingLocalChecksRef.current = prependUniqueCheck(check, pendingLocalChecksRef.current);
-      setChecks((current) => prependUniqueCheck(check, current));
+      setMutationError(null);
+      setPendingLocalChecks((current) => prependUniqueCheck(check, current));
+      queryClient.setQueryData<FinancialWorkspace>(
+        financialWorkspaceKeys.workspace(),
+        (current) =>
+          current
+            ? {
+                ...current,
+                checks: prependUniqueCheck(check, current.checks),
+              }
+            : current
+      );
       void refresh();
       return { check, result };
     },
-    [refresh, snapshot]
+    [queryClient, refresh, snapshot]
   );
 
   const markPurchaseCheckStatus = useCallback(
@@ -177,14 +186,29 @@ export function useFinancialState() {
       const result = await markPurchaseCheckStatusAction(check.id, status);
 
       if (!result.ok) {
-        setError(result.error);
+        setMutationError(result.error);
         throw new Error(result.error);
       }
 
+      queryClient.setQueryData<FinancialWorkspace>(
+        financialWorkspaceKeys.workspace(),
+        (current) =>
+          current
+            ? {
+                ...current,
+                checks: current.checks.map((existing) =>
+                  existing.id === check.id ? { ...existing, status } : existing
+                ),
+              }
+            : current
+      );
+      setPendingLocalChecks((current) =>
+        current.map((existing) => (existing.id === check.id ? { ...existing, status } : existing))
+      );
       await refresh();
       return { ...check, status };
     },
-    [refresh]
+    [queryClient, refresh]
   );
 
   const createGoal = useCallback(
@@ -192,7 +216,7 @@ export function useFinancialState() {
       const result = await createGoalAction(goalDraft);
 
       if (!result.ok) {
-        setError(result.error);
+        setMutationError(result.error);
         throw new Error(result.error);
       }
 
@@ -276,7 +300,7 @@ export function useFinancialState() {
       });
 
       if (!result.ok) {
-        setError(result.error);
+        setMutationError(result.error);
         return undefined;
       }
 
@@ -291,7 +315,7 @@ export function useFinancialState() {
       const result = await deleteCooldownItemAction(id);
 
       if (!result.ok) {
-        setError(result.error);
+        setMutationError(result.error);
         return;
       }
 
@@ -305,7 +329,7 @@ export function useFinancialState() {
       const result = await deleteGoalAction(id);
 
       if (!result.ok) {
-        setError(result.error);
+        setMutationError(result.error);
         throw new Error(result.error);
       }
 
@@ -319,7 +343,7 @@ export function useFinancialState() {
       const result = await updateGoalAction(id, goalDraft);
 
       if (!result.ok) {
-        setError(result.error);
+        setMutationError(result.error);
         throw new Error(result.error);
       }
 
@@ -333,7 +357,7 @@ export function useFinancialState() {
       const result = await createExpenseAction(expenseDraft);
 
       if (!result.ok) {
-        setError(result.error);
+        setMutationError(result.error);
         throw new Error(result.error);
       }
 
@@ -348,7 +372,7 @@ export function useFinancialState() {
       const result = await updateExpenseAction(id, expenseDraft);
 
       if (!result.ok) {
-        setError(result.error);
+        setMutationError(result.error);
         throw new Error(result.error);
       }
 
@@ -362,7 +386,7 @@ export function useFinancialState() {
       const result = await deleteExpenseAction(id);
 
       if (!result.ok) {
-        setError(result.error);
+        setMutationError(result.error);
         throw new Error(result.error);
       }
 
@@ -376,7 +400,7 @@ export function useFinancialState() {
       const result = await createDebtAction(debtDraft);
 
       if (!result.ok) {
-        setError(result.error);
+        setMutationError(result.error);
         throw new Error(result.error);
       }
 
@@ -391,7 +415,7 @@ export function useFinancialState() {
       const result = await updateDebtAction(id, debtDraft);
 
       if (!result.ok) {
-        setError(result.error);
+        setMutationError(result.error);
         throw new Error(result.error);
       }
 
@@ -405,7 +429,7 @@ export function useFinancialState() {
       const result = await deleteDebtAction(id);
 
       if (!result.ok) {
-        setError(result.error);
+        setMutationError(result.error);
         throw new Error(result.error);
       }
 
@@ -419,7 +443,7 @@ export function useFinancialState() {
       const result = await updateProfileSettingsAction(profile);
 
       if (!result.ok) {
-        setError(result.error);
+        setMutationError(result.error);
         throw new Error(result.error);
       }
 
@@ -432,7 +456,7 @@ export function useFinancialState() {
     const result = await deleteFinancialDataAction();
 
     if (!result.ok) {
-      setError(result.error);
+      setMutationError(result.error);
       throw new Error(result.error);
     }
 
@@ -443,7 +467,7 @@ export function useFinancialState() {
     const result = await deleteVoiceSessionsAction();
 
     if (!result.ok) {
-      setError(result.error);
+      setMutationError(result.error);
       throw new Error(result.error);
     }
 
@@ -477,7 +501,7 @@ export function useFinancialState() {
     });
 
     if (!result.ok) {
-      setError(result.error);
+      setMutationError(result.error);
       return report;
     }
 
@@ -491,7 +515,7 @@ export function useFinancialState() {
       const result = await saveVoiceSessionAction({ transcript, extractedFields });
 
       if (!result.ok) {
-        setError(result.error);
+        setMutationError(result.error);
       }
     },
     []
@@ -512,6 +536,11 @@ export function useFinancialState() {
     cooldownItems,
     weeklyReports,
     isHydrated,
+    isLoading: workspaceQuery.isLoading,
+    isFetching: workspaceQuery.isFetching,
+    isStale: workspaceQuery.isStale,
+    hasWorkspaceData: Boolean(workspace),
+    isWorkspaceEmpty: workspace ? isFinancialWorkspaceEmpty(workspace) : false,
     error,
     metrics,
     replaceFinancialSetup,

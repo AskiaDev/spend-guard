@@ -1,6 +1,7 @@
 "use client";
 
 import { Pencil, Trash2 } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { gooeyToast } from "goey-toast";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -12,6 +13,11 @@ import {
   type LedgerTransactionPage,
   updateLedgerTransactionAction,
 } from "@/features/ledger/api/manage-transactions";
+import { financialWorkspaceKeys } from "@/features/financial-profile/api/financial-workspace-query";
+import {
+  ledgerKeys,
+  ledgerTransactionsPageQueryOptions,
+} from "@/features/ledger/api/ledger-queries";
 import { LEDGER_CATEGORIES, type LedgerCategory } from "@/lib/schemas/ledger";
 import { useFinancialStateContext } from "@/providers/financial-state-provider";
 import { Badge } from "@/components/ui/badge";
@@ -41,13 +47,29 @@ type TransactionFormValues = {
 type TransactionFormErrors = Partial<Record<keyof TransactionFormValues, string>>;
 
 export function TransactionsPanel({
-  transactions,
-  pagination,
+  transactions: initialTransactions,
+  pagination: initialPagination,
   loadError,
 }: LedgerTransactionPage & { loadError?: string }) {
   const router = useRouter();
-  const { snapshot, refresh } = useFinancialStateContext();
+  const queryClient = useQueryClient();
+  const { snapshot } = useFinancialStateContext();
   const currency = snapshot.profile.currency;
+  const transactionsQuery = useQuery(
+    ledgerTransactionsPageQueryOptions(
+      initialPagination.page,
+      loadError
+        ? undefined
+        : { transactions: initialTransactions, pagination: initialPagination }
+    )
+  );
+  const ledgerPage = transactionsQuery.data ?? {
+    transactions: initialTransactions,
+    pagination: initialPagination,
+  };
+  const transactionLoadError =
+    transactionsQuery.error instanceof Error ? transactionsQuery.error.message : loadError;
+  const { transactions, pagination } = ledgerPage;
   const [activeTransaction, setActiveTransaction] = useState<LedgerTransaction | null>(null);
   const [formValues, setFormValues] = useState<TransactionFormValues>(() =>
     emptyTransactionForm()
@@ -56,6 +78,101 @@ export function TransactionsPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const updateMutation = useMutation({
+    mutationFn: async ({
+      id,
+      transaction,
+    }: {
+      id: string;
+      transaction: ParsedTransaction;
+    }) => {
+      const result = await updateLedgerTransactionAction(id, transaction);
+
+      if (!result.ok) {
+        throw new LedgerActionError(result.error, result.fieldErrors);
+      }
+    },
+    onMutate: async ({ id, transaction }) => {
+      const queryKey = ledgerKeys.transactionsPage(pagination.page);
+      await queryClient.cancelQueries({ queryKey });
+      const previousPage = queryClient.getQueryData<LedgerTransactionPage>(queryKey);
+
+      queryClient.setQueryData<LedgerTransactionPage>(queryKey, (current) =>
+        current
+          ? {
+              ...current,
+              transactions: current.transactions.map((existing) =>
+                existing.id === id
+                  ? {
+                      ...existing,
+                      amount: transaction.amount,
+                      label: transaction.counterparty ?? transaction.category,
+                      occurredAt: transaction.occurredAt,
+                      direction: transaction.direction,
+                      category: transaction.category,
+                      counterparty: transaction.counterparty,
+                    }
+                  : existing
+              ),
+            }
+          : current
+      );
+
+      return { queryKey, previousPage };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previousPage) {
+        queryClient.setQueryData(context.queryKey, context.previousPage);
+      }
+    },
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ledgerKeys.transactions() }),
+        queryClient.invalidateQueries({ queryKey: financialWorkspaceKeys.workspace() }),
+      ]);
+    },
+  });
+  const deleteMutation = useMutation({
+    mutationFn: async (transaction: LedgerTransaction) => {
+      const result = await deleteLedgerTransactionAction(transaction.id);
+
+      if (!result.ok) {
+        throw new LedgerActionError(result.error, result.fieldErrors);
+      }
+    },
+    onMutate: async (transaction) => {
+      const queryKey = ledgerKeys.transactionsPage(pagination.page);
+      await queryClient.cancelQueries({ queryKey });
+      const previousPage = queryClient.getQueryData<LedgerTransactionPage>(queryKey);
+
+      queryClient.setQueryData<LedgerTransactionPage>(queryKey, (current) =>
+        current
+          ? {
+              transactions: current.transactions.filter(
+                (existing) => existing.id !== transaction.id
+              ),
+              pagination: {
+                ...current.pagination,
+                total: Math.max(0, current.pagination.total - 1),
+              },
+            }
+          : current
+      );
+
+      return { queryKey, previousPage };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previousPage) {
+        queryClient.setQueryData(context.queryKey, context.previousPage);
+      }
+    },
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ledgerKeys.transactions() }),
+        queryClient.invalidateQueries({ queryKey: financialWorkspaceKeys.workspace() }),
+      ]);
+    },
+  });
 
   function openEdit(transaction: LedgerTransaction) {
     setActiveTransaction(transaction);
@@ -98,18 +215,17 @@ export function TransactionsPanel({
     setMessage(null);
 
     try {
-      const result = await updateLedgerTransactionAction(activeTransaction.id, parsed.transaction);
-
-      if (!result.ok) {
-        setMessage(result.error);
-        setFormErrors(toFormErrors(result.fieldErrors));
-        return;
-      }
+      await updateMutation.mutateAsync({
+        id: activeTransaction.id,
+        transaction: parsed.transaction,
+      });
 
       gooeyToast.success("Transaction updated");
       closeEdit();
-      await refresh();
-      router.refresh();
+    } catch (error) {
+      const actionError = LedgerActionError.from(error, "Unable to update this transaction.");
+      setMessage(actionError.message);
+      setFormErrors(toFormErrors(actionError.fieldErrors));
     } finally {
       setIsSaving(false);
     }
@@ -120,21 +236,15 @@ export function TransactionsPanel({
     setMessage(null);
 
     try {
-      const result = await deleteLedgerTransactionAction(transaction.id);
-
-      if (!result.ok) {
-        setMessage(result.error);
-        return;
-      }
+      await deleteMutation.mutateAsync(transaction);
 
       gooeyToast.success("Transaction removed");
-      await refresh();
 
       if (transactions.length === 1 && pagination.page > 1) {
         router.replace(pageHref(pagination.page - 1), { scroll: false });
-      } else {
-        router.refresh();
       }
+    } catch (error) {
+      setMessage(LedgerActionError.from(error, "Unable to remove this transaction.").message);
     } finally {
       setDeletingId(null);
     }
@@ -158,9 +268,15 @@ export function TransactionsPanel({
         </p>
       </div>
 
-      {loadError || message ? (
+      {transactionLoadError || message ? (
         <p role="alert" className="rounded-control border border-risk/20 bg-risk/10 px-3 py-2 text-sm text-risk">
-          {loadError ?? message}
+          {message ?? transactionLoadError}
+        </p>
+      ) : null}
+
+      {transactionsQuery.isFetching && !transactionsQuery.isLoading ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Updating transactions...
         </p>
       ) : null}
 
@@ -477,13 +593,7 @@ function toTransactionForm(transaction: LedgerTransaction): TransactionFormValue
 function parseTransactionForm(values: TransactionFormValues):
   | {
       ok: true;
-      transaction: {
-        occurredAt: string;
-        direction: "income" | "expense";
-        amount: number;
-        counterparty: string | null;
-        category: LedgerCategory;
-      };
+      transaction: ParsedTransaction;
     }
   | { ok: false; errors: TransactionFormErrors } {
   const errors: TransactionFormErrors = {};
@@ -515,6 +625,30 @@ function parseTransactionForm(values: TransactionFormValues):
       category: values.category,
     },
   };
+}
+
+type ParsedTransaction = {
+  occurredAt: string;
+  direction: "income" | "expense";
+  amount: number;
+  counterparty: string | null;
+  category: LedgerCategory;
+};
+
+class LedgerActionError extends Error {
+  fieldErrors?: Record<string, string[]>;
+
+  constructor(message: string, fieldErrors?: Record<string, string[]>) {
+    super(message);
+    this.name = "LedgerActionError";
+    this.fieldErrors = fieldErrors;
+  }
+
+  static from(error: unknown, fallback: string) {
+    return error instanceof LedgerActionError
+      ? error
+      : new LedgerActionError(error instanceof Error ? error.message : fallback);
+  }
 }
 
 function toFormErrors(fieldErrors: Record<string, string[]> | undefined): TransactionFormErrors {

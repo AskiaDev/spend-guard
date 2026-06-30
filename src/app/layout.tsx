@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Schibsted_Grotesk, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
+import { QueryProvider } from "@/providers/query-provider";
 import { ToastProvider } from "@/providers/toast-provider";
 
 const schibsted = Schibsted_Grotesk({
@@ -30,8 +31,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       className={`${schibsted.variable} ${hanken.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-background text-foreground">
-        {children}
-        <ToastProvider />
+        <QueryProvider>
+          {children}
+          <ToastProvider />
+        </QueryProvider>
       </body>
     </html>
   );

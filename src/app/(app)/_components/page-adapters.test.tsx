@@ -120,6 +120,11 @@ describe("page adapters", () => {
         },
       ],
       isHydrated: true,
+      isLoading: false,
+      isFetching: false,
+      isStale: false,
+      hasWorkspaceData: true,
+      isWorkspaceEmpty: false,
       metrics: {
         safeToSpend: 20000,
         monthlyFreeCashFlow: 10000,

@@ -1,8 +1,8 @@
 "use client";
 
 import { Upload } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +15,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { financialWorkspaceKeys } from "@/features/financial-profile/api/financial-workspace-query";
 import { confirmLedgerEntriesAction } from "@/features/ledger/api/confirm-ledger-entries";
+import { ledgerKeys } from "@/features/ledger/api/ledger-queries";
 import { mapWithConcurrency } from "@/features/ledger/lib/map-with-concurrency";
 import {
   LEDGER_CATEGORIES,
@@ -24,7 +26,6 @@ import {
   type ReviewedEntry,
 } from "@/lib/schemas/ledger";
 import { cn } from "@/lib/utils";
-import { useFinancialStateContext } from "@/providers/financial-state-provider";
 
 // ponytail: CONCURRENCY=3 matches the spec constraint (plan global §processing option A)
 const CONCURRENCY = 3;
@@ -93,14 +94,26 @@ function formatCategory(cat: LedgerCategory): string {
 }
 
 export function ImportWizard() {
-  const router = useRouter();
-  const { refresh } = useFinancialStateContext();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [done, setDone] = useState(0);
   const [total, setTotal] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const confirmMutation = useMutation({
+    mutationFn: (input: Parameters<typeof confirmLedgerEntriesAction>[0]) =>
+      confirmLedgerEntriesAction(input),
+    onSuccess: async (result) => {
+      if (!result.ok) return;
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ledgerKeys.transactions() }),
+        queryClient.invalidateQueries({ queryKey: financialWorkspaceKeys.workspace() }),
+      ]);
+    },
+  });
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -109,6 +122,7 @@ export function ImportWizard() {
     if (fileInputRef.current) fileInputRef.current.value = "";
     setBusy(true);
     setError(null);
+    setMessage(null);
     setRows([]);
     setDone(0);
     setTotal(list.length);
@@ -126,9 +140,11 @@ export function ImportWizard() {
 
   function patch(index: number, change: Partial<Row>) {
     setRows((current) => current.map((row, i) => (i === index ? { ...row, ...change } : row)));
+    setMessage(null);
   }
 
   async function handleConfirm() {
+    setMessage(null);
     const entries: ReviewedEntry[] = rows
       .filter((row) => row.selected && row.status === "done")
       .map((row) => ({
@@ -151,20 +167,21 @@ export function ImportWizard() {
       return;
     }
 
-    setBusy(true);
-    const result = await confirmLedgerEntriesAction({ entries });
-    setBusy(false);
+    const result = await confirmMutation.mutateAsync({ entries });
 
     if (!result.ok) {
       setError(result.error);
       return;
     }
-    await refresh();
-    router.push("/");
+
+    setError(null);
+    setRows((current) => current.filter((row) => row.status !== "done" || !row.selected));
+    setMessage(`Saved ${result.data.inserted} transaction${result.data.inserted === 1 ? "" : "s"}.`);
   }
 
   const selectedCount = rows.filter((row) => row.selected && row.status === "done").length;
   const progress = total > 0 ? Math.round((done / total) * 100) : 0;
+  const isBusy = busy || confirmMutation.isPending;
 
   return (
     <div className="grid gap-6">
@@ -176,7 +193,7 @@ export function ImportWizard() {
             className={cn(
               "flex cursor-pointer flex-col items-center gap-3 rounded-[var(--radius)] border border-dashed border-primary/30 px-6 py-10 text-center transition-colors",
               "hover:border-primary/60 hover:bg-primary/5",
-              busy && "pointer-events-none opacity-50"
+              isBusy && "pointer-events-none opacity-50"
             )}
             onClick={() => fileInputRef.current?.click()}
           >
@@ -197,7 +214,7 @@ export function ImportWizard() {
             aria-describedby="upload-format-hint"
             accept="image/png,image/jpeg,image/webp,application/pdf"
             multiple
-            disabled={busy}
+            disabled={isBusy}
             onChange={(e) => handleFiles(e.target.files)}
           />
           {/* Accepted-formats hint for assistive tech - the visible copy above sits in an aria-hidden subtree */}
@@ -209,7 +226,7 @@ export function ImportWizard() {
           <Button
             type="button"
             variant="outline"
-            disabled={busy}
+            disabled={isBusy}
             onClick={() => fileInputRef.current?.click()}
           >
             <Upload className="size-4" aria-hidden="true" />
@@ -239,6 +256,15 @@ export function ImportWizard() {
         >
           {error}
         </div>
+      ) : null}
+
+      {message ? (
+        <p
+          role="status"
+          className="rounded-control border border-safe/20 bg-safe/10 px-3 py-2 text-sm text-safe"
+        >
+          {message}
+        </p>
       ) : null}
 
       {/* Review table */}
@@ -390,8 +416,8 @@ export function ImportWizard() {
         <div className="flex justify-end">
           <Button
             type="button"
-            disabled={busy}
-            isLoading={busy}
+            disabled={isBusy}
+            isLoading={confirmMutation.isPending}
             loadingText="Saving..."
             onClick={handleConfirm}
           >

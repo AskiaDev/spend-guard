@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { emptySnapshot } from "@/lib/storage/default-data";
 
@@ -67,6 +68,21 @@ vi.mock("@/features/purchase-checker/api/save-voice-session", () => ({
 }));
 import { useFinancialState } from "./use-financial-state";
 
+function renderFinancialStateHook() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  return renderHook(() => useFinancialState(), {
+    wrapper: ({ children }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    ),
+  });
+}
+
 describe("useFinancialState Supabase mode", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -107,7 +123,7 @@ describe("useFinancialState Supabase mode", () => {
   });
 
   it("deletes voice transcripts then refreshes the workspace", async () => {
-    const { result } = renderHook(() => useFinancialState());
+    const { result } = renderFinancialStateHook();
     await waitFor(() => expect(result.current.isHydrated).toBe(true));
     actions.load.mockClear();
 
@@ -121,26 +137,90 @@ describe("useFinancialState Supabase mode", () => {
   });
 
   it("hydrates a new account from Supabase by default", async () => {
-    const { result } = renderHook(() => useFinancialState());
+    const { result } = renderFinancialStateHook();
 
     await waitFor(() => expect(result.current.isHydrated).toBe(true));
 
     expect(actions.load).toHaveBeenCalledTimes(1);
     expect(result.current.snapshot).toEqual(emptySnapshot);
     expect(result.current.error).toBeNull();
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.isWorkspaceEmpty).toBe(true);
   });
 
   it("surfaces a remote hydration failure", async () => {
     actions.load.mockResolvedValue({ ok: false, error: "Unable to load your financial workspace." });
 
-    const { result } = renderHook(() => useFinancialState());
+    const { result } = renderFinancialStateHook();
 
     await waitFor(() => expect(result.current.isHydrated).toBe(true));
     expect(result.current.error).toBe("Unable to load your financial workspace.");
   });
 
+  it("reports loading, stale, and background-refetch server-state flags", async () => {
+    let resolveInitialLoad: (value: Awaited<ReturnType<typeof actions.load>>) => void = () => {};
+    const initialLoad = new Promise<Awaited<ReturnType<typeof actions.load>>>((resolve) => {
+      resolveInitialLoad = resolve;
+    });
+    actions.load.mockReturnValueOnce(initialLoad);
+
+    const { result } = renderFinancialStateHook();
+
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.isHydrated).toBe(false);
+
+    await act(async () => {
+      resolveInitialLoad({
+        ok: true,
+        data: {
+          snapshot: emptySnapshot,
+          checks: [],
+          cooldownItems: [],
+          weeklyReports: [],
+        },
+      });
+      await initialLoad;
+    });
+
+    await waitFor(() => expect(result.current.isHydrated).toBe(true));
+    expect(result.current.isLoading).toBe(false);
+
+    let resolveRefresh: (value: Awaited<ReturnType<typeof actions.load>>) => void = () => {};
+    const delayedRefresh = new Promise<Awaited<ReturnType<typeof actions.load>>>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    actions.load.mockReturnValueOnce(delayedRefresh);
+
+    act(() => {
+      void result.current.refresh();
+    });
+
+    await waitFor(() => expect(result.current.isFetching).toBe(true));
+    expect(result.current.isStale).toBe(true);
+    expect(result.current.hasWorkspaceData).toBe(true);
+
+    await act(async () => {
+      resolveRefresh({
+        ok: true,
+        data: {
+          snapshot: {
+            ...emptySnapshot,
+            profile: { ...emptySnapshot.profile, monthlyIncome: 120_000 },
+          },
+          checks: [],
+          cooldownItems: [],
+          weeklyReports: [],
+        },
+      });
+      await delayedRefresh;
+    });
+
+    await waitFor(() => expect(result.current.isFetching).toBe(false));
+    expect(result.current.snapshot.profile.monthlyIncome).toBe(120_000);
+  });
+
   it("routes active financial workflows through authenticated actions", async () => {
-    const { result } = renderHook(() => useFinancialState());
+    const { result } = renderFinancialStateHook();
     await waitFor(() => expect(result.current.isHydrated).toBe(true));
 
     const setup = {
@@ -307,7 +387,7 @@ describe("useFinancialState Supabase mode", () => {
   });
 
   it("prepends a saved purchase check locally before the background refresh finishes", async () => {
-    const { result } = renderHook(() => useFinancialState());
+    const { result } = renderFinancialStateHook();
     await waitFor(() => expect(result.current.isHydrated).toBe(true));
 
     let resolveRefresh: (value: Awaited<ReturnType<typeof actions.load>>) => void = () => {};
@@ -345,7 +425,7 @@ describe("useFinancialState Supabase mode", () => {
   });
 
   it("resolves a purchase check save without waiting for a delayed refresh", async () => {
-    const { result } = renderHook(() => useFinancialState());
+    const { result } = renderFinancialStateHook();
     await waitFor(() => expect(result.current.isHydrated).toBe(true));
 
     let resolveRefresh: (value: Awaited<ReturnType<typeof actions.load>>) => void = () => {};
@@ -392,7 +472,7 @@ describe("useFinancialState Supabase mode", () => {
   });
 
   it("keeps a just-saved purchase check when the background refresh is stale", async () => {
-    const { result } = renderHook(() => useFinancialState());
+    const { result } = renderFinancialStateHook();
     await waitFor(() => expect(result.current.isHydrated).toBe(true));
 
     let resolveRefresh: (value: Awaited<ReturnType<typeof actions.load>>) => void = () => {};
@@ -429,7 +509,7 @@ describe("useFinancialState Supabase mode", () => {
 
   it("keeps the last remote mutation error visible", async () => {
     actions.saveProfile.mockResolvedValue({ ok: false, error: "Unable to save your profile." });
-    const { result } = renderHook(() => useFinancialState());
+    const { result } = renderFinancialStateHook();
     await waitFor(() => expect(result.current.isHydrated).toBe(true));
 
     await act(async () => {
@@ -445,7 +525,7 @@ describe("useFinancialState Supabase mode", () => {
   });
 
   it("surfaces failures from each remote workflow", async () => {
-    const { result } = renderHook(() => useFinancialState());
+    const { result } = renderFinancialStateHook();
     await waitFor(() => expect(result.current.isHydrated).toBe(true));
     const check = {
       id: "4fd8e28f-798a-4d71-b279-3ea9473c9ba3",
