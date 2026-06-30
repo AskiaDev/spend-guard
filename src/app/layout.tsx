@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Schibsted_Grotesk, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
+import { PwaLifecycle } from "@/components/pwa/pwa-lifecycle";
 import { QueryProvider } from "@/providers/query-provider";
 import { ToastProvider } from "@/providers/toast-provider";
 
@@ -18,6 +19,12 @@ const hanken = Hanken_Grotesk({
 export const metadata: Metadata = {
   title: "SpendGuard",
   description: "Deterministic purchase checks for personal spending decisions.",
+  applicationName: "SpendGuard",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "SpendGuard",
+  },
 };
 
 export const viewport: Viewport = {
@@ -32,6 +39,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     >
       <body className="flex min-h-full flex-col bg-background text-foreground">
         <QueryProvider>
+          <PwaLifecycle />
           {children}
           <ToastProvider />
         </QueryProvider>

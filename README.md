@@ -56,6 +56,24 @@ In Supabase **Authentication > URL Configuration**, set:
 
 Keep the Email provider enabled. With email confirmation enabled, signup displays a check-email message; the confirmation link establishes the cookie session and redirects to the dashboard. Login and signup errors are displayed in the form.
 
+### PWA and deployment checklist
+
+SpendGuard is a dynamic Supabase app, so deploy it as a Node.js/standalone
+Docker app, not a static export.
+
+- Serve production over HTTPS so the manifest and service worker are installable.
+- Add the production Site URL and `/auth/confirm` redirect URL in Supabase before
+  sending signup links.
+- Build public Supabase values into the image (`NEXT_PUBLIC_SUPABASE_URL` and
+  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) or rebuild per environment. These
+  `NEXT_PUBLIC_*` values are inlined into the browser bundle at build time.
+- Do not cache authenticated HTML, `/sw.js`, `/auth/*`, `/api/*`, or Supabase
+  responses at the CDN/proxy layer. Keep `/sw.js` on `no-store`; hashed Next
+  assets can stay immutable.
+- Put a reverse proxy in front of self-hosted Next for request limits, slow
+  connection handling, and rate limiting.
+- Run Lighthouse against a production-like HTTPS URL to verify PWA installability.
+
 ## Scripts
 
 ```bash

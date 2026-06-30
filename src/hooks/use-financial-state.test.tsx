@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { OFFLINE_MUTATION_MESSAGE } from "@/lib/pwa/network";
 import { emptySnapshot } from "@/lib/storage/default-data";
 
 const actions = vi.hoisted(() => ({
@@ -522,6 +523,55 @@ describe("useFinancialState Supabase mode", () => {
     });
 
     expect(result.current.error).toBe("Unable to save your profile.");
+  });
+
+  it("blocks financial writes while the browser is offline", async () => {
+    const onlineSpy = vi.spyOn(window.navigator, "onLine", "get").mockReturnValue(false);
+    const { result } = renderFinancialStateHook();
+    await waitFor(() => expect(result.current.isHydrated).toBe(true));
+
+    await act(async () => {
+      await result.current.replaceFinancialSetup({
+        profile: emptySnapshot.profile,
+        expenses: [],
+        debts: [],
+        goals: [],
+      });
+    });
+    expect(actions.saveProfile).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await expect(
+        result.current.runPurchaseCheck({
+          itemName: "Phone",
+          amount: 25_000,
+          urgency: "want",
+          paymentMethod: "cash",
+        })
+      ).rejects.toThrow(OFFLINE_MUTATION_MESSAGE);
+    });
+    expect(actions.saveCheck).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await expect(
+        result.current.createGoal({
+          label: "Camera upgrade",
+          targetAmount: 60_000,
+          savedAmount: 10_000,
+          monthlyContribution: 8_000,
+          priority: "high",
+        })
+      ).rejects.toThrow(OFFLINE_MUTATION_MESSAGE);
+    });
+    expect(actions.createGoal).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.generateWeeklyReport();
+    });
+    expect(actions.createReport).not.toHaveBeenCalled();
+    expect(result.current.error).toBe(OFFLINE_MUTATION_MESSAGE);
+
+    onlineSpy.mockRestore();
   });
 
   it("surfaces failures from each remote workflow", async () => {

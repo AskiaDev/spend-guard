@@ -1,7 +1,7 @@
-const PUBLIC_PATHS = new Set(["/login", "/signup"]);
+const PUBLIC_PATHS = new Set(["/login", "/signup", "/offline"]);
 const ONBOARDING_PATH = "/onboarding";
 const EXPLORE_PATH = "/explore";
-const ONBOARDING_ALLOWED_PATHS = new Set([ONBOARDING_PATH, EXPLORE_PATH]);
+const ONBOARDING_ALLOWED_PATHS = new Set([ONBOARDING_PATH, EXPLORE_PATH, "/offline"]);
 const AWAY_FROM_WHEN_ONBOARDED = new Set(["/login", "/signup", ONBOARDING_PATH]);
 
 function isPublicPath(pathname: string): boolean {

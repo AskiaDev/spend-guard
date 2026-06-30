@@ -48,6 +48,7 @@ import {
 } from "@/lib/calculations/purchase-decision";
 import { getCooldownDays } from "@/lib/calculations/cooldown";
 import { createFallbackAdvice } from "@/lib/advisor";
+import { OFFLINE_MUTATION_MESSAGE, isBrowserOnline } from "@/lib/pwa/network";
 import { emptySnapshot } from "@/lib/storage/default-data";
 import { createId, toIsoDate } from "@/lib/utils";
 import type {
@@ -102,6 +103,21 @@ export function useFinancialState() {
     await queryClient.invalidateQueries({ queryKey: financialWorkspaceKeys.workspace() });
   }, [queryClient]);
 
+  const canRunOnlineMutation = useCallback(() => {
+    if (isBrowserOnline()) {
+      return true;
+    }
+
+    setMutationError(OFFLINE_MUTATION_MESSAGE);
+    return false;
+  }, []);
+
+  const requireOnlineMutation = useCallback(() => {
+    if (!canRunOnlineMutation()) {
+      throw new Error(OFFLINE_MUTATION_MESSAGE);
+    }
+  }, [canRunOnlineMutation]);
+
   const snapshot = workspace?.snapshot ?? emptySnapshot;
   const checks = useMemo(
     () => mergeUniqueChecks(pendingLocalChecks, workspace?.checks ?? []),
@@ -115,6 +131,10 @@ export function useFinancialState() {
 
   const replaceFinancialSetup = useCallback(
     async ({ profile, expenses, debts, goals }: OnboardingPayload) => {
+      if (!canRunOnlineMutation()) {
+        return;
+      }
+
       const result = await saveFinancialProfileAction({ profile, expenses, debts, goals });
 
       if (!result.ok) {
@@ -124,7 +144,7 @@ export function useFinancialState() {
 
       await refresh();
     },
-    [refresh]
+    [canRunOnlineMutation, refresh]
   );
 
   const runPurchaseCheck = useCallback(
@@ -149,6 +169,8 @@ export function useFinancialState() {
         advisorText,
         reasons: result.reasons,
       };
+
+      requireOnlineMutation();
 
       const saved = await savePurchaseCheckAction(purchase, checkWithoutIdentity);
 
@@ -178,11 +200,13 @@ export function useFinancialState() {
       void refresh();
       return { check, result };
     },
-    [queryClient, refresh, snapshot]
+    [queryClient, refresh, requireOnlineMutation, snapshot]
   );
 
   const markPurchaseCheckStatus = useCallback(
     async (check: PurchaseCheck, status: PurchaseCheckStatus) => {
+      requireOnlineMutation();
+
       const result = await markPurchaseCheckStatusAction(check.id, status);
 
       if (!result.ok) {
@@ -208,11 +232,13 @@ export function useFinancialState() {
       await refresh();
       return { ...check, status };
     },
-    [queryClient, refresh]
+    [queryClient, refresh, requireOnlineMutation]
   );
 
   const createGoal = useCallback(
     async (goalDraft: GoalDraft) => {
+      requireOnlineMutation();
+
       const result = await createGoalAction(goalDraft);
 
       if (!result.ok) {
@@ -223,7 +249,7 @@ export function useFinancialState() {
       await refresh();
       return { id: createId("goal"), ...goalDraft };
     },
-    [refresh]
+    [refresh, requireOnlineMutation]
   );
 
   const addGoalFromCheck = useCallback(
@@ -262,6 +288,10 @@ export function useFinancialState() {
 
   const addCooldownFromCheck = useCallback(
     async (check: PurchaseCheck) => {
+      if (!canRunOnlineMutation()) {
+        return undefined;
+      }
+
       const days = check.cooldownDays || getCooldownDays(check.amount);
       const item: CooldownItem = {
         id: createId("cooldown"),
@@ -307,11 +337,15 @@ export function useFinancialState() {
       await refresh();
       return item;
     },
-    [refresh]
+    [canRunOnlineMutation, refresh]
   );
 
   const removeCooldownItem = useCallback(
     async (id: string) => {
+      if (!canRunOnlineMutation()) {
+        return;
+      }
+
       const result = await deleteCooldownItemAction(id);
 
       if (!result.ok) {
@@ -321,11 +355,13 @@ export function useFinancialState() {
 
       await refresh();
     },
-    [refresh]
+    [canRunOnlineMutation, refresh]
   );
 
   const deleteGoal = useCallback(
     async (id: string) => {
+      requireOnlineMutation();
+
       const result = await deleteGoalAction(id);
 
       if (!result.ok) {
@@ -335,11 +371,13 @@ export function useFinancialState() {
 
       await refresh();
     },
-    [refresh]
+    [refresh, requireOnlineMutation]
   );
 
   const updateGoal = useCallback(
     async (id: string, goalDraft: GoalDraft) => {
+      requireOnlineMutation();
+
       const result = await updateGoalAction(id, goalDraft);
 
       if (!result.ok) {
@@ -349,11 +387,13 @@ export function useFinancialState() {
 
       await refresh();
     },
-    [refresh]
+    [refresh, requireOnlineMutation]
   );
 
   const createExpense = useCallback(
     async (expenseDraft: ExpenseDraft) => {
+      requireOnlineMutation();
+
       const result = await createExpenseAction(expenseDraft);
 
       if (!result.ok) {
@@ -364,11 +404,13 @@ export function useFinancialState() {
       await refresh();
       return { id: createId("expense"), ...expenseDraft };
     },
-    [refresh]
+    [refresh, requireOnlineMutation]
   );
 
   const updateExpense = useCallback(
     async (id: string, expenseDraft: ExpenseDraft) => {
+      requireOnlineMutation();
+
       const result = await updateExpenseAction(id, expenseDraft);
 
       if (!result.ok) {
@@ -378,11 +420,13 @@ export function useFinancialState() {
 
       await refresh();
     },
-    [refresh]
+    [refresh, requireOnlineMutation]
   );
 
   const deleteExpense = useCallback(
     async (id: string) => {
+      requireOnlineMutation();
+
       const result = await deleteExpenseAction(id);
 
       if (!result.ok) {
@@ -392,11 +436,13 @@ export function useFinancialState() {
 
       await refresh();
     },
-    [refresh]
+    [refresh, requireOnlineMutation]
   );
 
   const createDebt = useCallback(
     async (debtDraft: DebtDraft) => {
+      requireOnlineMutation();
+
       const result = await createDebtAction(debtDraft);
 
       if (!result.ok) {
@@ -407,11 +453,13 @@ export function useFinancialState() {
       await refresh();
       return { id: createId("debt"), ...debtDraft };
     },
-    [refresh]
+    [refresh, requireOnlineMutation]
   );
 
   const updateDebt = useCallback(
     async (id: string, debtDraft: DebtDraft) => {
+      requireOnlineMutation();
+
       const result = await updateDebtAction(id, debtDraft);
 
       if (!result.ok) {
@@ -421,11 +469,13 @@ export function useFinancialState() {
 
       await refresh();
     },
-    [refresh]
+    [refresh, requireOnlineMutation]
   );
 
   const deleteDebt = useCallback(
     async (id: string) => {
+      requireOnlineMutation();
+
       const result = await deleteDebtAction(id);
 
       if (!result.ok) {
@@ -435,11 +485,13 @@ export function useFinancialState() {
 
       await refresh();
     },
-    [refresh]
+    [refresh, requireOnlineMutation]
   );
 
   const updateProfileSettings = useCallback(
     async (profile: FinancialProfile) => {
+      requireOnlineMutation();
+
       const result = await updateProfileSettingsAction(profile);
 
       if (!result.ok) {
@@ -449,10 +501,12 @@ export function useFinancialState() {
 
       await refresh();
     },
-    [refresh]
+    [refresh, requireOnlineMutation]
   );
 
   const deleteFinancialData = useCallback(async () => {
+    requireOnlineMutation();
+
     const result = await deleteFinancialDataAction();
 
     if (!result.ok) {
@@ -461,9 +515,11 @@ export function useFinancialState() {
     }
 
     await refresh();
-  }, [refresh]);
+  }, [refresh, requireOnlineMutation]);
 
   const deleteVoiceTranscripts = useCallback(async () => {
+    requireOnlineMutation();
+
     const result = await deleteVoiceSessionsAction();
 
     if (!result.ok) {
@@ -472,7 +528,7 @@ export function useFinancialState() {
     }
 
     await refresh();
-  }, [refresh]);
+  }, [refresh, requireOnlineMutation]);
 
   const generateWeeklyReport = useCallback(async () => {
     const safeToSpend = calculateSafeToSpend(snapshot);
@@ -493,6 +549,10 @@ export function useFinancialState() {
       summary: insights.narrative,
     };
 
+    if (!canRunOnlineMutation()) {
+      return report;
+    }
+
     const result = await createWeeklyReportAction({
       weekStart: report.weekStart,
       summary: report.summary,
@@ -507,10 +567,14 @@ export function useFinancialState() {
 
     await refresh();
     return report;
-  }, [checks, refresh, snapshot]);
+  }, [canRunOnlineMutation, checks, refresh, snapshot]);
 
   const confirmVoiceDraft = useCallback(
     async (draft: VoicePurchaseDraft) => {
+      if (!canRunOnlineMutation()) {
+        return;
+      }
+
       const { transcript, ...extractedFields } = draft;
       const result = await saveVoiceSessionAction({ transcript, extractedFields });
 
@@ -518,7 +582,7 @@ export function useFinancialState() {
         setMutationError(result.error);
       }
     },
-    []
+    [canRunOnlineMutation]
   );
 
   const metrics = useMemo(

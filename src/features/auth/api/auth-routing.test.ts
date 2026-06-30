@@ -70,4 +70,10 @@ describe("getAuthRedirect", () => {
     expect(getAuthRedirect("/auth/confirm", false)).toBeNull();
     expect(getAuthRedirect("/", true, true)).toBeNull();
   });
+
+  it("allows the public offline fallback without authentication", () => {
+    expect(getAuthRedirect("/offline", false)).toBeNull();
+    expect(getAuthRedirect("/offline", true, false)).toBeNull();
+    expect(getAuthRedirect("/offline", true, true)).toBeNull();
+  });
 });
