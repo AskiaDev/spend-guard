@@ -56,7 +56,7 @@ describe("DashboardOverview", () => {
     render(<DashboardOverview snapshot={defaultSnapshot} checks={checks} metrics={metrics} />);
 
     expect(screen.queryByText("Monthly Flow")).not.toBeInTheDocument();
-    expect(screen.getByText(/safe to spend is a guardrail/i)).toBeVisible();
+    expect(screen.getByText(/of ₱10,000 free cash flow/i)).toBeVisible();
 
     const kpiGrid = screen.getByTestId("dashboard-kpi-grid");
     expect(kpiGrid).toHaveClass("grid-cols-2", "lg:grid-cols-3");
@@ -67,7 +67,9 @@ describe("DashboardOverview", () => {
       "Emergency Progress",
       "Monthly Expenses",
       "Debt Payments",
-      "Free Cash Flow",
+      "Free Cash Flow (Month)",
+      "Total Debt Balance",
+      "Goal Funding",
     ]) {
       expect(screen.getByRole("heading", { name: label })).toBeVisible();
     }
@@ -86,24 +88,26 @@ describe("DashboardOverview", () => {
       "82"
     );
 
-    expect(screen.getByRole("heading", { name: "Active Goals" })).toBeVisible();
-    expect(screen.getByText("Emergency buffer")).toBeVisible();
-    expect(screen.getByText("₱120,000 of ₱180,000")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Cash Flow Overview" })).toBeVisible();
+    expect(screen.getByTestId("cash-flow-chart")).toBeVisible();
 
-    expect(screen.getByRole("heading", { name: "Recent Checks" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Goals & Progress" })).toBeVisible();
+    expect(screen.getByText("Emergency buffer")).toBeVisible();
+    expect(screen.getAllByText("₱120,000 of ₱180,000").length).toBeGreaterThan(0);
+
+    expect(
+      screen.getByRole("heading", { name: "Recent Checks & Spending Intelligence" })
+    ).toBeVisible();
     expect(screen.getByText("Work bag")).toBeVisible();
     expect(screen.getByText("Weekend trip")).toBeVisible();
     expect(screen.getByText("Safe to Buy")).toBeVisible();
     expect(screen.getByText("Wait")).toBeVisible();
 
-    expect(screen.getByRole("link", { name: "Read full insight" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "View full strategy report" })).toHaveAttribute(
       "href",
       "/reports"
     );
-    expect(screen.getByRole("img", { name: "Person reviewing personal finance progress" })).toHaveAttribute(
-      "src",
-      expect.stringContaining("personal-finance.svg")
-    );
+    expect(screen.getByText("Prioritize debt payoff")).toBeVisible();
   });
 
   it("shows a labelled empty state when no purchase checks have been persisted", () => {
@@ -134,13 +138,13 @@ describe("DashboardOverview", () => {
     );
   });
 
-  it("keeps additional recent checks hidden until the lg breakpoint", () => {
+  it("keeps recent checks visible in the compact intelligence list", () => {
     render(<DashboardOverview snapshot={defaultSnapshot} checks={checks} metrics={metrics} />);
 
     const secondCheckRow = screen.getByText("Weekend trip").closest("article");
 
-    expect(secondCheckRow).toHaveClass("hidden", "lg:grid");
-    expect(secondCheckRow).not.toHaveClass("md:grid");
+    expect(secondCheckRow).not.toHaveClass("hidden");
+    expect(screen.getByRole("button", { name: "More actions for Weekend trip" })).toBeVisible();
   });
 
   it("renders date-only goal targets as local calendar dates across time zones", () => {
@@ -166,7 +170,7 @@ describe("DashboardOverview — Phase 8 dashboard completeness", () => {
     render(<DashboardOverview snapshot={defaultSnapshot} checks={checks} metrics={metrics} />);
 
     const banner = screen.getByTestId("health-status-banner");
-    expect(within(banner).getByText(/your finances are strong/i)).toBeVisible();
+    expect(within(banner).getByText("Strong")).toBeVisible();
     expect(
       within(banner).getByText(/healthy margin across savings, cash flow, and debt/i)
     ).toBeVisible();
@@ -182,7 +186,7 @@ describe("DashboardOverview — Phase 8 dashboard completeness", () => {
     );
 
     const banner = screen.getByTestId("health-status-banner");
-    expect(within(banner).getByText(/your finances are risky/i)).toBeVisible();
+    expect(within(banner).getByText("Risky")).toBeVisible();
     expect(screen.getByRole("heading", { name: "Protect your buffer first" })).toBeVisible();
   });
 
@@ -207,12 +211,13 @@ describe("DashboardOverview — Phase 8 dashboard completeness", () => {
     const row = within(card).getByText("Credit card").closest("li");
     expect(row).not.toBeNull();
     expect(within(row as HTMLElement).getByText("₱5,000")).toBeVisible();
-    expect(within(row as HTMLElement).getByText(/Jul 20/)).toBeVisible();
-    expect(within(row as HTMLElement).getByText(/In 26 days/)).toBeVisible();
+    expect(within(row as HTMLElement).getByText("Jul")).toBeVisible();
+    expect(within(row as HTMLElement).getByText("20")).toBeVisible();
+    expect(within(row as HTMLElement).getByText(/Due in 26 days/)).toBeVisible();
     expect(within(card).getByText(/due across 1 payment/i)).toBeVisible();
   });
 
-  it("groups multiple upcoming payments from the same debt account", () => {
+  it("lists multiple upcoming payments from the same debt account separately", () => {
     const snapshot: FinancialSnapshot = {
       ...defaultSnapshot,
       debts: [
@@ -247,12 +252,16 @@ describe("DashboardOverview — Phase 8 dashboard completeness", () => {
     const card = screen.getByTestId("upcoming-debt-card");
     expect(within(card).getByText(/₱9,800/)).toBeVisible();
     expect(within(card).getByText(/due across 3 payments from 2 debts/i)).toBeVisible();
-    expect(within(card).getAllByText("TT Loan")).toHaveLength(1);
+    expect(within(card).getAllByText("TT Loan")).toHaveLength(2);
 
-    const row = within(card).getByText("TT Loan").closest("li");
-    expect(row).not.toBeNull();
-    expect(within(row as HTMLElement).getByText("₱6,000")).toBeVisible();
-    expect(within(row as HTMLElement).getByText(/2 payments · Jul 1, Jul 16/)).toBeVisible();
+    const rows = within(card)
+      .getAllByText("TT Loan")
+      .map((label) => label.closest("li") as HTMLElement);
+
+    expect(within(rows[0]).getByText("₱3,000")).toBeVisible();
+    expect(within(rows[0]).getByText("1")).toBeVisible();
+    expect(within(rows[1]).getByText("₱3,000")).toBeVisible();
+    expect(within(rows[1]).getByText("16")).toBeVisible();
   });
 
   it("shows an empty state when no debts are due in the window", () => {

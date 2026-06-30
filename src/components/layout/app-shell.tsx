@@ -43,7 +43,7 @@ export function AppShell({
       <AppHeader userEmail={userEmail} signOutAction={signOutAction} />
 
       <div className="lg:pl-[240px]">
-        <main className="mx-auto flex min-h-screen w-full max-w-[1180px] flex-col px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-6 lg:px-8 lg:py-8 lg:pb-8">
+        <main className="flex min-h-screen w-full flex-col px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-6 lg:px-8 lg:py-8 lg:pb-8">
           <div className="flex-1">{children}</div>
           <FinancialDisclaimer />
         </main>

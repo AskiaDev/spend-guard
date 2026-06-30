@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import type { ReactNode } from "react";
 
 const DEFAULT_SIZE = 96;
 const MIN_SIZE = 24;
@@ -11,6 +12,8 @@ export interface ProgressRingProps {
   size?: number;
   strokeWidth?: number;
   className?: string;
+  children?: ReactNode;
+  role?: "progressbar" | "meter";
 }
 
 function clampPercentage(value: number) {
@@ -42,6 +45,8 @@ export function ProgressRing({
   size = DEFAULT_SIZE,
   strokeWidth = DEFAULT_STROKE_WIDTH,
   className,
+  children,
+  role = "progressbar",
 }: ProgressRingProps) {
   const boundedValue = clampPercentage(value);
   const normalizedSize = normalizeSize(size);
@@ -54,7 +59,7 @@ export function ProgressRing({
 
   return (
     <div
-      role="progressbar"
+      role={role}
       aria-label={label}
       aria-valuemin={0}
       aria-valuemax={100}
@@ -91,8 +96,11 @@ export function ProgressRing({
           className="text-safe transition-[stroke-dashoffset] motion-reduce:transition-none"
         />
       </svg>
-      <span aria-hidden="true" className="text-sm font-bold tabular-nums text-foreground">
-        {displayValue}%
+      <span
+        aria-hidden="true"
+        className="grid place-items-center text-center text-sm font-bold tabular-nums text-foreground"
+      >
+        {children ?? `${displayValue}%`}
       </span>
     </div>
   );

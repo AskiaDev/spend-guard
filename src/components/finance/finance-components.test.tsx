@@ -100,6 +100,19 @@ describe("ProgressRing", () => {
     expect(circles[0]).toHaveAttribute("r", "44");
     expect(circles[1]).toHaveAttribute("stroke-width", "8");
   });
+
+  it("can render a score-style meter with custom center content", () => {
+    render(
+      <ProgressRing value={82} label="Financial health score" role="meter">
+        <span>82 /100</span>
+      </ProgressRing>
+    );
+
+    const meter = screen.getByRole("meter", { name: "Financial health score" });
+
+    expect(meter).toHaveAttribute("aria-valuenow", "82");
+    expect(within(meter).getByText("82 /100")).toBeVisible();
+  });
 });
 
 describe("ScoreGauge", () => {

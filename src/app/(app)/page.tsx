@@ -9,7 +9,6 @@ export const metadata: Metadata = {
 export default function DashboardPage() {
   return (
     <PageFrame
-      eyebrow="Today’s spending guard"
       title={<DashboardGreetingTitle />}
       description="Start with your safe-to-spend picture before making a purchase decision."
     >
