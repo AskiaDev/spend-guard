@@ -24,6 +24,7 @@ const WARMUP_INPUT = {
   system: "You are a local model readiness check. Reply with OK.",
   prompt: "Reply with OK.",
 };
+const FALLBACK_PROVIDERS = new Set(["cloud", "mock"]);
 
 type GateStatus =
   | "checking"
@@ -36,10 +37,20 @@ type GateStatus =
 export function usesLocalProvider(
   providerSpec: string | undefined = process.env.NEXT_PUBLIC_AI_PROVIDER
 ): boolean {
+  return providerTokens(providerSpec).includes("local");
+}
+
+function usesFallbackProvider(
+  providerSpec: string | undefined = process.env.NEXT_PUBLIC_AI_PROVIDER
+): boolean {
+  return providerTokens(providerSpec).some((token) => FALLBACK_PROVIDERS.has(token));
+}
+
+function providerTokens(providerSpec: string | undefined): string[] {
   return (providerSpec ?? "")
     .split(",")
     .map((token) => token.trim().toLowerCase())
-    .includes("local");
+    .filter(Boolean);
 }
 
 function readyKey(modelUrl: string): string {
@@ -72,6 +83,7 @@ export function LocalAdvisorGate({
   providerSpec?: string;
 }) {
   const shouldGate = usesLocalProvider(providerSpec);
+  const hasFallbackProvider = usesFallbackProvider(providerSpec);
   const localClient = useMemo(() => client ?? getLocalModelClient(), [client]);
   const modelUrl = process.env.NEXT_PUBLIC_LITERT_MODEL_URL ?? DEFAULT_LITERT_MODEL_URL;
   const storageKey = readyKey(modelUrl);
@@ -133,11 +145,11 @@ export function LocalAdvisorGate({
     };
   }, [localClient, probe, shouldGate, storageKey, warmModel]);
 
-  if (!shouldGate || status === "ready") {
+  if (!shouldGate) {
     return children;
   }
 
-  return (
+  const setupCard = (
     <Card>
       <CardHeader>
         <CardTitle>Local advisor setup</CardTitle>
@@ -146,7 +158,9 @@ export function LocalAdvisorGate({
         {status === "unsupported" ? (
           <>
             <InlineNotice tone="error" title="WebGPU is not available">
-              Use a WebGPU-capable Chrome or Edge browser, then reload this page.
+              {hasFallbackProvider
+                ? "This browser or installed PWA cannot download the on-device advisor model. SpendGuard will keep using the fallback advisor path."
+                : "This browser or installed PWA cannot download the on-device advisor model. Use a WebGPU-capable browser, then reload this page."}
             </InlineNotice>
             <Button
               type="button"
@@ -171,7 +185,9 @@ export function LocalAdvisorGate({
         {status === "needs-download" ? (
           <>
             <InlineNotice tone="warning" title="Download the local advisor model">
-              The purchase checker is waiting for the on-device model before continuing.
+              {hasFallbackProvider
+                ? "Download it to run explanations on this device. You can keep using the fallback advisor path while it downloads."
+                : "The purchase checker is waiting for the on-device model before continuing."}
             </InlineNotice>
             <Button type="button" onClick={() => void warmModel()}>
               <Download className="size-4" aria-hidden="true" />
@@ -189,7 +205,9 @@ export function LocalAdvisorGate({
         {status === "failed" ? (
           <>
             <InlineNotice tone="error" title="Local model is not ready">
-              The model could not finish loading in this browser. Check WebGPU support and try again.
+              {hasFallbackProvider
+                ? "The local model could not finish loading. You can continue with the fallback advisor path and retry later."
+                : "The model could not finish loading in this browser. Check WebGPU support and try again."}
             </InlineNotice>
             <Button type="button" onClick={() => void warmModel()}>
               <RotateCw className="size-4" aria-hidden="true" />
@@ -200,4 +218,19 @@ export function LocalAdvisorGate({
       </CardContent>
     </Card>
   );
+
+  if (hasFallbackProvider) {
+    return (
+      <div className="grid gap-4">
+        {status === "checking" || status === "ready" ? null : setupCard}
+        {children}
+      </div>
+    );
+  }
+
+  if (status === "ready") {
+    return children;
+  }
+
+  return setupCard;
 }

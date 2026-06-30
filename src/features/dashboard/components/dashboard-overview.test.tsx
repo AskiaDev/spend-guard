@@ -212,6 +212,49 @@ describe("DashboardOverview — Phase 8 dashboard completeness", () => {
     expect(within(card).getByText(/due across 1 payment/i)).toBeVisible();
   });
 
+  it("groups multiple upcoming payments from the same debt account", () => {
+    const snapshot: FinancialSnapshot = {
+      ...defaultSnapshot,
+      debts: [
+        {
+          id: "tt-loan",
+          label: "TT Loan",
+          outstandingBalance: 18000,
+          minimumPayment: 3000,
+          dueDay: 1,
+          paymentCadence: "semi_monthly",
+          secondDueDay: 16,
+        },
+        {
+          id: "atome",
+          label: "Atome",
+          outstandingBalance: 10900,
+          minimumPayment: 3800,
+          dueDay: 6,
+        },
+      ],
+    };
+
+    render(
+      <DashboardOverview
+        snapshot={snapshot}
+        checks={checks}
+        metrics={metrics}
+        referenceDate={new Date(2026, 5, 30)}
+      />
+    );
+
+    const card = screen.getByTestId("upcoming-debt-card");
+    expect(within(card).getByText(/₱9,800/)).toBeVisible();
+    expect(within(card).getByText(/due across 3 payments from 2 debts/i)).toBeVisible();
+    expect(within(card).getAllByText("TT Loan")).toHaveLength(1);
+
+    const row = within(card).getByText("TT Loan").closest("li");
+    expect(row).not.toBeNull();
+    expect(within(row as HTMLElement).getByText("₱6,000")).toBeVisible();
+    expect(within(row as HTMLElement).getByText(/2 payments · Jul 1, Jul 16/)).toBeVisible();
+  });
+
   it("shows an empty state when no debts are due in the window", () => {
     const snapshotWithoutDebts: FinancialSnapshot = { ...defaultSnapshot, debts: [] };
     render(<DashboardOverview snapshot={snapshotWithoutDebts} checks={checks} metrics={metrics} />);

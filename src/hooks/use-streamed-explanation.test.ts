@@ -120,4 +120,24 @@ describe("useStreamedExplanation", () => {
     await waitFor(() => expect(result.current.text).toBe("Cloud text."));
     expect(result.current.usedModel).toBe(true);
   });
+
+  it("falls back when an available client never sends the first token", async () => {
+    const stalled: ModelClient = {
+      id: "cloud",
+      isAvailable: async () => true,
+      generateText: async () => "unused",
+      async *streamText() {
+        await new Promise(() => {});
+      },
+    };
+
+    const { result } = renderHook(() =>
+      useStreamedExplanation({ ...base, clients: [stalled], firstTokenTimeoutMs: 1 })
+    );
+
+    await waitFor(() => expect(result.current.phase).toBe("fallback"));
+    expect(result.current.text).toBe("Deterministic narrative.");
+    expect(result.current.usedModel).toBe(false);
+    expect(result.current.isStreaming).toBe(false);
+  });
 });

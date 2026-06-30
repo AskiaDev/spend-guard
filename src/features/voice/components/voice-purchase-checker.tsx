@@ -53,6 +53,13 @@ const emptyReviewDraft: ReviewDraft = {
 };
 
 const financedPaymentMethods: PaymentMethod[] = ["installment", "loan", "bnpl"];
+const paymentMethodLabels: Record<PaymentMethod, string> = {
+  cash: "Cash",
+  installment: "Installment",
+  credit_card: "Credit card",
+  loan: "Loan",
+  bnpl: "Buy now, pay later",
+};
 const analysisFailureMessage =
   "We couldn’t analyze this purchase yet. Your reviewed details are still here—please try again.";
 // Capture stays open across natural pauses; we only force-stop after this much silence.
@@ -652,29 +659,37 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
                     value={reviewAmount === undefined ? "Not found" : formatCurrency(reviewAmount)}
                   />
                   <ReviewValue
-                    label="Down payment"
-                    value={
-                      reviewDownPayment === undefined
-                        ? "Not found"
-                        : formatCurrency(reviewDownPayment)
-                    }
+                    label="Payment"
+                    value={paymentMethodLabels[reviewDraft.paymentMethod]}
                   />
-                  <ReviewValue
-                    label="Monthly"
-                    value={
-                      reviewMonthlyPayment === undefined
-                        ? "Not found"
-                        : formatCurrency(reviewMonthlyPayment)
-                    }
-                  />
-                  <ReviewValue
-                    label="Term"
-                    value={
-                      reviewDraft.installmentMonths
-                        ? `${reviewDraft.installmentMonths} months`
-                        : "Not found"
-                    }
-                  />
+                  {showFinancingFields ? (
+                    <>
+                      <ReviewValue
+                        label="Down payment"
+                        value={
+                          reviewDownPayment === undefined
+                            ? "Not found"
+                            : formatCurrency(reviewDownPayment)
+                        }
+                      />
+                      <ReviewValue
+                        label="Monthly"
+                        value={
+                          reviewMonthlyPayment === undefined
+                            ? "Not found"
+                            : formatCurrency(reviewMonthlyPayment)
+                        }
+                      />
+                      <ReviewValue
+                        label="Term"
+                        value={
+                          reviewDraft.installmentMonths
+                            ? `${reviewDraft.installmentMonths} months`
+                            : "Not found"
+                        }
+                      />
+                    </>
+                  ) : null}
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -693,17 +708,6 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
                     value={reviewDraft.amount}
                     onChange={(value) => updateReviewField("amount", value)}
                   />
-
-                  <ReviewNumberField
-                    id="voice-down-payment"
-                    label="Down payment"
-                    value={reviewDraft.downPayment}
-                    onChange={(value) => updateReviewField("downPayment", value)}
-                  />
-                  <p className="text-xs text-muted-foreground sm:col-span-2">
-                    Down payment is included in the savings-after-purchase check for financed
-                    purchases.
-                  </p>
 
                   <div className="grid gap-2">
                     <Label htmlFor="voice-payment-method">Payment method</Label>
@@ -749,6 +753,12 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
                   {showFinancingFields ? (
                     <>
                       <ReviewNumberField
+                        id="voice-down-payment"
+                        label="Down payment"
+                        value={reviewDraft.downPayment}
+                        onChange={(value) => updateReviewField("downPayment", value)}
+                      />
+                      <ReviewNumberField
                         id="voice-monthly-payment"
                         label="Monthly payment"
                         value={reviewDraft.monthlyPayment}
@@ -761,6 +771,10 @@ export function VoicePurchaseChecker({ onRunCheck, onSaveVoiceSession }: VoicePu
                         value={reviewDraft.installmentMonths}
                         onChange={(value) => updateReviewField("installmentMonths", value)}
                       />
+                      <p className="text-xs text-muted-foreground sm:col-span-2">
+                        Down payment is included in the savings-after-purchase check for financed
+                        purchases.
+                      </p>
                     </>
                   ) : null}
                 </div>

@@ -1,7 +1,7 @@
 import type { PaymentMethod, PurchaseUrgency, VoicePurchaseDraft } from "@/types/finance";
 
 const amountPattern =
-  /(?:₱|php|peso(?:s)?|for|around|about)\s*([0-9]+(?:\.[0-9]+)?\s*k|[0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?)\b/i;
+  /(?:₱|php|peso(?:s)?|for|around|about|worth|costs?)\s*([0-9]+(?:\.[0-9]+)?\s*k|[0-9]+(?:,[0-9]{3})*(?:\.[0-9]+)?)\b/i;
 
 function parseNumericAmount(value: string): number {
   const trimmed = value.trim().toLowerCase();

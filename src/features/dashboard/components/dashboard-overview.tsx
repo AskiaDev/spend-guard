@@ -94,6 +94,7 @@ export function DashboardOverview({
   const healthStatus = getHealthStatus(metrics.healthScore);
   const now = referenceDate ?? new Date();
   const upcomingDebts = getUpcomingDebts(snapshot.debts, now);
+  const upcomingDebtGroups = groupUpcomingDebts(upcomingDebts);
   const upcomingDebtTotal = getUpcomingDebtTotal(snapshot.debts, now);
   const advisor = generateAdvisorInsight({ metrics, snapshot });
 
@@ -178,23 +179,24 @@ export function DashboardOverview({
                   {formatCurrency(upcomingDebtTotal, currency)}
                 </span>{" "}
                 due across {upcomingDebts.length}{" "}
-                {upcomingDebts.length === 1 ? "payment" : "payments"}
+                {upcomingDebts.length === 1 ? "payment" : "payments"} from{" "}
+                {upcomingDebtGroups.length} {upcomingDebtGroups.length === 1 ? "debt" : "debts"}
               </p>
               <ul className="grid gap-3">
-                {upcomingDebts.map(({ debt, nextDueDate, daysUntilDue }) => (
+                {upcomingDebtGroups.map((group) => (
                   <li
-                    key={`${debt.id}-${nextDueDate}`}
+                    key={group.debt.id}
                     className="flex items-center justify-between gap-3 rounded-control border border-border bg-muted/30 p-4"
                   >
                     <div className="min-w-0">
-                      <p className="font-semibold text-foreground">{debt.label}</p>
+                      <p className="font-semibold text-foreground">{group.debt.label}</p>
                       <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                         <CalendarDays aria-hidden="true" className="size-3.5" />
-                        Due {formatShortDate(nextDueDate)} · {formatDueWindow(daysUntilDue)}
+                        {formatUpcomingDebtDetail(group)}
                       </p>
                     </div>
                     <p className="shrink-0 font-semibold text-foreground">
-                      {formatCurrency(debt.minimumPayment, currency)}
+                      {formatCurrency(group.total, currency)}
                     </p>
                   </li>
                 ))}
@@ -316,6 +318,37 @@ export function DashboardOverview({
   );
 }
 
+type UpcomingDebtItem = ReturnType<typeof getUpcomingDebts>[number];
+
+interface UpcomingDebtGroup {
+  debt: UpcomingDebtItem["debt"];
+  payments: UpcomingDebtItem[];
+  total: number;
+}
+
+function groupUpcomingDebts(items: UpcomingDebtItem[]): UpcomingDebtGroup[] {
+  const byDebtId = new Map<string, UpcomingDebtGroup>();
+
+  for (const item of items) {
+    const previous = byDebtId.get(item.debt.id);
+    const next = previous
+      ? {
+          ...previous,
+          payments: [...previous.payments, item],
+          total: previous.total + item.debt.minimumPayment,
+        }
+      : {
+          debt: item.debt,
+          payments: [item],
+          total: item.debt.minimumPayment,
+        };
+
+    byDebtId.set(item.debt.id, next);
+  }
+
+  return [...byDebtId.values()];
+}
+
 const healthStatusPresentation: Record<
   HealthStatus,
   { Icon: typeof ShieldCheck; className: string }
@@ -358,6 +391,16 @@ function formatDueWindow(daysUntilDue: number) {
   }
 
   return `In ${daysUntilDue} days`;
+}
+
+function formatUpcomingDebtDetail(group: UpcomingDebtGroup) {
+  if (group.payments.length === 1) {
+    const [payment] = group.payments;
+    return `Due ${formatShortDate(payment.nextDueDate)} · ${formatDueWindow(payment.daysUntilDue)}`;
+  }
+
+  const dates = group.payments.map((payment) => formatShortDate(payment.nextDueDate)).join(", ");
+  return `${group.payments.length} payments · ${dates}`;
 }
 
 function ActionLink({

@@ -40,6 +40,17 @@ describe("voice and money parsers", () => {
     });
   });
 
+  it("extracts worth-style cash purchases", () => {
+    expect(
+      extractPurchaseFromTranscript("I want to buy mac mini m2 worth 105,000 pesos cash")
+    ).toMatchObject({
+      itemName: "mac mini m2",
+      amount: 105000,
+      paymentMethod: "cash",
+      urgency: "want",
+    });
+  });
+
   it("removes the full indefinite article from a supplied-style product name", () => {
     expect(
       extractPurchaseFromTranscript(

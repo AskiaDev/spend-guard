@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { resolveModelClients } from "@/lib/ai/resolve-model-clients";
 import type { ModelClient } from "@/lib/ai/types";
 
+export const FIRST_TOKEN_TIMEOUT_MS = 8_000;
+
 export type StreamedExplanationPhase =
   | "idle"
   | "checking"
@@ -27,6 +29,26 @@ interface UseStreamedExplanationArgs {
   fallback: string;
   /** Injectable for tests; defaults to the env-resolved chain. Pass a stable `[]` to disable. */
   clients?: ModelClient[];
+  /** Test seam for stalled providers; production keeps the default timeout. */
+  firstTokenTimeoutMs?: number;
+}
+
+function nextWithTimeout(
+  iterator: AsyncIterator<string>,
+  timeoutMs: number
+): Promise<IteratorResult<string>> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeout = new Promise<IteratorResult<string>>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new Error("advisor explanation timed out before the first token")),
+      timeoutMs
+    );
+  });
+
+  return Promise.race([iterator.next(), timeout]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
 }
 
 /**
@@ -42,6 +64,7 @@ export function useStreamedExplanation({
   prompt,
   fallback,
   clients,
+  firstTokenTimeoutMs = FIRST_TOKEN_TIMEOUT_MS,
 }: UseStreamedExplanationArgs): StreamedExplanation {
   const [text, setText] = useState(fallback);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -75,8 +98,14 @@ export function useStreamedExplanation({
           let accumulated = "";
           let started = false;
           setPhase("preparing");
-          for await (const chunk of client.streamText({ system, prompt })) {
+          const iterator = client.streamText({ system, prompt })[Symbol.asyncIterator]();
+          while (true) {
+            const next = started
+              ? await iterator.next()
+              : await nextWithTimeout(iterator, firstTokenTimeoutMs);
             if (cancelled) return;
+            if (next.done) break;
+            const chunk = next.value;
             accumulated += chunk;
             if (!accumulated.trim()) continue;
             if (!started) {
@@ -116,7 +145,7 @@ export function useStreamedExplanation({
     return () => {
       cancelled = true;
     };
-  }, [system, prompt, fallback, clients]);
+  }, [system, prompt, fallback, clients, firstTokenTimeoutMs]);
 
   return { text, isStreaming, usedModel, phase };
 }

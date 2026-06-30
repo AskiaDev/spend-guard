@@ -1,14 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { StepProgress } from "@/components/finance/step-progress";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DatePicker } from "@/components/ui/date-picker";
-import { Input, Label, Textarea } from "@/components/ui/form-fields";
+import { Input, Label } from "@/components/ui/form-fields";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
@@ -48,7 +46,7 @@ interface PurchaseWizardValues {
 type PurchaseWizardErrors = Partial<Record<keyof PurchaseWizardValues, string>>;
 type SubmitPhase = "idle" | "validating" | "saving" | "opening";
 
-const steps = [{ label: "Product details" }, { label: "Motivation" }, { label: "Payment" }];
+const steps = [{ label: "Purchase" }, { label: "Decision details" }];
 
 const financedPaymentMethods: PaymentMethod[] = ["installment", "loan", "bnpl"];
 
@@ -127,21 +125,6 @@ function trimmedStringOrUndefined(value: string): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-function isIsoDate(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-
-  return (
-    date.getUTCFullYear() === year &&
-    date.getUTCMonth() === month - 1 &&
-    date.getUTCDate() === day
-  );
-}
-
 function isFinancedPaymentMethod(paymentMethod: PaymentMethod) {
   return financedPaymentMethods.includes(paymentMethod);
 }
@@ -154,15 +137,19 @@ function buildPurchaseInput(values: PurchaseWizardValues): PurchaseInput {
   const purchase: PurchaseInput = {
     itemName: values.itemName.trim(),
     amount: values.amount,
-    category: values.category,
     urgency: values.urgency,
     paymentMethod: values.paymentMethod,
     currentAlternativeStillWorks: values.currentAlternativeWorks === "yes",
     isIncomeGenerating: values.incomeGeneration === "yes",
   };
+  const category = trimmedStringOrUndefined(values.category);
   const saleDeadline = trimmedStringOrUndefined(values.saleDeadline);
   const location = trimmedStringOrUndefined(values.location);
   const notes = trimmedStringOrUndefined(values.notes);
+
+  if (category) {
+    purchase.category = category;
+  }
 
   if (saleDeadline) {
     purchase.saleDeadline = saleDeadline;
@@ -242,7 +229,7 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
   const submitLoadingText = submitStatus ?? "Validating details...";
 
   useEffect(() => {
-    if (currentStep === 3) {
+    if (currentStep === 2) {
       router.prefetch("/checker/result");
     }
   }, [currentStep, router]);
@@ -259,51 +246,11 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
       nextErrors.amount = "Enter a positive price.";
     }
 
-    if (!values.category) {
-      nextErrors.category = "Choose a category.";
-    }
-
-    if (values.saleDeadline && !isIsoDate(values.saleDeadline)) {
-      nextErrors.saleDeadline = "Enter a valid sale deadline.";
-    }
-
-    if (values.location.trim().length > 120) {
-      nextErrors.location = "Keep the location under 120 characters.";
-    }
-
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   }
 
   function validateStepTwo() {
-    const values = getValues();
-    const nextErrors: PurchaseWizardErrors = {};
-
-    if (!values.reason.trim()) {
-      nextErrors.reason = "Add why you are considering this purchase.";
-    }
-
-    if (values.notes.trim().length > 1000) {
-      nextErrors.notes = "Keep notes under 1000 characters.";
-    }
-
-    if (!values.alternative.trim()) {
-      nextErrors.alternative = "Add the best alternative.";
-    }
-
-    if (!values.currentAlternativeWorks) {
-      nextErrors.currentAlternativeWorks = "Choose whether the current alternative still works.";
-    }
-
-    if (!values.incomeGeneration) {
-      nextErrors.incomeGeneration = "Choose whether this can generate income.";
-    }
-
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
-  }
-
-  function validateStepThree() {
     const values = getValues();
     const nextErrors: PurchaseWizardErrors = {};
 
@@ -338,15 +285,6 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
     }
   }
 
-  function continueFromStepTwo() {
-    setAnalysisError(null);
-    setDraftMessage(null);
-
-    if (validateStepTwo()) {
-      setCurrentStep(3);
-    }
-  }
-
   function goBack() {
     setAnalysisError(null);
     setDraftMessage(null);
@@ -354,32 +292,12 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
     setCurrentStep((step) => Math.max(1, step - 1));
   }
 
-  async function submit(values: PurchaseWizardValues) {
-    if (currentStep === 1) {
-      continueFromStepOne();
-      return;
-    }
-
-    if (currentStep === 2) {
-      continueFromStepTwo();
-      return;
-    }
-
-    setDraftMessage(null);
-    setAnalysisError(null);
-
+  async function runCheck(values: PurchaseWizardValues) {
     if (submitInFlightRef.current) {
       return;
     }
 
     submitInFlightRef.current = true;
-    setSubmitPhase("validating");
-
-    if (!validateStepThree()) {
-      submitInFlightRef.current = false;
-      setSubmitPhase("idle");
-      return;
-    }
 
     try {
       setSubmitPhase("saving");
@@ -391,6 +309,24 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
       setSubmitPhase("idle");
       setAnalysisError(failureMessage);
     }
+  }
+
+  async function submit(values: PurchaseWizardValues) {
+    if (currentStep === 1) {
+      continueFromStepOne();
+      return;
+    }
+
+    setDraftMessage(null);
+    setAnalysisError(null);
+    setSubmitPhase("validating");
+
+    if (!validateStepTwo()) {
+      setSubmitPhase("idle");
+      return;
+    }
+
+    await runCheck(values);
   }
 
   return (
@@ -456,11 +392,9 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
                         <SelectTrigger
                           id="purchase-category"
                           className="w-full"
-                          aria-describedby={errors.category ? errorIds.category : undefined}
-                          aria-invalid={errors.category ? "true" : undefined}
                           onBlur={field.onBlur}
                         >
-                          <SelectValue placeholder="Choose a category" />
+                          <SelectValue placeholder="Optional" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="phone">Phone</SelectItem>
@@ -473,43 +407,6 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
                       </Select>
                     )}
                   />
-                  <FieldErrorText id={errorIds.category}>{errors.category}</FieldErrorText>
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label htmlFor="purchase-sale-deadline">Sale deadline</Label>
-                  <Controller
-                    control={control}
-                    name="saleDeadline"
-                    render={({ field }) => (
-                      <DatePicker
-                        id="purchase-sale-deadline"
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        ariaInvalid={errors.saleDeadline ? true : undefined}
-                        ariaDescribedBy={
-                          errors.saleDeadline ? errorIds.saleDeadline : undefined
-                        }
-                      />
-                    )}
-                  />
-                  <FieldErrorText id={errorIds.saleDeadline}>
-                    {errors.saleDeadline}
-                  </FieldErrorText>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label htmlFor="purchase-location">Location</Label>
-                  <Input
-                    id="purchase-location"
-                    aria-describedby={errors.location ? errorIds.location : undefined}
-                    aria-invalid={errors.location ? "true" : undefined}
-                    placeholder="Makati showroom"
-                    {...register("location")}
-                  />
-                  <FieldErrorText id={errorIds.location}>{errors.location}</FieldErrorText>
                 </div>
               </div>
             </section>
@@ -519,39 +416,15 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
             <section className="grid gap-4" aria-labelledby="purchase-checker-step-two">
               <div>
                 <h2 id="purchase-checker-step-two" className="text-lg font-semibold text-foreground">
-                  Motivation
+                  Decision details
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Capture the why, timing, and fallback before choosing how to pay.
+                  Confirm timing and payment details before SpendGuard analyzes the purchase.
                 </p>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="purchase-reason">Reason for purchase</Label>
-                <Textarea
-                  id="purchase-reason"
-                  aria-describedby={errors.reason ? errorIds.reason : undefined}
-                  aria-invalid={errors.reason ? "true" : undefined}
-                  placeholder="work and family photos"
-                  {...register("reason")}
-                />
-                <FieldErrorText id={errorIds.reason}>{errors.reason}</FieldErrorText>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="purchase-notes">Notes</Label>
-                <Textarea
-                  id="purchase-notes"
-                  aria-describedby={errors.notes ? errorIds.notes : undefined}
-                  aria-invalid={errors.notes ? "true" : undefined}
-                  placeholder="delivery, warranty, discount details"
-                  {...register("notes")}
-                />
-                <FieldErrorText id={errorIds.notes}>{errors.notes}</FieldErrorText>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="grid gap-2">
+              <div className="grid gap-5">
+                <div className="grid max-w-xl gap-2">
                   <Label htmlFor="purchase-urgency">Urgency</Label>
                   <Controller
                     control={control}
@@ -572,146 +445,30 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
                   />
                 </div>
 
-                <div className="grid gap-2">
-                  <Label htmlFor="purchase-alternative">Best alternative</Label>
-                  <Textarea
-                    id="purchase-alternative"
-                    aria-describedby={errors.alternative ? errorIds.alternative : undefined}
-                    aria-invalid={errors.alternative ? "true" : undefined}
-                    placeholder="keep current phone"
-                    {...register("alternative")}
+                <fieldset className="grid gap-3">
+                  <legend className="text-sm font-medium text-foreground">Payment method</legend>
+                  <Controller
+                    control={control}
+                    name="paymentMethod"
+                    render={({ field }) => (
+                      <RadioGroup
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5"
+                      >
+                        {paymentOptions.map((option) => (
+                          <RadioCard
+                            key={option.value}
+                            description={option.description}
+                            label={option.label}
+                            value={option.value}
+                          />
+                        ))}
+                      </RadioGroup>
+                    )}
                   />
-                  <FieldErrorText id={errorIds.alternative}>{errors.alternative}</FieldErrorText>
-                </div>
+                </fieldset>
               </div>
-
-              <fieldset
-                aria-describedby={
-                  errors.currentAlternativeWorks ? errorIds.currentAlternativeWorks : undefined
-                }
-                aria-invalid={errors.currentAlternativeWorks ? "true" : undefined}
-                className="grid gap-3"
-              >
-                <legend className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
-                  Current alternative
-                </legend>
-                <Controller
-                  control={control}
-                  name="currentAlternativeWorks"
-                  render={({ field }) => (
-                    <RadioGroup
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      className="grid gap-3 md:grid-cols-2"
-                    >
-                      <RadioCard
-                        description="The current option can still cover the need."
-                        label="Yes, it still works"
-                        value="yes"
-                      />
-                      <RadioCard
-                        description="The current option no longer covers the need."
-                        label="No, it does not work"
-                        value="no"
-                      />
-                    </RadioGroup>
-                  )}
-                />
-                <FieldErrorText id={errorIds.currentAlternativeWorks}>
-                  {errors.currentAlternativeWorks}
-                </FieldErrorText>
-              </fieldset>
-
-              <fieldset
-                aria-describedby={
-                  errors.incomeGeneration ? errorIds.incomeGeneration : undefined
-                }
-                aria-invalid={errors.incomeGeneration ? "true" : undefined}
-                className="grid gap-3"
-              >
-                <legend className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
-                  Income generation
-                </legend>
-                <Controller
-                  control={control}
-                  name="incomeGeneration"
-                  render={({ field }) => (
-                    <RadioGroup
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      className="grid gap-3 md:grid-cols-2"
-                    >
-                      <RadioCard
-                        description="This purchase may directly support earning money."
-                        label="Yes, this can generate income"
-                        value="yes"
-                      />
-                      <RadioCard
-                        description="This is mainly for personal use or quality of life."
-                        label="No, this is personal use"
-                        value="no"
-                      />
-                    </RadioGroup>
-                  )}
-                />
-                <FieldErrorText id={errorIds.incomeGeneration}>
-                  {errors.incomeGeneration}
-                </FieldErrorText>
-              </fieldset>
-            </section>
-          ) : null}
-
-          {currentStep === 3 ? (
-            <section className="grid gap-4" aria-labelledby="purchase-checker-step-three">
-              <div>
-                <h2 id="purchase-checker-step-three" className="text-lg font-semibold text-foreground">
-                  Payment
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Choose the payment method and add any recurring payment details.
-                </p>
-              </div>
-
-              <div className="grid gap-4 rounded-control border border-primary/15 bg-primary/5 p-4 md:grid-cols-[auto_1fr] md:items-center">
-                <Image
-                  src="/illustrations/payment-info.svg"
-                  alt="Person entering payment details"
-                  width={220}
-                  height={180}
-                  loading="eager"
-                  className="hidden h-auto w-36 md:block"
-                />
-                <p className="text-sm leading-6 text-muted-foreground">
-                  Payment method changes the real monthly risk. Add installment, loan, or
-                  buy-now-pay-later amounts before SpendGuard analyzes the purchase.
-                </p>
-              </div>
-
-              <fieldset className="grid gap-3">
-                <legend className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
-                  Payment method
-                </legend>
-                <Controller
-                  control={control}
-                  name="paymentMethod"
-                  render={({ field }) => (
-                    <RadioGroup
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      className="grid gap-3 lg:grid-cols-5 md:grid-cols-2"
-                    >
-                      {paymentOptions.map((option) => (
-                        <RadioCard
-                          key={option.value}
-                          description={option.description}
-                          label={option.label}
-                          value={option.value}
-                        />
-                      ))}
-                    </RadioGroup>
-                  )}
-                />
-              </fieldset>
 
               {showPaymentSchedule ? (
                 <div className="grid gap-4 md:grid-cols-3">
@@ -767,6 +524,73 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
                 </div>
               ) : null}
 
+              <div className="grid gap-4 rounded-control border border-border bg-muted/20 p-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Optional context</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    These answers refine the risk score but are not required.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <fieldset className="grid gap-3">
+                    <legend className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                      Current alternative
+                    </legend>
+                    <Controller
+                      control={control}
+                      name="currentAlternativeWorks"
+                      render={({ field }) => (
+                        <RadioGroup
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          className="grid gap-3"
+                        >
+                          <RadioCard
+                            description="The current option can still cover the need."
+                            label="Yes, it still works"
+                            value="yes"
+                          />
+                          <RadioCard
+                            description="The current option no longer covers the need."
+                            label="No, it does not work"
+                            value="no"
+                          />
+                        </RadioGroup>
+                      )}
+                    />
+                  </fieldset>
+
+                  <fieldset className="grid gap-3">
+                    <legend className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">
+                      Income generation
+                    </legend>
+                    <Controller
+                      control={control}
+                      name="incomeGeneration"
+                      render={({ field }) => (
+                        <RadioGroup
+                          value={field.value}
+                          onValueChange={field.onChange}
+                          className="grid gap-3"
+                        >
+                          <RadioCard
+                            description="This purchase may directly support earning money."
+                            label="Yes, this can generate income"
+                            value="yes"
+                          />
+                          <RadioCard
+                            description="This is mainly for personal use or quality of life."
+                            label="No, this is personal use"
+                            value="no"
+                          />
+                        </RadioGroup>
+                      )}
+                    />
+                  </fieldset>
+                </div>
+              </div>
+
               {analysisError ? (
                 <p
                   className="rounded-control border border-risk/30 bg-risk/10 px-3 py-2 text-sm font-medium text-risk"
@@ -808,32 +632,13 @@ export function PurchaseCheckerWizard({ onRunCheck }: PurchaseCheckerWizardProps
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {currentStep === 3 ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => {
-                    setAnalysisError(null);
-                    setDraftMessage("Draft saved in this form until you leave the page.");
-                  }}
-                >
-                  Save Draft
-                </Button>
-              ) : null}
-
               {currentStep === 1 ? (
-                <Button type="button" onClick={continueFromStepOne}>
+                <Button type="button" variant="secondary" onClick={continueFromStepOne}>
                   Continue
                 </Button>
               ) : null}
 
               {currentStep === 2 ? (
-                <Button type="button" onClick={continueFromStepTwo}>
-                  Continue
-                </Button>
-              ) : null}
-
-              {currentStep === 3 ? (
                 <Button
                   type="submit"
                   disabled={isSubmitBusy}

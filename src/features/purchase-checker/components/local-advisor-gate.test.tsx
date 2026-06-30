@@ -42,7 +42,22 @@ describe("LocalAdvisorGate", () => {
     );
 
     expect(await screen.findByRole("alert")).toHaveTextContent("WebGPU is not available");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "This browser or installed PWA cannot download the on-device advisor model"
+    );
     expect(screen.queryByText("checker form")).not.toBeInTheDocument();
+  });
+
+  it("keeps the checker usable when a fallback advisor provider is configured", async () => {
+    render(
+      <LocalAdvisorGate providerSpec="local,cloud" client={client({ available: false })}>
+        <div>checker form</div>
+      </LocalAdvisorGate>
+    );
+
+    expect(await screen.findByText("checker form")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("WebGPU is not available");
+    expect(screen.getByRole("alert")).toHaveTextContent("fallback advisor path");
   });
 
   it("asks the user to download the model before showing the checker", async () => {
@@ -61,6 +76,25 @@ describe("LocalAdvisorGate", () => {
     await user.click(screen.getByRole("button", { name: /download model/i }));
 
     await waitFor(() => expect(screen.getByText("checker form")).toBeInTheDocument());
+    expect(localClient.generateText).toHaveBeenCalledOnce();
+  });
+
+  it("offers local model download without blocking when a fallback is configured", async () => {
+    const localClient = client();
+    const user = userEvent.setup();
+
+    render(
+      <LocalAdvisorGate providerSpec="local,cloud" client={localClient}>
+        <div>checker form</div>
+      </LocalAdvisorGate>
+    );
+
+    expect(await screen.findByText("checker form")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /download model/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /download model/i }));
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: /download model/i })).not.toBeInTheDocument());
     expect(localClient.generateText).toHaveBeenCalledOnce();
   });
 

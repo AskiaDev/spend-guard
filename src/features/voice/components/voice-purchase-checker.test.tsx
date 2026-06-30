@@ -305,6 +305,25 @@ describe("VoicePurchaseChecker", () => {
     expect(screen.queryByDisplayValue("40000")).not.toBeInTheDocument();
   });
 
+  it("hides financing review fields for cash purchases", async () => {
+    const user = userEvent.setup();
+
+    render(<VoicePurchaseChecker onRunCheck={vi.fn()} />);
+    await user.type(
+      screen.getByLabelText(/purchase transcript/i),
+      "I want to buy mac mini m2 worth 105,000 pesos cash"
+    );
+    await user.click(screen.getByRole("button", { name: /review extracted details/i }));
+
+    const review = screen.getByRole("region", { name: /purchase details to review/i });
+    expect(within(review).getByText("₱105,000")).toBeVisible();
+    expect(screen.getByLabelText(/payment method/i)).toHaveTextContent("Cash");
+    expect(screen.queryByLabelText(/down payment/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/monthly payment/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/term.*months/i)).not.toBeInTheDocument();
+    expect(within(review).queryByText(/down payment/i)).not.toBeInTheDocument();
+  });
+
   it("shows Not found instead of ₱0 when numeric review fields are blank", async () => {
     const user = userEvent.setup();
 
