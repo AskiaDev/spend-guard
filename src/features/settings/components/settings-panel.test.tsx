@@ -93,7 +93,6 @@ describe("SettingsPanel", () => {
     renderSettingsPanel({ onUpdateProfile });
 
     await user.clear(screen.getByLabelText("Monthly income"));
-    await user.type(screen.getByLabelText("Monthly income"), "-1");
     await user.clear(screen.getByLabelText("Current savings"));
     await user.click(screen.getByRole("button", { name: "Save Settings" }));
 

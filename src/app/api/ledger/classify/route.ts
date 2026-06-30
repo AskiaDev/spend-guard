@@ -1,14 +1,16 @@
 import { generateObject } from "ai";
 
 import { resolveServerModel } from "@/lib/ai/model-spec";
-import { isAutoConfirmEligible } from "@/features/ledger/lib/auto-confirm";
-import { LEDGER_CATEGORIES, ledgerCandidateSchema } from "@/lib/schemas/ledger";
+import { LEDGER_CATEGORIES, ledgerCandidateBatchSchema } from "@/lib/schemas/ledger";
 import { requireUserId } from "@/lib/supabase/server";
 
 const CLASSIFY_PROMPT = [
-  "You are reading a single financial transaction from a receipt or e-wallet/bank",
-  "screenshot (GCash, GoTyme, Maya, Maribank, SeaBank, or a Philippine bank).",
-  "Extract exactly one transaction.",
+  "You are reading financial transactions from a receipt, e-wallet screenshot,",
+  "bank screenshot, or bank statement PDF (GCash, GoTyme, Maya, Maribank,",
+  "SeaBank, or a Philippine bank).",
+  "Extract every visible transaction. For a single receipt, return one transaction.",
+  "For bank statements with many dated rows, return one item per transaction row;",
+  "do not summarize totals or collapse rows into one transaction.",
   "- amount: the transaction total, a positive number, no currency symbol.",
   "- direction: 'income' if money came in, 'expense' if money went out.",
   "- occurredAt: the transaction date as YYYY-MM-DD, or null if not visible.",
@@ -58,25 +60,34 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const bytes = new Uint8Array(await image.arrayBuffer());
+  const uploadPart =
+    image.type === "application/pdf"
+      ? {
+          type: "file" as const,
+          data: bytes,
+          filename: image.name,
+          mediaType: image.type,
+        }
+      : { type: "image" as const, image: bytes, mediaType: image.type };
 
   try {
-    const { object: candidate } = await generateObject({
+    const { object } = await generateObject({
       model,
-      schema: ledgerCandidateSchema,
-      schemaName: "LedgerTransactionCandidate",
-      schemaDescription: "One financial transaction extracted from a receipt or wallet screenshot.",
+      schema: ledgerCandidateBatchSchema,
+      schemaName: "LedgerTransactionBatch",
+      schemaDescription: "Financial transactions extracted from one upload.",
       messages: [
         {
           role: "user",
           content: [
             { type: "text", text: CLASSIFY_PROMPT },
-            { type: "image", image: bytes, mediaType: image.type },
+            uploadPart,
           ],
         },
       ],
     });
 
-    return Response.json({ candidate, autoConfirm: isAutoConfirmEligible(candidate) });
+    return Response.json({ candidates: object.transactions });
   } catch {
     // Model could not produce a schema-valid object (bad image, refusal, etc.).
     return Response.json({ error: "Could not read this image." }, { status: 422 });

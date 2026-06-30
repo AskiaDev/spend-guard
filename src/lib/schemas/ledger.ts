@@ -34,6 +34,10 @@ export const ledgerCandidateSchema = z.object({
 
 export type LedgerCandidate = z.infer<typeof ledgerCandidateSchema>;
 
+export const ledgerCandidateBatchSchema = z.object({
+  transactions: z.array(ledgerCandidateSchema).min(1),
+});
+
 const reviewedEntrySchema = z.object({
   occurredAt: z
     .string()

@@ -66,7 +66,10 @@ const steps: Array<{ id: StepId; label: string; title: string }> = [
 
 const currencySchema = z.enum(["PHP", "USD", "EUR", "JPY", "SGD"]);
 const payFrequencySchema = z.enum(PAY_FREQUENCIES);
-const money = z.coerce.number().min(0, "Enter a positive amount.");
+const money = z.preprocess(
+  (value) => (value === "" || value === null || value === undefined ? undefined : value),
+  z.coerce.number("Enter a positive amount.").min(0, "Enter a positive amount.")
+);
 const incomeSchema = z.object({
   currency: currencySchema,
   fullName: z.string().trim().max(120, "Keep the name under 120 characters.").optional(),

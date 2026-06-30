@@ -2,7 +2,7 @@
 
 import { Upload } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState } from "react";
+import { type DragEvent, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import {
 import { financialWorkspaceKeys } from "@/features/financial-profile/api/financial-workspace-query";
 import { confirmLedgerEntriesAction } from "@/features/ledger/api/confirm-ledger-entries";
 import { ledgerKeys } from "@/features/ledger/api/ledger-queries";
+import { isAutoConfirmEligible } from "@/features/ledger/lib/auto-confirm";
 import { mapWithConcurrency } from "@/features/ledger/lib/map-with-concurrency";
 import {
   LEDGER_CATEGORIES,
@@ -30,7 +31,7 @@ import { cn } from "@/lib/utils";
 // ponytail: CONCURRENCY=3 matches the spec constraint (plan global §processing option A)
 const CONCURRENCY = 3;
 
-const ACCEPTED_FORMATS = "GCash, bank, or receipt images - PNG, JPEG, WebP, or PDF";
+const ACCEPTED_FORMATS = "GCash, bank statements, or receipts - PNG, JPEG, WebP, or PDF";
 
 type Row = {
   sourceRef: string;
@@ -72,7 +73,7 @@ function failedRow(fileName: string): Row {
   };
 }
 
-async function classifyFile(file: File): Promise<Row> {
+async function classifyFile(file: File): Promise<Row[]> {
   // Per-item isolation: any failure (non-ok OR a thrown fetch/parse error from
   // an offline or dropped connection) fails only this tile, never the batch.
   try {
@@ -80,12 +81,14 @@ async function classifyFile(file: File): Promise<Row> {
     body.append("image", file);
     const response = await fetch("/api/ledger/classify", { method: "POST", body });
     if (!response.ok) {
-      return failedRow(file.name);
+      return [failedRow(file.name)];
     }
-    const data = (await response.json()) as { candidate: LedgerCandidate; autoConfirm: boolean };
-    return toRow(file.name, data.candidate, data.autoConfirm);
+    const data = (await response.json()) as { candidates: LedgerCandidate[] };
+    return data.candidates.map((candidate) =>
+      toRow(file.name, candidate, isAutoConfirmEligible(candidate))
+    );
   } catch {
-    return failedRow(file.name);
+    return [failedRow(file.name)];
   }
 }
 
@@ -102,6 +105,7 @@ export function ImportWizard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const confirmMutation = useMutation({
     mutationFn: (input: Parameters<typeof confirmLedgerEntriesAction>[0]) =>
       confirmLedgerEntriesAction(input),
@@ -115,7 +119,7 @@ export function ImportWizard() {
     },
   });
 
-  async function handleFiles(files: FileList | null) {
+  async function handleFiles(files: FileList | File[] | null) {
     if (!files || files.length === 0) return;
     const list = Array.from(files);
     // Reset so the same files can be re-selected after correction
@@ -128,14 +132,20 @@ export function ImportWizard() {
     setTotal(list.length);
 
     const processed = await mapWithConcurrency(list, CONCURRENCY, async (file) => {
-      const row = await classifyFile(file);
+      const fileRows = await classifyFile(file);
       setDone((value) => value + 1);
-      setRows((current) => [...current, row]);
-      return row;
+      setRows((current) => [...current, ...fileRows]);
+      return fileRows;
     });
 
     setBusy(false);
     void processed;
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragging(false);
+    if (!isBusy) void handleFiles(event.dataTransfer.files);
   }
 
   function patch(index: number, change: Partial<Row>) {
@@ -189,17 +199,25 @@ export function ImportWizard() {
       <Card>
         <CardContent className="grid gap-4">
           <div
+            data-testid="import-drop-zone"
             aria-hidden="true"
             className={cn(
               "flex cursor-pointer flex-col items-center gap-3 rounded-[var(--radius)] border border-dashed border-primary/30 px-6 py-10 text-center transition-colors",
               "hover:border-primary/60 hover:bg-primary/5",
+              isDragging && "border-primary/70 bg-primary/10",
               isBusy && "pointer-events-none opacity-50"
             )}
+            onDragLeave={() => setIsDragging(false)}
+            onDragOver={(event) => {
+              event.preventDefault();
+              if (!isBusy) setIsDragging(true);
+            }}
+            onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
           >
             <Upload className="size-10 text-primary" aria-hidden="true" />
             <div className="grid gap-1">
-              <p className="text-sm font-semibold text-foreground">Select screenshots to import</p>
+              <p className="text-sm font-semibold text-foreground">Drop files to import</p>
               <p className="text-xs text-muted-foreground">{ACCEPTED_FORMATS}</p>
             </div>
           </div>

@@ -47,7 +47,6 @@ describe("OnboardingSetup", () => {
 
     const income = screen.getByLabelText("Monthly income");
     await user.clear(income);
-    await user.type(income, "-1");
     await user.click(screen.getByRole("button", { name: "Continue" }));
 
     expect(await screen.findByText(/enter a positive amount/i)).toBeVisible();

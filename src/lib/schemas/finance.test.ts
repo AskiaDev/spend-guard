@@ -128,6 +128,17 @@ describe("financialProfileSchema", () => {
       })
     ).toThrow();
   });
+
+  it("rejects blank required money values", () => {
+    expect(() =>
+      financialProfileSchema.parse({
+        currency: "PHP",
+        monthlyIncome: "",
+        currentSavings: 130_000,
+        emergencyFundTarget: 240_000,
+      })
+    ).toThrow("Enter a positive amount.");
+  });
 });
 
 describe("purchaseInputSchema", () => {

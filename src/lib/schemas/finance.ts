@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { PAY_FREQUENCIES, RECURRING_CADENCES } from "@/types/finance";
 
-const money = z.coerce.number().min(0, "Enter a positive amount.");
+const money = z.preprocess(
+  (value) => (value === "" || value === null || value === undefined ? undefined : value),
+  z.coerce.number("Enter a positive amount.").min(0, "Enter a positive amount.")
+);
 const dueDay = z.coerce.number().int().min(1).max(31);
 const nonBlankArrayItem = z.string().trim().min(1);
 const emptyToUndefined = (value: unknown) =>

@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import { Button } from "./button";
 import { Card } from "./card";
@@ -30,6 +30,31 @@ describe("SpendGuard UI primitives", () => {
     );
 
     expect(screen.getByLabelText("Price")).toHaveAttribute("id", "price");
+  });
+
+  it("blocks sign and exponent keys for non-negative number inputs", () => {
+    render(<Input aria-label="Amount" type="number" min="0" />);
+
+    const amount = screen.getByLabelText("Amount");
+
+    expect(fireEvent.keyDown(amount, { key: "-" })).toBe(false);
+    expect(fireEvent.keyDown(amount, { key: "e" })).toBe(false);
+  });
+
+  it("sanitizes pasted non-negative number input before change handlers run", () => {
+    const changedValues: string[] = [];
+    const onChange = vi.fn((event: React.ChangeEvent<HTMLInputElement>) => {
+      changedValues.push(event.currentTarget.value);
+    });
+    render(<Input aria-label="Amount" type="number" min="0" onChange={onChange} />);
+
+    const amount = screen.getByLabelText("Amount") as HTMLInputElement;
+
+    fireEvent.change(amount, { target: { value: "1e-2" } });
+
+    expect(amount.value).toBe("12");
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(changedValues).toEqual(["12"]);
   });
 
   it("exposes named progressbar semantics and a numeric value", () => {

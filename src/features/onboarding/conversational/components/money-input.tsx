@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  isBlockedNonNegativeNumberKey,
+  sanitizeNonNegativeNumberInput,
+} from "@/lib/forms/non-negative-number-input";
 import type { CurrencyCode } from "@/types/finance";
 import { VaultField } from "../../vault/components/primitives/vault-field";
 
@@ -33,7 +37,12 @@ export function MoneyInput({
           id={id}
           inputMode="decimal"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => onChange(sanitizeNonNegativeNumberInput(e.target.value))}
+          onKeyDown={(event) => {
+            if (isBlockedNonNegativeNumberKey(event.key)) {
+              event.preventDefault();
+            }
+          }}
           autoFocus={autoFocus}
           className="flex-1 bg-transparent border-none text-foreground text-[13px] py-[10px] px-[13px] outline-none w-full box-border"
         />
