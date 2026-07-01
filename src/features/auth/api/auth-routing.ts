@@ -1,4 +1,4 @@
-const PUBLIC_PATHS = new Set(["/login", "/signup", "/offline"]);
+const PUBLIC_PATHS = new Set(["/", "/login", "/signup", "/offline"]);
 const ONBOARDING_PATH = "/onboarding";
 const EXPLORE_PATH = "/explore";
 const ONBOARDING_ALLOWED_PATHS = new Set([ONBOARDING_PATH, EXPLORE_PATH, "/offline"]);
@@ -29,7 +29,7 @@ export function getAuthRedirect(
 
   // Authenticated and onboarded: keep them out of the setup/auth entry pages.
   if (AWAY_FROM_WHEN_ONBOARDED.has(pathname)) {
-    return "/";
+    return "/dashboard";
   }
 
   return null;

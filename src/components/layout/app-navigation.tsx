@@ -17,7 +17,7 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const primaryNavigation = [
-  { href: "/", label: "Dashboard", mobileLabel: "Home", icon: House },
+  { href: "/dashboard", label: "Dashboard", mobileLabel: "Home", icon: House },
   { href: "/checker", label: "Purchase Checker", mobileLabel: "Checker", icon: SearchCheck },
   { href: "/goals", label: "Goals", mobileLabel: "Goals", icon: Target },
   { href: "/cooldown", label: "Cooldown", mobileLabel: "More", icon: Menu },
