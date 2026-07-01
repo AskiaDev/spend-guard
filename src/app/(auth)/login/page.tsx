@@ -1,5 +1,5 @@
 import { env } from "@/config/env";
-import { AuthForm } from "@/features/auth";
+import { AuthScreen } from "@/features/auth";
 import { signInAction } from "@/features/auth/api/actions";
 
 export default async function LoginPage({
@@ -15,5 +15,5 @@ export default async function LoginPage({
       ? "The confirmation link is invalid or expired. Request a new signup email."
       : undefined;
 
-  return <AuthForm mode="login" action={signInAction} notice={notice} />;
+  return <AuthScreen mode="login" action={signInAction} notice={notice} />;
 }
