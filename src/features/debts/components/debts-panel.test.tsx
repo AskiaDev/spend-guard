@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { financialSnapshotFixture } from "@/test/fixtures/financial-snapshot";
 import type { Debt } from "@/types/finance";
@@ -36,6 +36,10 @@ function renderDebtsPanel({
 }
 
 describe("DebtsPanel", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("renders debt summary and editable debt cards", () => {
     renderDebtsPanel();
 
@@ -82,6 +86,9 @@ describe("DebtsPanel", () => {
   });
 
   it("creates a biweekly debt from the form", async () => {
+    // The due-date picker defaults to the current month, so freeze "now" for a stable date.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-06-15"));
     const user = userEvent.setup();
     const onCreateDebt = vi.fn().mockResolvedValue(undefined);
     renderDebtsPanel({ onCreateDebt });

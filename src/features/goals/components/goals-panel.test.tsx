@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("goey-toast", () => ({ gooeyToast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -56,6 +56,10 @@ async function openGoalDrawer(user: ReturnType<typeof userEvent.setup>, goalLabe
 }
 
 describe("GoalsPanel", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("renders summary metrics, a scannable goal list, and advisor guidance", () => {
     renderGoalsPanel();
 
@@ -176,6 +180,9 @@ describe("GoalsPanel", () => {
   });
 
   it("uses the profile pay frequency for per-payday guidance in the drawer", async () => {
+    // Per-payday guidance derives from months-until-target, so freeze "now" for a stable value.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-06-15"));
     const user = userEvent.setup();
     renderGoalsPanel({
       snapshot: {

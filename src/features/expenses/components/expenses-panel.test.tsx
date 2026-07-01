@@ -1,6 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { financialSnapshotFixture } from "@/test/fixtures/financial-snapshot";
 import type { Expense } from "@/types/finance";
@@ -36,6 +36,10 @@ function renderExpensesPanel({
 }
 
 describe("ExpensesPanel", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("renders expense summary and editable expense cards", () => {
     renderExpensesPanel();
 
@@ -81,6 +85,9 @@ describe("ExpensesPanel", () => {
   });
 
   it("creates a biweekly recurring expense from the form", async () => {
+    // The due-date picker defaults to the current month, so freeze "now" for a stable date.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-06-15"));
     const user = userEvent.setup();
     const onCreateExpense = vi.fn().mockResolvedValue(undefined);
     renderExpensesPanel({ onCreateExpense });
