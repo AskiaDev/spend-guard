@@ -121,3 +121,98 @@ button, input, select, textarea { font: inherit; }
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ============================================================
+   Editorial Ledger - new brand direction.
+   Tokens live in @theme so they're promotable app-wide; the paper
+   surface + grain stay scoped to .theme-ledger so the dark Vault
+   app keeps its own look untouched.
+   ============================================================ */
+@theme {
+  /* paper surfaces */
+  --color-paper: #f5f0e6;
+  --color-paper-soft: #fbf7ee;
+  --color-paper-muted: #f0eadf;
+
+  /* ink */
+  --color-ink: #0b0d0c;
+  --color-ink-soft: #4f514b;
+  --color-ink-faint: #7b766b;
+  --color-ink-inverse: #f8f5ee;
+
+  /* brand lime - the clarity accent */
+  --color-brand: #b8f20c;        /* bright: only legible on dark cards */
+  --color-brand-soft: #d8ff5f;
+  --color-brand-dark: #6f9e00;   /* deepened so lime stays readable on paper */
+
+  /* dark ledger cards */
+  --color-slate: #0d1110;
+  --color-slate-line: #2a2f2b;
+
+  /* hairlines - the ledger structure */
+  --color-hair: #cfc5b4;
+  --color-hair-strong: #938b7d;
+
+  /* verdict status */
+  --color-positive: #14823b;
+  --color-positive-soft: #dff5e7;
+  --color-warning: #e1a900;
+  --color-warning-soft: #fff3c4;
+  --color-negative: #d94b4b;
+
+  --radius-ledger: 14px;
+}
+
+@theme inline {
+  --font-poster: var(--font-anton);
+  --font-ledger: var(--font-plex);
+  --font-script: var(--font-caveat);
+}
+
+.theme-ledger {
+  background:
+    radial-gradient(circle at 18% 32%, rgba(184, 242, 12, 0.06), transparent 30%),
+    linear-gradient(180deg, #fbf7ee 0%, #f5f0e6 100%);
+  color: var(--color-ink);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* printed-sheet container: subtle dot grain + ledger ruling behind content */
+.ledger-sheet { position: relative; }
+.ledger-sheet > * { position: relative; z-index: 1; }
+.ledger-sheet::before,
+.ledger-sheet::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.ledger-sheet::before {
+  opacity: 0.45;
+  background-image: radial-gradient(rgba(11, 13, 12, 0.13) 0.6px, transparent 0.6px);
+  background-size: 6px 6px;
+}
+.ledger-sheet::after {
+  opacity: 0.6;
+  background:
+    repeating-linear-gradient(90deg, transparent 0, transparent 63px, rgba(11, 13, 12, 0.05) 64px),
+    repeating-linear-gradient(0deg, transparent 0, transparent 63px, rgba(11, 13, 12, 0.04) 64px);
+}
+
+/* brand surfaces */
+.card-paper {
+  background: rgba(251, 247, 238, 0.86);
+  border: 1px solid var(--color-hair);
+  border-radius: var(--radius-ledger);
+  box-shadow: 0 16px 40px rgba(20, 18, 14, 0.06);
+}
+.card-slate {
+  background:
+    radial-gradient(circle at 82% 16%, rgba(184, 242, 12, 0.09), transparent 34%),
+    linear-gradient(135deg, #101412 0%, #090b0a 100%);
+  color: var(--color-ink-inverse);
+  border: 1px solid var(--color-slate-line);
+  border-radius: var(--radius-ledger);
+  box-shadow: 0 18px 50px rgba(10, 10, 8, 0.18);
+}

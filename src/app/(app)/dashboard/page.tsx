@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { DashboardGreetingTitle, DashboardPageContent } from "./_components/page-adapters";
-import { PageFrame } from "./_components/page-frame";
+import { DashboardGreetingTitle, DashboardPageContent } from "../_components/page-adapters";
+import { PageFrame } from "../_components/page-frame";
 
 export const metadata: Metadata = {
   title: "Dashboard | SpendGuard",
